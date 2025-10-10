@@ -1,0 +1,52 @@
+cmake_minimum_required(VERSION 3.10)
+
+# Set vcpkg toolchain file
+if(DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+elseif(EXISTS "D:/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "D:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+endif()
+
+project(vah)
+
+set(CMAKE_CXX_STANDARD 20)
+
+find_package(SDL2 CONFIG REQUIRED)
+find_package(assimp CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(RmlUi CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(Lua REQUIRED)
+find_package(sol2 CONFIG REQUIRED)
+
+find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
+
+add_executable(bb1
+    src/main.cpp
+    src/Logger.cpp
+    src/RmlUi_Renderer_GL3.cpp
+)
+
+target_include_directories(bb1 PRIVATE
+    ${CMAKE_SOURCE_DIR}/external/stb
+    src/
+    ${MINIAUDIO_INCLUDE_DIRS}
+)
+
+target_link_libraries(bb1 PRIVATE
+    SDL2::SDL2
+    SDL2::SDL2main
+    RmlUi::RmlUi
+    RmlUi::Lua
+    OpenGL::GL
+    glm::glm
+    glad::glad
+    spdlog::spdlog
+    ${LUA_LIBRARIES}
+    sol2::sol2
+)
+
+
+ 
