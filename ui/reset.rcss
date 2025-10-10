@@ -1,0 +1,743 @@
+/*
+ * Dark Mode Material Design Foundation
+ * Based on RmlUI RCSS Properties
+ */
+
+/* ============================================
+   Color Palette - Material Dark Theme
+   ============================================ */
+
+/* CSS Variables aren't supported in RmlUI, so we use comments for reference
+   --bg-primary: #121212      (surface)
+   --bg-secondary: #1e1e1e    (elevated surface)
+   --bg-tertiary: #2c2c2c     (high elevation)
+   --text-primary: #e0e0e0    (87% white)
+   --text-secondary: #a0a0a0  (60% white)
+   --text-disabled: #606060   (38% white)
+   --accent: #bb86fc          (purple 200)
+   --primary: #3700b3         (purple)
+   --error: #cf6679           (error)
+   --divider: #373737         (12% white)
+*/
+
+/* ============================================
+   Universal Reset
+   ============================================ */
+
+* {
+    /* Box Model Reset */
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+
+    /* Box Sizing */
+    box-sizing: border-box;
+
+    /* Position */
+    position: relative;
+
+    /* Focus behavior */
+    focus: auto;
+
+    /* Cursor */
+    cursor: auto;
+
+    /* Smooth transitions for interactive states */
+    transition: background-color 0.2s, color 0.15s, opacity 0.2s, transform 0.2s;
+}
+
+/* ============================================
+   Root Elements
+   ============================================ */
+
+body {
+    /* Dark background */
+    background-color: #121212;
+
+    /* Default text styling */
+    color: #e0e0e0;
+    font-family: Roboto;
+    font-size: 14dp;
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1.5;
+
+    /* Full viewport */
+    width: 100%;
+    height: 100%;
+
+    /* No scrollbars by default */
+    overflow: hidden;
+
+    /* Text rendering */
+    text-align: left;
+    white-space: normal;
+    word-break: normal;
+}
+
+html {
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+
+/* Headings - Material Design Type Scale */
+h1 {
+    font-size: 96dp;
+    font-weight: 300;
+    letter-spacing: -1.5px;
+    line-height: 1.167;
+    color: #e0e0e0;
+    margin-bottom: 16dp;
+}
+
+h2 {
+    font-size: 60dp;
+    font-weight: 300;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    color: #e0e0e0;
+    margin-bottom: 14dp;
+}
+
+h3 {
+    font-size: 48dp;
+    font-weight: normal;
+    letter-spacing: 0px;
+    line-height: 1.167;
+    color: #e0e0e0;
+    margin-bottom: 12dp;
+}
+
+h4 {
+    font-size: 34dp;
+    font-weight: normal;
+    letter-spacing: 0.25px;
+    line-height: 1.235;
+    color: #e0e0e0;
+    margin-bottom: 10dp;
+}
+
+h5 {
+    font-size: 24dp;
+    font-weight: normal;
+    letter-spacing: 0px;
+    line-height: 1.334;
+    color: #e0e0e0;
+    margin-bottom: 8dp;
+}
+
+h6 {
+    font-size: 20dp;
+    font-weight: 500;
+    letter-spacing: 0.15px;
+    line-height: 1.6;
+    color: #e0e0e0;
+    margin-bottom: 8dp;
+}
+
+/* Body Text */
+p {
+    font-size: 16dp;
+    font-weight: normal;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+    color: #e0e0e0;
+    margin-bottom: 16dp;
+    display: block;
+}
+
+/* Small Text */
+small {
+    font-size: 12dp;
+    color: #a0a0a0;
+}
+
+/* Strong/Bold */
+strong, b {
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+/* Emphasis/Italic */
+em, i {
+    font-style: italic;
+}
+
+/* Links */
+a {
+    color: #bb86fc;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: #d7b4ff;
+    text-decoration: underline;
+}
+
+a:active {
+    color: #9965f4;
+}
+
+/* Code */
+code {
+    font-family: "Roboto Mono";
+    font-size: 14dp;
+    background-color: #1e1e1e;
+    color: #a0f0a0;
+    padding: 2dp 4dp;
+    border-radius: 3dp;
+}
+
+pre {
+    font-family: "Roboto Mono";
+    font-size: 14dp;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    padding: 16dp;
+    border-radius: 4dp;
+    overflow: auto;
+    white-space: pre;
+    display: block;
+    margin-bottom: 16dp;
+}
+
+/* ============================================
+   Interactive Elements
+   ============================================ */
+
+/* Buttons - Material Design Contained Button */
+button, input[type=submit], input[type=button] {
+    /* Appearance */
+    background-color: #3700b3;
+    color: #ffffff;
+    border-width: 0;
+    border-radius: 4dp;
+
+    /* Typography */
+    font-family: Roboto;
+    font-size: 14dp;
+    font-weight: 500;
+    letter-spacing: 1.25px;
+    text-transform: uppercase;
+    text-align: center;
+
+    /* Layout */
+    padding: 8dp 16dp;
+    min-width: 64dp;
+    min-height: 36dp;
+    display: inline-block;
+
+    /* Interaction */
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+
+    /* Shadow - elevation 2 */
+    box-shadow: rgba(0, 0, 0, 51) 0px 3px 1px -2px,
+                rgba(0, 0, 0, 36) 0px 2px 2px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 5px 0px;
+}
+
+button:hover {
+    background-color: #4a11d3;
+    /* Shadow - elevation 4 */
+    box-shadow: rgba(0, 0, 0, 51) 0px 2px 4px -1px,
+                rgba(0, 0, 0, 36) 0px 4px 5px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 10px 0px;
+}
+
+button:active {
+    background-color: #5b22e3;
+    transform: scale(0.98);
+    /* Shadow - elevation 8 */
+    box-shadow: rgba(0, 0, 0, 51) 0px 5px 5px -3px,
+                rgba(0, 0, 0, 36) 0px 8px 10px 1px,
+                rgba(0, 0, 0, 31) 0px 3px 14px 2px;
+}
+
+button:disabled, input[type=submit]:disabled, input[type=button]:disabled {
+    background-color: #2c2c2c;
+    color: #606060;
+    cursor: auto;
+    box-shadow: none;
+}
+
+/* Text Buttons (modifier class) */
+button.text {
+    background-color: transparent;
+    color: #bb86fc;
+    box-shadow: none;
+}
+
+button.text:hover {
+    background-color: rgba(187, 134, 252, 20);
+}
+
+button.text:active {
+    background-color: rgba(187, 134, 252, 41);
+}
+
+/* Danger Buttons */
+button.danger {
+    background-color: #cf6679;
+}
+
+button.danger:hover {
+    background-color: #df7689;
+}
+
+button.danger:active {
+    background-color: #bf5669;
+}
+
+/* Input Fields - Material Design Filled Text Field */
+input[type=text], input[type=password], input[type=email], input[type=number], textarea {
+    /* Appearance */
+    background-color: #2c2c2c;
+    color: #e0e0e0;
+    border-width: 0 0 2dp 0;
+    border-color: #606060;
+    border-radius: 4dp 4dp 0 0;
+
+    /* Typography */
+    font-family: Roboto;
+    font-size: 16dp;
+    line-height: 1.5;
+
+    /* Layout */
+    padding: 20dp 12dp 8dp 12dp;
+    width: 100%;
+    min-height: 56dp;
+    display: block;
+
+    /* Interaction */
+    transition: border-color 0.2s, background-color 0.2s;
+    caret-color: #bb86fc;
+}
+
+input:hover, textarea:hover {
+    background-color: #373737;
+}
+
+input:focus, textarea:focus {
+    border-color: #bb86fc;
+    background-color: #373737;
+}
+
+/* Select/Dropdown */
+select, dataselect {
+    background-color: #2c2c2c;
+    color: #e0e0e0;
+    border-width: 0;
+    border-radius: 4dp;
+    padding: 12dp;
+    font-family: Roboto;
+    font-size: 16dp;
+    cursor: pointer;
+    min-height: 48dp;
+    width: 100%;
+    display: block;
+}
+
+select:hover, dataselect:hover {
+    background-color: #373737;
+}
+
+/* Range/Slider */
+input[type=range] {
+    background-color: #606060;
+    height: 4dp;
+    border-radius: 2dp;
+    width: 100%;
+    cursor: pointer;
+}
+
+/* Checkboxes and Radio buttons */
+input[type=checkbox], input[type=radio] {
+    width: 18dp;
+    height: 18dp;
+    background-color: transparent;
+    border-width: 2dp;
+    border-color: #a0a0a0;
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+input[type=checkbox] {
+    border-radius: 2dp;
+}
+
+input[type=radio] {
+    border-radius: 9dp;
+}
+
+input[type=checkbox]:checked, input[type=radio]:checked {
+    background-color: #bb86fc;
+    border-color: #bb86fc;
+}
+
+/* Labels */
+label {
+    color: #a0a0a0;
+    font-size: 12dp;
+    font-weight: normal;
+    letter-spacing: 0.4px;
+    display: block;
+    margin-bottom: 4dp;
+}
+
+/* ============================================
+   Layout Elements
+   ============================================ */
+
+/* Dividers */
+hr {
+    height: 1dp;
+    background-color: #373737;
+    border-width: 0;
+    margin: 16dp 0;
+    display: block;
+}
+
+/* Containers */
+div {
+    display: block;
+}
+
+span {
+    display: inline;
+}
+
+/* Sections */
+section, article, aside, header, footer, main, nav {
+    display: block;
+    margin-bottom: 16dp;
+}
+
+/* Lists */
+ul, ol {
+    margin-left: 24dp;
+    margin-bottom: 16dp;
+    color: #e0e0e0;
+    display: block;
+}
+
+li {
+    margin-bottom: 4dp;
+    display: block;
+}
+
+/* Definition Lists */
+dl {
+    margin-bottom: 16dp;
+    display: block;
+}
+
+dt {
+    font-weight: bold;
+    color: #f0f0f0;
+    margin-bottom: 4dp;
+    display: block;
+}
+
+dd {
+    margin-left: 24dp;
+    margin-bottom: 8dp;
+    color: #a0a0a0;
+    display: block;
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+
+table {
+    background-color: #1e1e1e;
+    border-radius: 4dp;
+    width: 100%;
+    display: table;
+    gap: 0;
+    margin-bottom: 16dp;
+}
+
+thead {
+    background-color: #2c2c2c;
+    display: table-row-group;
+}
+
+tbody {
+    display: table-row-group;
+}
+
+tr {
+    display: table-row;
+    border-bottom-width: 1dp;
+    border-bottom-color: #373737;
+}
+
+th {
+    color: #f0f0f0;
+    font-weight: 500;
+    text-align: left;
+    padding: 16dp;
+    display: table-cell;
+}
+
+td {
+    color: #e0e0e0;
+    padding: 16dp;
+    display: table-cell;
+}
+
+tr:hover {
+    background-color: #2c2c2c;
+}
+
+/* ============================================
+   Cards & Panels - Material Design Surface
+   ============================================ */
+
+.card, .panel {
+    background-color: #1e1e1e;
+    border-radius: 4dp;
+    padding: 16dp;
+    margin-bottom: 16dp;
+    display: block;
+
+    /* Elevation 1 */
+    box-shadow: rgba(0, 0, 0, 51) 0px 2px 1px -1px,
+                rgba(0, 0, 0, 36) 0px 1px 1px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 3px 0px;
+}
+
+.card:hover {
+    /* Elevation 2 */
+    box-shadow: rgba(0, 0, 0, 51) 0px 3px 1px -2px,
+                rgba(0, 0, 0, 36) 0px 2px 2px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 5px 0px;
+}
+
+/* ============================================
+   Progress Elements
+   ============================================ */
+
+progress, progressbar {
+    background-color: #2c2c2c;
+    height: 4dp;
+    border-radius: 2dp;
+    width: 100%;
+    display: block;
+    overflow: hidden;
+}
+
+progressbar fill {
+    background-color: #bb86fc;
+    height: 100%;
+}
+
+/* ============================================
+   Scrollbars
+   ============================================ */
+
+scrollbarvertical {
+    width: 12dp;
+    background-color: #1e1e1e;
+}
+
+scrollbarhorizontal {
+    height: 12dp;
+    background-color: #1e1e1e;
+}
+
+scrollbarvertical sliderbar,
+scrollbarhorizontal sliderbar {
+    background-color: #606060;
+    border-radius: 6dp;
+    min-height: 48dp;
+    min-width: 48dp;
+}
+
+scrollbarvertical sliderbar:hover,
+scrollbarhorizontal sliderbar:hover {
+    background-color: #808080;
+}
+
+scrollbarvertical sliderbar:active,
+scrollbarhorizontal sliderbar:active {
+    background-color: #a0a0a0;
+}
+
+/* Scrollbar buttons */
+scrollbarvertical sliderarrowdec,
+scrollbarvertical sliderarrowinc,
+scrollbarhorizontal sliderarrowdec,
+scrollbarhorizontal sliderarrowinc {
+    display: none;
+}
+
+/* ============================================
+   Images & Media
+   ============================================ */
+
+img {
+    display: inline-block;
+    max-width: 100%;
+    height: auto;
+    image-color: white;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+/* Text Alignment */
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Text Colors */
+.text-primary { color: #e0e0e0; }
+.text-secondary { color: #a0a0a0; }
+.text-disabled { color: #606060; }
+.text-accent { color: #bb86fc; }
+.text-error { color: #cf6679; }
+.text-success { color: #4caf50; }
+.text-warning { color: #ff9800; }
+
+/* Display */
+.hidden { display: none; }
+.block { display: block; }
+.inline { display: inline; }
+.inline-block { display: inline-block; }
+.flex { display: flex; }
+
+/* Spacing */
+.m-0 { margin: 0; }
+.m-1 { margin: 8dp; }
+.m-2 { margin: 16dp; }
+.m-3 { margin: 24dp; }
+.m-4 { margin: 32dp; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: 8dp; }
+.p-2 { padding: 16dp; }
+.p-3 { padding: 24dp; }
+.p-4 { padding: 32dp; }
+
+/* Elevation (Material Design shadows) */
+.elevation-0 { box-shadow: none; }
+
+.elevation-1 {
+    box-shadow: rgba(0, 0, 0, 51) 0px 2px 1px -1px,
+                rgba(0, 0, 0, 36) 0px 1px 1px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 3px 0px;
+}
+
+.elevation-2 {
+    box-shadow: rgba(0, 0, 0, 51) 0px 3px 1px -2px,
+                rgba(0, 0, 0, 36) 0px 2px 2px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 5px 0px;
+}
+
+.elevation-3 {
+    box-shadow: rgba(0, 0, 0, 51) 0px 3px 3px -2px,
+                rgba(0, 0, 0, 36) 0px 3px 4px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 8px 0px;
+}
+
+.elevation-4 {
+    box-shadow: rgba(0, 0, 0, 51) 0px 2px 4px -1px,
+                rgba(0, 0, 0, 36) 0px 4px 5px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 10px 0px;
+}
+
+/* Backgrounds */
+.bg-primary { background-color: #121212; }
+.bg-secondary { background-color: #1e1e1e; }
+.bg-tertiary { background-color: #2c2c2c; }
+.bg-accent { background-color: #bb86fc; }
+.bg-error { background-color: #cf6679; }
+.bg-transparent { background-color: transparent; }
+
+/* Borders */
+.border-none { border-width: 0; }
+.border { border-width: 1dp; border-color: #373737; }
+.border-top { border-top-width: 1dp; border-top-color: #373737; }
+.border-right { border-right-width: 1dp; border-right-color: #373737; }
+.border-bottom { border-bottom-width: 1dp; border-bottom-color: #373737; }
+.border-left { border-left-width: 1dp; border-left-color: #373737; }
+
+/* Border Radius */
+.rounded-none { border-radius: 0; }
+.rounded { border-radius: 4dp; }
+.rounded-lg { border-radius: 8dp; }
+.rounded-full { border-radius: 9999dp; }
+
+/* Opacity */
+.opacity-0 { opacity: 0; }
+.opacity-25 { opacity: 0.25; }
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+.opacity-100 { opacity: 1; }
+
+/* Cursor */
+.cursor-auto { cursor: auto; }
+.cursor-pointer { cursor: pointer; }
+
+/* Overflow */
+.overflow-auto { overflow: auto; }
+.overflow-hidden { overflow: hidden; }
+.overflow-scroll { overflow: scroll; }
+.overflow-visible { overflow: visible; }
+
+/* Position */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.static { position: static; }
+
+/* Z-Index Layers */
+.z-0 { z-index: 0; }
+.z-10 { z-index: 10; }
+.z-20 { z-index: 20; }
+.z-30 { z-index: 30; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+.z-max { z-index: 9999; }
+
+/* Width & Height */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.w-auto { width: auto; }
+.h-auto { height: auto; }
+
+/* Flexbox Utilities */
+.flex-row { flex-direction: row; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
+.justify-start { justify-content: flex-start; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.justify-between { justify-content: space-between; }
+.justify-around { justify-content: space-around; }
+.items-start { align-items: flex-start; }
+.items-center { align-items: center; }
+.items-end { align-items: flex-end; }
+.items-stretch { align-items: stretch; }
+.flex-1 { flex: 1 1 0; }
+.flex-auto { flex: 1 1 auto; }
+.flex-none { flex: none; }
+
+/* Gap for Flexbox and Tables */
+.gap-0 { gap: 0; }
+.gap-1 { gap: 8dp; }
+.gap-2 { gap: 16dp; }
+.gap-3 { gap: 24dp; }
+.gap-4 { gap: 32dp; }
