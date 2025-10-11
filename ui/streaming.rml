@@ -3,12 +3,21 @@
     <title>Streaming Data Demo</title>
     <link type="text/rcss" href="reset.rcss"/>
     <style>
+        html {
+            width: 100%;
+            height: 100%;
+        }
+
         body {
             font-family: Roboto;
             font-size: 14px;
             color: #cdd6f4;
             background: #1e1e2e;
+            width: 100%;
+            height: 100%;
             padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
         }
 
         .header {
@@ -29,25 +38,36 @@
 
         .container {
             display: block;
-            max-width: 1200px;
+            width: 100%;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         .grid {
-            display: block;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
             margin-bottom: 20px;
-            text-align: center;
         }
 
         .card {
-            display: inline-block;
-            width: 280px;
+            display: block;
+            flex: 1 1 280px;
+            min-width: 250px;
+            max-width: 400px;
             background: #313244;
             padding: 20px;
-            margin: 10px;
             border-radius: 8px;
             border: 2px #45475a;
-            vertical-align: top;
+        }
+
+        .card.wide {
+            display: block;
+            width: auto;
+            flex: none;
+            max-width: none;
         }
 
         .card-title {
@@ -126,7 +146,7 @@
         }
 
         .bar-container {
-            background: #181825;
+            background-color: #181825;
             height: 30px;
             border-radius: 4px;
             overflow: hidden;
@@ -134,8 +154,10 @@
         }
 
         .bar-fill {
-            background: #89b4fa;
+            background-color: #89b4fa;
+            decorator: linear-gradient(to right, #89b4fa, #74c7ec);
             height: 100%;
+            border-radius: 2px;
         }
 
         /* Scrollbar styling */
@@ -199,21 +221,21 @@
                 <div class="metric">
                     <div class="metric-label">CPU Load</div>
                     <div id="cpu_value" class="metric-value">0%</div>
-                    <div class="bar-container">
-                        <div id="cpu_bar" class="bar-fill" style="width: 0%;"></div>
+                    <div id="cpu_bar" class="bar-container">
+                        <div class="bar-fill" style="width: 0%;"></div>
                     </div>
                 </div>
                 <div class="metric" style="margin-top: 20px;">
                     <div class="metric-label">Memory</div>
                     <div id="mem_value" class="metric-value">0%</div>
-                    <div class="bar-container">
-                        <div id="mem_bar" class="bar-fill" style="width: 0%;"></div>
+                    <div id="mem_bar" class="bar-container">
+                        <div class="bar-fill" style="width: 0%;"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="width: 1160px; display: block;">
+        <div class="card wide">
             <div class="card-title">Event Log</div>
             <div id="event_log" class="event-log">
                 <div class="event-entry">
