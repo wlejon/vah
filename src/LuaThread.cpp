@@ -100,6 +100,34 @@ void LuaThread::CallLoadHook(const sol::object& data) {
     }
 }
 
+void LuaThread::LoadFromLuaFile(const std::string& file_path) {
+    if (!lua_) {
+        LOG_ERROR("LuaThread {}: Cannot load from file, lua state not initialized", id_);
+        return;
+    }
+
+    try {
+        // Execute the Lua file to get the data
+        auto result = lua_->safe_script_file(file_path);
+
+        if (!result.valid()) {
+            sol::error err = result;
+            LOG_ERROR("LuaThread {}: Error loading save file '{}': {}", id_, file_path, err.what());
+            return;
+        }
+
+        // The file should return a table
+        sol::object data = result;
+
+        // Call the load hook with the data
+        CallLoadHook(data);
+
+        LOG_DEBUG("LuaThread {}: Loaded save data from '{}'", id_, file_path);
+    } catch (const std::exception& e) {
+        LOG_ERROR("LuaThread {}: Error loading from file '{}': {}", id_, file_path, e.what());
+    }
+}
+
 void LuaThread::ProcessResponses() {
     if (!lua_) return;
 

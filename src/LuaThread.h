@@ -42,6 +42,7 @@ public:
     // Save/Load hooks
     sol::object CallSaveHook();
     void CallLoadHook(const sol::object& data);
+    void LoadFromLuaFile(const std::string& file_path);
 
     // Getters
     int GetId() const { return id_; }

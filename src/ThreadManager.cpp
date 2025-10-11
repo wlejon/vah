@@ -5,6 +5,125 @@
 #include "InputState.h"
 #include "Logger.h"
 #include <fstream>
+#include <sstream>
+
+namespace {
+    // Escape a string for Lua (handle quotes and special characters)
+    std::string EscapeLuaString(const std::string& str) {
+        std::string result;
+        for (char c : str) {
+            if (c == '"' || c == '\\') {
+                result += '\\';
+            }
+            result += c;
+        }
+        return result;
+    }
+
+    // Convert sol::object to Lua code
+    void SerializeLuaValue(std::ostream& out, const sol::object& obj, int indent_level = 0) {
+        std::string indent(indent_level * 2, ' ');
+
+        if (!obj.valid() || obj.is<sol::nil_t>()) {
+            out << "nil";
+            return;
+        }
+
+        sol::type obj_type = obj.get_type();
+
+        switch (obj_type) {
+            case sol::type::boolean:
+                out << (obj.as<bool>() ? "true" : "false");
+                break;
+
+            case sol::type::number:
+                // Try int first for cleaner output
+                if (obj.is<int>()) {
+                    out << obj.as<int>();
+                } else {
+                    out << obj.as<double>();
+                }
+                break;
+
+            case sol::type::string:
+                out << '"' << EscapeLuaString(obj.as<std::string>()) << '"';
+                break;
+
+            case sol::type::table: {
+                sol::table tbl = obj.as<sol::table>();
+
+                // Check if it's an array (consecutive integer keys starting from 1)
+                bool is_array = true;
+                size_t expected_index = 1;
+                size_t count = 0;
+
+                for (const auto& [key, value] : tbl) {
+                    count++;
+                    if (!key.is<int>() || key.as<int>() != static_cast<int>(expected_index)) {
+                        is_array = false;
+                        break;
+                    }
+                    expected_index++;
+                }
+
+                out << "{";
+
+                if (count > 0) {
+                    out << "\n";
+
+                    if (is_array) {
+                        // Array-style
+                        for (const auto& [key, value] : tbl) {
+                            out << indent << "  ";
+                            SerializeLuaValue(out, value, indent_level + 1);
+                            out << ",\n";
+                        }
+                    } else {
+                        // Object/map style
+                        for (const auto& [key, value] : tbl) {
+                            out << indent << "  ";
+
+                            // Write key
+                            if (key.is<std::string>()) {
+                                std::string key_str = key.as<std::string>();
+                                // Check if key is a valid Lua identifier
+                                bool is_identifier = !key_str.empty() &&
+                                    (std::isalpha(key_str[0]) || key_str[0] == '_');
+                                for (size_t i = 1; i < key_str.size() && is_identifier; ++i) {
+                                    is_identifier = std::isalnum(key_str[i]) || key_str[i] == '_';
+                                }
+
+                                if (is_identifier) {
+                                    out << key_str << " = ";
+                                } else {
+                                    out << "[\"" << EscapeLuaString(key_str) << "\"] = ";
+                                }
+                            } else if (key.is<int>()) {
+                                out << "[" << key.as<int>() << "] = ";
+                            } else {
+                                continue; // Skip unsupported key types
+                            }
+
+                            // Write value
+                            SerializeLuaValue(out, value, indent_level + 1);
+                            out << ",\n";
+                        }
+                    }
+
+                    out << indent;
+                }
+
+                out << "}";
+                break;
+            }
+
+            default:
+                // Unsupported types (functions, userdata, etc.) -> nil
+                out << "nil";
+                break;
+        }
+    }
+}
 
 ThreadManager::ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock)
     : next_thread_id_(1)
@@ -226,12 +345,25 @@ void ThreadManager::SaveThread(int thread_id, const std::string& save_path) {
             thread->Pause();
         }
 
-        // Call lua save hook
-        sol::object save_data = thread->CallSaveHook();
+        try {
+            // Call lua save hook
+            sol::object save_data = thread->CallSaveHook();
 
-        // TODO: Serialize save_data to file at save_path
-        // For now, just log
-        LOG_INFO("ThreadManager: Saved thread {} to '{}'", thread_id, save_path);
+            // Write to file as Lua code
+            std::ofstream file(save_path);
+            if (!file.is_open()) {
+                LOG_ERROR("ThreadManager: Failed to open file '{}' for writing", save_path);
+            } else {
+                file << "-- Thread " << thread_id << " save data\n";
+                file << "return ";
+                SerializeLuaValue(file, save_data);
+                file << "\n";
+                file.close();
+                LOG_INFO("ThreadManager: Saved thread {} to '{}'", thread_id, save_path);
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR("ThreadManager: Error saving thread {}: {}", thread_id, e.what());
+        }
 
         // Resume if it was running
         if (was_running) {
@@ -243,12 +375,14 @@ void ThreadManager::SaveThread(int thread_id, const std::string& save_path) {
 void ThreadManager::LoadThread(int thread_id, const std::string& load_path) {
     LuaThread* thread = GetThread(thread_id);
     if (thread != nullptr) {
-        // TODO: Deserialize save_data from file at load_path
-        // For now, just log
-        LOG_INFO("ThreadManager: Loaded thread {} from '{}'", thread_id, load_path);
+        try {
+            // Load into thread (will execute Lua file and call load hook)
+            thread->LoadFromLuaFile(load_path);
 
-        // Call lua load hook with deserialized data
-        // thread->CallLoadHook(save_data);
+            LOG_INFO("ThreadManager: Loaded thread {} from '{}'", thread_id, load_path);
+        } catch (const std::exception& e) {
+            LOG_ERROR("ThreadManager: Error loading thread {}: {}", thread_id, e.what());
+        }
     }
 }
 
