@@ -53,6 +53,11 @@ namespace Commands {
         std::string document_path;
         bool show = true;
     };
+
+    struct SetElementText {
+        std::string element_id;
+        std::string text;
+    };
 }
 
 // Variant holding all possible command types
@@ -64,7 +69,8 @@ using Command = std::variant<
     Commands::SaveThread,
     Commands::Print,
     Commands::SendResponse,
-    Commands::LoadUIDocument
+    Commands::LoadUIDocument,
+    Commands::SetElementText
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

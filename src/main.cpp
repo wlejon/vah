@@ -9,6 +9,7 @@
 
 #include "Logger.h"
 #include "RmlUi_Renderer_GL3.h"
+#include "RmlUiSystemInterface.h"
 #include "CommandQueue.h"
 #include "ResponseQueue.h"
 #include "Seqlock.h"
@@ -77,7 +78,11 @@ public:
             return false;
         }
 
+        // Initialize RmlUI system interface (for logging and time)
+        rml_system_interface_ = std::make_unique<RmlUiSystemInterface>();
+
         Rml::SetRenderInterface(rml_renderer_.get());
+        Rml::SetSystemInterface(rml_system_interface_.get());
 
         if (!Rml::Initialise()) {
             LOG_ERROR("Failed to initialize RmlUI");
@@ -162,6 +167,7 @@ public:
 
         Rml::Shutdown();
 
+        rml_system_interface_.reset();
         rml_renderer_.reset();
         RmlGL3::Shutdown();
 
@@ -346,6 +352,21 @@ private:
                         LOG_WARN("Failed to load UI document: {}", command.document_path);
                     }
                 }
+                else if constexpr (std::is_same_v<T, Commands::SetElementText>) {
+                    if (rml_context_) {
+                        // Search all documents for the element
+                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
+                            auto doc = rml_context_->GetDocument(i);
+                            if (doc) {
+                                auto element = doc->GetElementById(command.element_id.c_str());
+                                if (element) {
+                                    element->SetInnerRML(command.text.c_str());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
 
             }, cmd);
         });
@@ -381,6 +402,7 @@ private:
     SDL_GLContext gl_context_ = nullptr;
 
     std::unique_ptr<RenderInterface_GL3> rml_renderer_;
+    std::unique_ptr<RmlUiSystemInterface> rml_system_interface_;
     Rml::Context* rml_context_ = nullptr;
 
     std::unique_ptr<CommandQueue> command_queue_;

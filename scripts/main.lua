@@ -4,12 +4,18 @@
 function startup()
     print("Main Lua thread started")
 
-    -- Request main thread to load and show the UI document
-    ui.load_document("ui/main.rml")
+    -- Load the streaming data demo UI
+    ui.load_document("ui/streaming.rml")
+
+    -- Spawn the data stream thread to continuously generate data
+    command.spawn_thread("scripts/data_stream.lua")
+
+    print("Streaming data demo initialized")
 end
 
 function update(dt)
     -- Called at 30hz
+    -- Main coordination happens here if needed
 end
 
 function shutdown()

@@ -174,7 +174,7 @@ void LuaThread::ThreadMain() {
         // Create lua state for this thread
         lua_ = std::make_unique<sol::state>();
         lua_->open_libraries(sol::lib::base, sol::lib::package, sol::lib::math,
-                            sol::lib::string, sol::lib::table);
+                            sol::lib::string, sol::lib::table, sol::lib::os);
 
         // Setup bindings
         SetupLuaBindings();
@@ -335,6 +335,13 @@ void LuaThread::SetupLuaBindings() {
         cmd.show = show.value_or(true);
         command_queue_->Push(std::move(cmd));
         LOG_DEBUG("Lua thread {} queued LoadUIDocument: {}", id_, path);
+    };
+
+    ui_table["set_element_text"] = [this](const std::string& element_id, const std::string& text) {
+        Commands::SetElementText cmd;
+        cmd.element_id = element_id;
+        cmd.text = text;
+        command_queue_->Push(std::move(cmd));
     };
 
     (*lua_)["ui"] = ui_table;

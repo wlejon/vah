@@ -1,0 +1,204 @@
+<rml>
+<head>
+    <title>Streaming Data Demo</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <style>
+        body {
+            font-family: Roboto;
+            font-size: 14px;
+            color: #cdd6f4;
+            background: #1e1e2e;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #89b4fa;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #6c7086;
+        }
+
+        .container {
+            display: block;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .grid {
+            display: block;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            display: inline-block;
+            width: 280px;
+            background: #313244;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 8px;
+            vertical-align: top;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #f5c2e7;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric {
+            margin-bottom: 12px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #6c7086;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #94e2d5;
+        }
+
+        .data-row {
+            background: #45475a;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            font-family: Roboto;
+            font-size: 12px;
+        }
+
+        .event-log {
+            background: #181825;
+            padding: 15px;
+            border-radius: 6px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: Roboto;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .event-entry {
+            color: #a6adc8;
+            margin-bottom: 4px;
+        }
+
+        .event-timestamp {
+            color: #6c7086;
+            font-family: Roboto;
+        }
+
+        .event-type {
+            color: #f9e2af;
+            font-weight: bold;
+            font-family: Roboto;
+        }
+
+        .status-good {
+            color: #a6e3a1;
+        }
+
+        .status-warn {
+            color: #f9e2af;
+        }
+
+        .status-error {
+            color: #f38ba8;
+        }
+
+        .bar-container {
+            background: #181825;
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .bar-fill {
+            decorator: linear-gradient(90deg, #89b4fa, #74c7ec);
+            height: 100%;
+            transition: width 0.3s cubic-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Real-time Streaming Data</h1>
+            <p class="subtitle">Continuous async data generation and visualization</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">System Metrics</div>
+                <div class="metric">
+                    <div class="metric-label">Active Threads</div>
+                    <div class="metric-value" id="metric_threads">0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Messages/sec</div>
+                    <div class="metric-value" id="metric_rate">0</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Total Processed</div>
+                    <div class="metric-value" id="metric_total">0</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Live Data Stream</div>
+                <div id="data_stream">
+                    <div class="data-row">Waiting for data...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Resource Usage</div>
+                <div class="metric">
+                    <div class="metric-label">CPU Load</div>
+                    <div id="cpu_value" class="metric-value">0%</div>
+                    <div class="bar-container">
+                        <div id="cpu_bar" class="bar-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div class="metric" style="margin-top: 20px;">
+                    <div class="metric-label">Memory</div>
+                    <div id="mem_value" class="metric-value">0%</div>
+                    <div class="bar-container">
+                        <div id="mem_bar" class="bar-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="width: 1160px;">
+            <div class="card-title">Event Log</div>
+            <div id="event_log" class="event-log">
+                <div class="event-entry">
+                    <span class="event-timestamp">[00:00:00]</span>
+                    <span class="event-type">SYSTEM</span>
+                    <span>Streaming data demo initialized</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>

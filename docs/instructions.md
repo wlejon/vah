@@ -4,8 +4,10 @@ we are building vah. this is a foundation to build manufold, a data organization
 
 ## important documents to read
 
-[idea](idea.md)
-[manufold-client.md](manufold-client.md)
+please read these documents first:
+
+- [idea](idea.md)
+- [manufold-client.md](manufold-client.md)
 
 ## notes
 - avoid using bash for project exploration, use the built in tools you have instead.
@@ -24,5 +26,5 @@ we are building vah. this is a foundation to build manufold, a data organization
 ## current task
 this task is small enough that you should not use subagents.
 
-
+the main visual purpose of this application will be to realtime populate a view within streaming data async. let's create a scenario for this to operate in lua scripts. please create a lua script that continously creates data of a varied kind that fits a format we're displaying. have this continously generated data represented in a high level view of the data in the UI. this will help us iron out imporant bugs and any memory leaks we may have. this will serve the purpose of demonstrating one facet of the visualizations we can provide. this will help solidify the threading architecture we're following. 
 
