@@ -559,8 +559,8 @@ scrollbarvertical sliderbar,
 scrollbarhorizontal sliderbar {
     background-color: #606060;
     border-radius: 6dp;
-    min-height: 48dp;
-    min-width: 48dp;
+    min-height: 4dp;
+    min-width: 4dp;
 }
 
 scrollbarvertical sliderbar:hover,

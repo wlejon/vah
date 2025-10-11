@@ -26,5 +26,10 @@ please read these documents first:
 ## current task
 this task is small enough that you should not use subagents.
 
-the main visual purpose of this application will be to realtime populate a view within streaming data async. let's create a scenario for this to operate in lua scripts. please create a lua script that continously creates data of a varied kind that fits a format we're displaying. have this continously generated data represented in a high level view of the data in the UI. this will help us iron out imporant bugs and any memory leaks we may have. this will serve the purpose of demonstrating one facet of the visualizations we can provide. this will help solidify the threading architecture we're following. 
+we're having issues with how the scrollbar renders on streaming.rml. i need you to read the documentation for how scrollbars are used and also read the code for how it's rendered. 
+
+D:/projects/RmlUi
+D:/projects/RmlUiDoc
+
+please explore these two folders to figure out exactly how you're meant to use the scrollbar and then compare to how we're using it. our current implementation, as a whole, is incorrect and the scrollbar renders comically large. adjusting the size in css has had no impact. 
 

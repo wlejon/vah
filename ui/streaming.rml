@@ -36,6 +36,7 @@
         .grid {
             display: block;
             margin-bottom: 20px;
+            text-align: center;
         }
 
         .card {
@@ -45,8 +46,8 @@
             padding: 20px;
             margin: 10px;
             border-radius: 8px;
+            border: 2px #45475a;
             vertical-align: top;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
         .card-title {
@@ -133,9 +134,32 @@
         }
 
         .bar-fill {
-            decorator: linear-gradient(90deg, #89b4fa, #74c7ec);
+            background: #89b4fa;
             height: 100%;
-            transition: width 0.3s cubic-in-out;
+        }
+
+        /* Scrollbar styling */
+        scrollbarvertical {
+            width: 8px;
+        }
+
+        scrollbarvertical slidertrack {
+            width: 8px;
+            background: transparent;
+        }
+
+        scrollbarvertical sliderbar {
+            width: 6px;
+            margin-left: 1px;
+            background: #6c7086;
+            border-radius: 3px;
+            min-height: 30px;
+        }
+
+        scrollbarvertical sliderarrowdec,
+        scrollbarvertical sliderarrowinc {
+            width: 0px;
+            height: 0px;
         }
     </style>
 </head>
@@ -189,7 +213,7 @@
             </div>
         </div>
 
-        <div class="card" style="width: 1160px;">
+        <div class="card" style="width: 1160px; display: block;">
             <div class="card-title">Event Log</div>
             <div id="event_log" class="event-log">
                 <div class="event-entry">
