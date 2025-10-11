@@ -18,6 +18,14 @@ we are working in vah. this is a foundation for supporting the manufold data org
 - do not create simplifications. you are the primary programmer. complete the effort properly.
 - go into c++ as needed. don't be shy.
 
+## RmlUi
+
+the application uses RmlUi for the UI. It does supports a subset of CSS3.
+
+for assistance, please read the code directly or the documentation. they can be found in these directories:
+- D:/projects/RmlUi
+- D:/projects/RmlUiDoc
+
 ## current task
 
 the current task given to you is the only thing you should work on. do not create additional documentation/documents, tests, or examples. this excess causes confusion in the codebase, especially with other coding agents. keep it clean.
