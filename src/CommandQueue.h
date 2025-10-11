@@ -52,11 +52,42 @@ namespace Commands {
     struct LoadUIDocument {
         std::string document_path;
         bool show = true;
+        std::string document_id;  // Optional ID to reference this document later
+    };
+
+    struct ShowUIDocument {
+        std::string document_id;
+    };
+
+    struct HideUIDocument {
+        std::string document_id;
     };
 
     struct SetElementText {
         std::string element_id;
         std::string text;
+    };
+
+    struct SetElementAttribute {
+        std::string element_id;
+        std::string attribute_name;
+        std::string value;
+    };
+
+    struct SetElementStyle {
+        std::string element_id;
+        std::string property;
+        std::string value;
+    };
+
+    struct AddElementClass {
+        std::string element_id;
+        std::string class_name;
+    };
+
+    struct RemoveElementClass {
+        std::string element_id;
+        std::string class_name;
     };
 }
 
@@ -70,7 +101,13 @@ using Command = std::variant<
     Commands::Print,
     Commands::SendResponse,
     Commands::LoadUIDocument,
-    Commands::SetElementText
+    Commands::ShowUIDocument,
+    Commands::HideUIDocument,
+    Commands::SetElementText,
+    Commands::SetElementAttribute,
+    Commands::SetElementStyle,
+    Commands::AddElementClass,
+    Commands::RemoveElementClass
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

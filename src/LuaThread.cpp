@@ -329,18 +329,61 @@ void LuaThread::SetupLuaBindings() {
     // Bind UI operations
     auto ui_table = lua_->create_table();
 
-    ui_table["load_document"] = [this](const std::string& path, sol::optional<bool> show) {
+    ui_table["load_document"] = [this](const std::string& path, sol::optional<bool> show, sol::optional<std::string> doc_id) {
         Commands::LoadUIDocument cmd;
         cmd.document_path = path;
         cmd.show = show.value_or(true);
+        cmd.document_id = doc_id.value_or("");
         command_queue_->Push(std::move(cmd));
         LOG_DEBUG("Lua thread {} queued LoadUIDocument: {}", id_, path);
+    };
+
+    ui_table["show_document"] = [this](const std::string& doc_id) {
+        Commands::ShowUIDocument cmd;
+        cmd.document_id = doc_id;
+        command_queue_->Push(std::move(cmd));
+    };
+
+    ui_table["hide_document"] = [this](const std::string& doc_id) {
+        Commands::HideUIDocument cmd;
+        cmd.document_id = doc_id;
+        command_queue_->Push(std::move(cmd));
     };
 
     ui_table["set_element_text"] = [this](const std::string& element_id, const std::string& text) {
         Commands::SetElementText cmd;
         cmd.element_id = element_id;
         cmd.text = text;
+        command_queue_->Push(std::move(cmd));
+    };
+
+    ui_table["set_element_attribute"] = [this](const std::string& element_id, const std::string& attribute_name, const std::string& value) {
+        Commands::SetElementAttribute cmd;
+        cmd.element_id = element_id;
+        cmd.attribute_name = attribute_name;
+        cmd.value = value;
+        command_queue_->Push(std::move(cmd));
+    };
+
+    ui_table["set_element_style"] = [this](const std::string& element_id, const std::string& property, const std::string& value) {
+        Commands::SetElementStyle cmd;
+        cmd.element_id = element_id;
+        cmd.property = property;
+        cmd.value = value;
+        command_queue_->Push(std::move(cmd));
+    };
+
+    ui_table["add_element_class"] = [this](const std::string& element_id, const std::string& class_name) {
+        Commands::AddElementClass cmd;
+        cmd.element_id = element_id;
+        cmd.class_name = class_name;
+        command_queue_->Push(std::move(cmd));
+    };
+
+    ui_table["remove_element_class"] = [this](const std::string& element_id, const std::string& class_name) {
+        Commands::RemoveElementClass cmd;
+        cmd.element_id = element_id;
+        cmd.class_name = class_name;
         command_queue_->Push(std::move(cmd));
     };
 

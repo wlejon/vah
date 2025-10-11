@@ -2,7 +2,7 @@
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Lua.h>
-#include <sol/sol.hpp>
+#include <string>
 #include "Seqlock.h"
 #include "InputState.h"
 
@@ -12,7 +12,7 @@ public:
     ~RmlUiBridge() = default;
 
     // Setup lua bindings in RmlUI's lua state
-    void SetupLuaBindings(lua_State* L);
+    void SetupLuaBindings(lua_State* L, Rml::Context* context);
 
     // Add a UI event to the input state
     void TriggerEvent(const std::string& event_name, const PayloadMap& payload);

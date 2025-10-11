@@ -34,7 +34,4 @@ for assistance, please read the code directly or the documentation. they can be 
 ## current task
 this task is small enough that you should not use subagents.
 
-we want to have complex UI components that we can feed data into for the purpose of displaying various types of data in an organized way. i want some standard components paired with data generators for them. i want a main UI that allows me to explore these various components and return to it. 
-
-we'll need to expose more rmlui functionality in c++ in order to build it in lua, i believe. please review what we have and figure out what we need. i want 5 initial data views. think about the most common ways we look at data and create UIs for those use cases. 
 

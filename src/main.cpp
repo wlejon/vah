@@ -127,9 +127,14 @@ public:
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get());
 
-        // Setup RmlUI lua bindings
+        // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
-        rmlui_bridge_->SetupLuaBindings(rml_lua);
+
+        // Store context in Lua registry for data model creation
+        lua_pushlightuserdata(rml_lua, rml_context_);
+        lua_setfield(rml_lua, LUA_REGISTRYINDEX, "rmlui_context");
+
+        rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_);
 
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");
@@ -296,7 +301,12 @@ private:
             }
         }
 
+        auto state_after_events = input_seqlock_->Read();
+        current_state.ui_events = state_after_events.ui_events;
+
         // Write updated input state to seqlock
+        input_seqlock_->Write(current_state);
+        current_state.ui_events.clear();
         input_seqlock_->Write(current_state);
     }
 
@@ -344,12 +354,38 @@ private:
                     LOG_INFO("Processing LoadUIDocument command: {}", command.document_path);
                     auto doc = rml_context_->LoadDocument(command.document_path.c_str());
                     if (doc) {
+                        // Store document if ID provided
+                        if (!command.document_id.empty()) {
+                            loaded_documents_[command.document_id] = doc;
+                            LOG_INFO("Stored document with ID: {}", command.document_id);
+                        }
+
                         if (command.show) {
                             doc->Show();
+                        } else {
+                            doc->Hide();
                         }
                         LOG_INFO("Loaded UI document: {}", command.document_path);
                     } else {
                         LOG_WARN("Failed to load UI document: {}", command.document_path);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::ShowUIDocument>) {
+                    auto it = loaded_documents_.find(command.document_id);
+                    if (it != loaded_documents_.end()) {
+                        it->second->Show();
+                        LOG_INFO("Showing document: {}", command.document_id);
+                    } else {
+                        LOG_WARN("Document not found: {}", command.document_id);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::HideUIDocument>) {
+                    auto it = loaded_documents_.find(command.document_id);
+                    if (it != loaded_documents_.end()) {
+                        it->second->Hide();
+                        LOG_INFO("Hiding document: {}", command.document_id);
+                    } else {
+                        LOG_WARN("Document not found: {}", command.document_id);
                     }
                 }
                 else if constexpr (std::is_same_v<T, Commands::SetElementText>) {
@@ -361,6 +397,62 @@ private:
                                 auto element = doc->GetElementById(command.element_id.c_str());
                                 if (element) {
                                     element->SetInnerRML(command.text.c_str());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::SetElementAttribute>) {
+                    if (rml_context_) {
+                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
+                            auto doc = rml_context_->GetDocument(i);
+                            if (doc) {
+                                auto element = doc->GetElementById(command.element_id.c_str());
+                                if (element) {
+                                    element->SetAttribute(command.attribute_name.c_str(), command.value.c_str());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::SetElementStyle>) {
+                    if (rml_context_) {
+                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
+                            auto doc = rml_context_->GetDocument(i);
+                            if (doc) {
+                                auto element = doc->GetElementById(command.element_id.c_str());
+                                if (element) {
+                                    element->SetProperty(command.property.c_str(), command.value.c_str());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::AddElementClass>) {
+                    if (rml_context_) {
+                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
+                            auto doc = rml_context_->GetDocument(i);
+                            if (doc) {
+                                auto element = doc->GetElementById(command.element_id.c_str());
+                                if (element) {
+                                    element->SetClass(command.class_name.c_str(), true);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::RemoveElementClass>) {
+                    if (rml_context_) {
+                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
+                            auto doc = rml_context_->GetDocument(i);
+                            if (doc) {
+                                auto element = doc->GetElementById(command.element_id.c_str());
+                                if (element) {
+                                    element->SetClass(command.class_name.c_str(), false);
                                     break;
                                 }
                             }
@@ -409,6 +501,9 @@ private:
     std::unique_ptr<Seqlock<InputState>> input_seqlock_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
+
+    // Track loaded documents by ID
+    std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
 };
 
 int main(int argc, char* argv[]) {

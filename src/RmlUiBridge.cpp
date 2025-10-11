@@ -1,5 +1,7 @@
 #include "RmlUiBridge.h"
 #include "Logger.h"
+#include <RmlUi/Lua/Utilities.h>
+#include <RmlUi/Lua/Interpreter.h>
 
 namespace {
     // Global reference to the bridge for lua callback
@@ -54,12 +56,17 @@ RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock)
     g_bridge = this;
 }
 
-void RmlUiBridge::SetupLuaBindings(lua_State* L) {
+void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
     // Register the trigger function globally in RmlUI's lua state
     lua_pushcfunction(L, lua_trigger);
     lua_setglobal(L, "trigger");
 
-    LOG_INFO("RmlUiBridge: Registered trigger() function in RmlUI lua state");
+    // Expose the context as a global for RML inline scripts to use
+    // Use RmlUI's Lua type system to push it properly
+    Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
+    lua_setglobal(L, "rmlui_context");
+
+    LOG_INFO("RmlUiBridge: Registered trigger() and update_data_model() functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {
