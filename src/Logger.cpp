@@ -1,5 +1,4 @@
 #include "Logger.h"
-#include "Config.h"
 #include <filesystem>
 
 std::shared_ptr<spdlog::logger> Logger::instance = nullptr;

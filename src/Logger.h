@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <memory>
+#include <fstream>
 
 class Logger {
 private:
@@ -11,6 +12,9 @@ public:
     static void Initialize() {
         if (!instance) {
             try {
+                // Truncate the log file from previous run
+                std::ofstream("logs/log.txt", std::ios::trunc).close();
+
                 // Create a rotating file logger using configuration constants
                 instance = spdlog::rotating_logger_mt("vah_logger", "logs/log.txt", 1024 * 1024 * 5, 3);
                 instance->set_level(spdlog::level::debug);

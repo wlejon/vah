@@ -34,4 +34,22 @@ RmlUi Bridge: the main thread will run rmlui and it's lua state. When UI events 
 
 The main thread will keep track of the lua threads spawned and have tools needed to manage them (pause, resume, save, exit).
 
-Please explain what all these things mean to me before you begin, the goal being to verify i've said the right things. 
+Please review the code created so far to understand what i'm after. 
+
+we need to define the lua interface a little better. 
+
+a lua thread will have a lua entry script. the entry script can require and load as many other scripts as it wants, of course. the lua thread c++ side will send some calls into the lua state created:
+
+startup: called after the lua state is ready (scripts load).
+load: load from a saved state. called after startup
+update: called at 30hz
+event function: called for registered events at the given function
+save: save state
+shutdown: called before shutting down
+
+i'm trying to think through lifecycle and interactions with the thread. 
+
+an example usage would be an application agent. we'd give the agent tools and those tools would trigger events in the application. the application would then call back to the lua thread with whatever the agent asked for. this async process also means we can see all transactions and review and approve them. we'd give agent tools like "search" and we'd build the search results in the application based on what the agent is searching for. tools like "read" and "write" for scripts and the ability to run those scripts. the agent would be able to manage that running script as needed as well. all of this passing through the main thread and the user interface so the user can monitor the agent activity as needed. so the agent would setup in startup, load previous data it chose to save in load, perform processing when update is called, react to events it registers to, saves data it deems important, cleanly shutsdown on shutdown. the agent might "think" on "update" but i think a lot of the time it will be waiting. either wating for a remote api call to respond or waiting for user input. 
+
+what else will an agent need? of course we'll give the agent a lot of tools (filesystem, http, api, ui, etc) but when working autonomously to understand the data contained in the environment, are there any other application level interfaces the agent should have?
+

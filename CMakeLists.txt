@@ -23,19 +23,24 @@ find_package(sol2 CONFIG REQUIRED)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
-add_executable(bb1
+add_executable(vah
     src/main.cpp
     src/Logger.cpp
     src/RmlUi_Renderer_GL3.cpp
+    src/CommandQueue.cpp
+    src/ResponseQueue.cpp
+    src/LuaThread.cpp
+    src/ThreadManager.cpp
+    src/RmlUiBridge.cpp
 )
 
-target_include_directories(bb1 PRIVATE
+target_include_directories(vah PRIVATE
     ${CMAKE_SOURCE_DIR}/external/stb
     src/
     ${MINIAUDIO_INCLUDE_DIRS}
 )
 
-target_link_libraries(bb1 PRIVATE
+target_link_libraries(vah PRIVATE
     SDL2::SDL2
     SDL2::SDL2main
     RmlUi::RmlUi

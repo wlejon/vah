@@ -1,0 +1,84 @@
+<rml>
+<head>
+    <title>Vah Test UI</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <style>
+        body {
+            font-family: Roboto;
+            font-size: 18px;
+            color: white;
+            background: #1e1e2e;
+            padding: 40px;
+        }
+
+        .container {
+            width: 600px;
+            margin: 0 auto;
+            background: #313244;
+            padding: 30px;
+            border-radius: 8px;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #89b4fa;
+        }
+
+        p {
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        button {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 10px 10px 10px 0;
+            background: #89b4fa;
+            color: #1e1e2e;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: Roboto;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #74c7ec;
+        }
+
+        .info {
+            color: #94e2d5;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+    </style>
+    <script>
+        function testEvent()
+            trigger('test_event', {message = 'Hello from UI!', count = 42})
+        end
+
+        function spawnThread()
+            trigger('spawn_test_thread')
+        end
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Vah Engine Test</h1>
+        <p>This demonstrates the multi-threaded Lua architecture with RmlUI.</p>
+
+        <button onclick="testEvent()">Trigger Test Event</button>
+        <button onclick="spawnThread()">Spawn Lua Thread</button>
+
+        <div class="info">
+            <p><strong>Features demonstrated:</strong></p>
+            <p>• Lock-free seqlock for input state</p>
+            <p>• Thread-safe command queue</p>
+            <p>• UI events flow to Lua threads</p>
+            <p>• Independent Lua thread execution</p>
+        </div>
+    </div>
+</body>
+</rml>
