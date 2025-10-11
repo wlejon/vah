@@ -48,6 +48,11 @@ namespace Commands {
         sol::object data;
         std::string error;
     };
+
+    struct LoadUIDocument {
+        std::string document_path;
+        bool show = true;
+    };
 }
 
 // Variant holding all possible command types
@@ -58,7 +63,8 @@ using Command = std::variant<
     Commands::StopThread,
     Commands::SaveThread,
     Commands::Print,
-    Commands::SendResponse
+    Commands::SendResponse,
+    Commands::LoadUIDocument
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

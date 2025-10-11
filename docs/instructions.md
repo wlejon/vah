@@ -22,34 +22,18 @@ we are building vah. this is a foundation to build manufold, a data organization
 - when using subagents, tell them to read the [subagent-instructions document](subagent-instructions.md) in your instructions to them.
 
 ## current task
+this task is small enough that you should not use subagents.
 
-i've brought in various parts that we've made in previous projects. we need to setup the foundation to build to include these things and also build what's below.
+currently we're doing this in main.cpp:
 
-here's what should be present and working:
+        // Load and show test UI
+        auto doc = rml_context_->LoadDocument("ui/main.rml");
+        if (doc) {
+            doc->Show();
+            LOG_INFO("Loaded test UI document");
+        } else {
+            LOG_WARN("Failed to load test UI document");
+        }
 
-Lock Free Threads: The application lua state (separate from the RmlUi lua state) will only run on separate threads, not the main thread. Each entry point script that is run will be run on its own thread.
-Command Queue: All interaction to the main thread from lua threads will be through a command queue. There will be multiple lua threads asking the main thread to do things.
-Seqlock: Input should be read from the lua threads as needed (not all will read input) and it should be populated from the main thread as a state not individual inputs. A lua thread can just ask the data about what inputs were pressed in the last frame.
-RmlUi Bridge: the main thread will run rmlui and it's lua state. When UI events happen, we need to inform lua threads as well. We'll include UI events in the seqlock information. We'll treat it as an input event the same as mouse and keyboard. it'll have a string name and a payload as needed. the rmlui lua code should remain idiomatic with events being simple to create. something like trigger('eventname', {payload}). 
-
-The main thread will keep track of the lua threads spawned and have tools needed to manage them (pause, resume, save, exit).
-
-Please review the code created so far to understand what i'm after. 
-
-we need to define the lua interface a little better. 
-
-a lua thread will have a lua entry script. the entry script can require and load as many other scripts as it wants, of course. the lua thread c++ side will send some calls into the lua state created:
-
-startup: called after the lua state is ready (scripts load).
-load: load from a saved state. called after startup
-update: called at 30hz
-event function: called for registered events at the given function
-save: save state
-shutdown: called before shutting down
-
-i'm trying to think through lifecycle and interactions with the thread. 
-
-an example usage would be an application agent. we'd give the agent tools and those tools would trigger events in the application. the application would then call back to the lua thread with whatever the agent asked for. this async process also means we can see all transactions and review and approve them. we'd give agent tools like "search" and we'd build the search results in the application based on what the agent is searching for. tools like "read" and "write" for scripts and the ability to run those scripts. the agent would be able to manage that running script as needed as well. all of this passing through the main thread and the user interface so the user can monitor the agent activity as needed. so the agent would setup in startup, load previous data it chose to save in load, perform processing when update is called, react to events it registers to, saves data it deems important, cleanly shutsdown on shutdown. the agent might "think" on "update" but i think a lot of the time it will be waiting. either wating for a remote api call to respond or waiting for user input. 
-
-what else will an agent need? of course we'll give the agent a lot of tools (filesystem, http, api, ui, etc) but when working autonomously to understand the data contained in the environment, are there any other application level interfaces the agent should have?
+what i'd like instead is to do that in lua. you can look at bb1 (../bb1 or D:/projects/bb1) to see how we exposed the rmlui api to lua. lua should load the ui documents through a command queue. after the application initializes, it loads the scripts/main.lua file in a thread. this thread should then ask the main thread to display the ui/main.rml file through a command queue (like the ones that exist already).
 

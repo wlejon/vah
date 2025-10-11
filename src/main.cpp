@@ -126,14 +126,8 @@ public:
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
         rmlui_bridge_->SetupLuaBindings(rml_lua);
 
-        // Load and show test UI
-        auto doc = rml_context_->LoadDocument("ui/main.rml");
-        if (doc) {
-            doc->Show();
-            LOG_INFO("Loaded test UI document");
-        } else {
-            LOG_WARN("Failed to load test UI document");
-        }
+        // Spawn main Lua thread which will load UI
+        thread_manager_->SpawnThread("scripts/main.lua");
 
         LOG_INFO("Vah Engine initialized successfully");
         return true;
@@ -338,6 +332,18 @@ private:
                         response_queue->Push(Response{command.request_id, command.data, command.error});
                     } else {
                         LOG_WARN("Cannot send response to thread {}: thread not found", command.target_thread_id);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
+                    LOG_INFO("Processing LoadUIDocument command: {}", command.document_path);
+                    auto doc = rml_context_->LoadDocument(command.document_path.c_str());
+                    if (doc) {
+                        if (command.show) {
+                            doc->Show();
+                        }
+                        LOG_INFO("Loaded UI document: {}", command.document_path);
+                    } else {
+                        LOG_WARN("Failed to load UI document: {}", command.document_path);
                     }
                 }
 

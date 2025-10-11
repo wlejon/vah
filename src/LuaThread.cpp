@@ -202,19 +202,6 @@ void LuaThread::ThreadMain() {
             }
         }
 
-        // Call load() if it exists (after startup)
-        sol::optional<sol::function> load_fn = (*lua_)["load"];
-        if (load_fn) {
-            auto load_result = load_fn.value()();
-            if (!load_result.valid()) {
-                sol::error err = load_result;
-                error_message_ = err.what();
-                LOG_ERROR("Lua thread {} error in load(): {}", id_, error_message_);
-                state_ = State::Error;
-                return;
-            }
-        }
-
         state_ = State::Running;
         LOG_INFO("Lua thread {} running", id_);
 
@@ -286,16 +273,6 @@ void LuaThread::ThreadMain() {
             std::this_thread::sleep_until(next_frame_time);
         }
 
-        // Call save() if it exists
-        sol::optional<sol::function> save_fn = (*lua_)["save"];
-        if (save_fn) {
-            auto save_result = save_fn.value()();
-            if (!save_result.valid()) {
-                sol::error err = save_result;
-                LOG_WARN("Lua thread {} error in save(): {}", id_, err.what());
-            }
-        }
-
         // Call shutdown() if it exists
         sol::optional<sol::function> shutdown_fn = (*lua_)["shutdown"];
         if (shutdown_fn) {
@@ -348,6 +325,19 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["command"] = command_table;
+
+    // Bind UI operations
+    auto ui_table = lua_->create_table();
+
+    ui_table["load_document"] = [this](const std::string& path, sol::optional<bool> show) {
+        Commands::LoadUIDocument cmd;
+        cmd.document_path = path;
+        cmd.show = show.value_or(true);
+        command_queue_->Push(std::move(cmd));
+        LOG_DEBUG("Lua thread {} queued LoadUIDocument: {}", id_, path);
+    };
+
+    (*lua_)["ui"] = ui_table;
 
     // Bind input state interface
     auto input_table = lua_->create_table();
