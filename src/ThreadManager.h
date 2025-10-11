@@ -1,9 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
+#include <vector>
 #include <string>
-#include <mutex>
+#include <atomic>
 #include "LuaThread.h"
 
 class CommandQueue;
@@ -44,10 +44,15 @@ public:
     class ResponseQueue* GetThreadResponseQueue(int thread_id);
 
 private:
-    int next_thread_id_;
+    LuaThread* GetThread(int thread_id) const;
+    void EnsureCapacity(int thread_id);
+
+    std::atomic<int> next_thread_id_;
     CommandQueue* command_queue_;
     Seqlock<InputState>* input_seqlock_;
 
-    mutable std::mutex mutex_;
-    std::unordered_map<int, std::unique_ptr<LuaThread>> threads_;
+    // Lock-free thread storage: array of atomic pointers indexed by thread_id
+    // Note: We use raw pointers with atomic operations for lock-free access
+    std::atomic<std::atomic<LuaThread*>*> threads_;
+    std::atomic<size_t> capacity_;
 };

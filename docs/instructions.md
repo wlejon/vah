@@ -34,4 +34,4 @@ for assistance, please read the code directly or the documentation. they can be 
 ## current task
 this task is small enough that you should not use subagents.
 
-
+This is meant to be a lock free implementation but i see that ThreadManager is rife with mutexes. can you please reimplement this lock free. 
