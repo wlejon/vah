@@ -25,7 +25,7 @@ please read these documents first:
 
 ## RmlUi
 
-the application uses RmlUi for the UI. It supports a subset of CSS3.
+the application uses RmlUi for the UI. It supports a subset of CSS3. it's safer to build in css2 to avoid issues.
 
 for assistance, please read the code directly or the documentation. they can be found in these directories:
 - D:/projects/RmlUi
@@ -34,4 +34,4 @@ for assistance, please read the code directly or the documentation. they can be 
 ## current task
 this task is small enough that you should not use subagents.
 
-This is meant to be a lock free implementation but i see that ThreadManager is rife with mutexes. can you please reimplement this lock free. 
+after understanding the long term goal (manufold-client), please review the codebase. we're laying a foundation where we can build the client, the agents, basically as much as we can, in lua. please work through what we have implemented so far and determine what other foundational pillars we should build into vah to support manufold-client.

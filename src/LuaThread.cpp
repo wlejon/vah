@@ -4,6 +4,9 @@
 #include "Seqlock.h"
 #include "InputState.h"
 #include "Logger.h"
+#include "FileSystem.h"
+#include "JsonBindings.h"
+#include "SqliteBindings.h"
 #include <chrono>
 
 namespace {
@@ -322,6 +325,15 @@ void LuaThread::ThreadMain() {
 }
 
 void LuaThread::SetupLuaBindings() {
+    // Setup file system bindings
+    FileSystemBindings::SetupBindings(*lua_);
+
+    // Setup JSON bindings
+    JsonBindings::SetupBindings(*lua_);
+
+    // Setup SQLite bindings
+    SqliteBindings::SetupBindings(*lua_);
+
     // Bind event registration system
     auto event_table = lua_->create_table();
 

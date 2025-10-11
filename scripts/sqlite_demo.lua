@@ -1,0 +1,203 @@
+-- SQLite Demo
+-- Displays an editable table view with database persistence
+
+local database = nil
+local contacts = {}
+
+function init_database()
+    -- Open/create database
+    local db_handle, error = db.open("data/contacts.db")
+    if error ~= "" then
+        print("Error opening database: " .. error)
+        return false
+    end
+
+    database = db_handle
+    print("Database opened successfully")
+
+    -- Create contacts table if it doesn't exist
+    local success, exec_error = database:execute([[
+        CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT,
+            company TEXT,
+            notes TEXT
+        )
+    ]])
+
+    if not success then
+        print("Error creating table: " .. exec_error)
+        return false
+    end
+
+    -- Check if we need to add sample data
+    local count_result, count_error = database:query("SELECT COUNT(*) as count FROM contacts")
+    if count_error ~= "" then
+        print("Error checking row count: " .. count_error)
+        return false
+    end
+
+    if count_result and #count_result > 0 and count_result[1].count == 0 then
+        -- Add some sample data
+        print("Adding sample contacts...")
+        add_contact("Alice Johnson", "alice@example.com", "555-0101", "Acme Corp", "Lead developer")
+        add_contact("Bob Smith", "bob@example.com", "555-0102", "Tech Solutions", "Designer")
+        add_contact("Carol Davis", "carol@example.com", "555-0103", "StartUp Inc", "Project manager")
+    end
+
+    return true
+end
+
+function load_contacts()
+    if not database then
+        return
+    end
+
+    local results, error = database:query("SELECT * FROM contacts ORDER BY name")
+    if error ~= "" then
+        print("Error loading contacts: " .. error)
+        return
+    end
+
+    contacts = results or {}
+    print("Loaded " .. #contacts .. " contacts")
+    render_contacts()
+end
+
+function render_contacts()
+    local html = ""
+
+    if #contacts == 0 then
+        html = '<div class="empty-state">No contacts yet. Click "Add Contact" to create one.</div>'
+    else
+        -- Table header
+        html = html .. '<div class="table-header">'
+        html = html .. '<div class="col-name">Name</div>'
+        html = html .. '<div class="col-email">Email</div>'
+        html = html .. '<div class="col-phone">Phone</div>'
+        html = html .. '<div class="col-company">Company</div>'
+        html = html .. '<div class="col-actions">Actions</div>'
+        html = html .. '</div>'
+
+        -- Table rows
+        for _, contact in ipairs(contacts) do
+            html = html .. '<div class="table-row">'
+            html = html .. string.format('<div class="col-name">%s</div>', contact.name or "")
+            html = html .. string.format('<div class="col-email">%s</div>', contact.email or "")
+            html = html .. string.format('<div class="col-phone">%s</div>', contact.phone or "")
+            html = html .. string.format('<div class="col-company">%s</div>', contact.company or "")
+            html = html .. string.format(
+                '<div class="col-actions"><button onclick="trigger(\'delete_contact\', {id = %d})">Delete</button></div>',
+                contact.id
+            )
+            html = html .. '</div>'
+        end
+    end
+
+    ui.set_element_text("contacts_table", html)
+    ui.set_element_text("contact_count", string.format("Total: %d contacts", #contacts))
+end
+
+function add_contact(name, email, phone, company, notes)
+    if not database then
+        return false
+    end
+
+    -- Escape single quotes for SQL
+    local escaped_name = name:gsub("'", "''")
+    local escaped_email = email:gsub("'", "''")
+    local escaped_phone = (phone or ""):gsub("'", "''")
+    local escaped_company = (company or ""):gsub("'", "''")
+    local escaped_notes = (notes or ""):gsub("'", "''")
+
+    local sql = string.format([[
+        INSERT INTO contacts (name, email, phone, company, notes)
+        VALUES ('%s', '%s', '%s', '%s', '%s')
+    ]], escaped_name, escaped_email, escaped_phone, escaped_company, escaped_notes)
+
+    local success, error = database:execute(sql)
+    if not success then
+        print("Error adding contact: " .. error)
+        return false
+    end
+
+    print("Added contact: " .. name)
+    load_contacts()
+    return true
+end
+
+function delete_contact(contact_id)
+    if not database then
+        return false
+    end
+
+    local sql = string.format("DELETE FROM contacts WHERE id = %d", contact_id)
+    local success, error = database:execute(sql)
+
+    if not success then
+        print("Error deleting contact: " .. error)
+        return false
+    end
+
+    print("Deleted contact with id: " .. contact_id)
+    load_contacts()
+    return true
+end
+
+function add_random_contact()
+    local first_names = {"John", "Jane", "Mike", "Sarah", "David", "Emma", "Chris", "Lisa"}
+    local last_names = {"Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller"}
+    local companies = {"Tech Corp", "Digital Inc", "Cloud Systems", "Data Solutions", "Web Services"}
+
+    local first = first_names[math.random(#first_names)]
+    local last = last_names[math.random(#last_names)]
+    local name = first .. " " .. last
+    local email = string.lower(first .. "." .. last .. "@example.com")
+    local phone = string.format("555-%04d", math.random(1000, 9999))
+    local company = companies[math.random(#companies)]
+
+    add_contact(name, email, phone, company, "Randomly generated contact")
+end
+
+function startup()
+    print("SQLite demo started (thread_id: " .. thread_id .. ")")
+
+    -- Seed random number generator
+    math.randomseed(os.time())
+
+    -- Load UI
+    ui.load_document("ui/sqlite_demo.rml")
+
+    -- Initialize database
+    if not init_database() then
+        ui.set_element_text("contacts_table", '<div class="error">Failed to initialize database</div>')
+        return
+    end
+
+    -- Register event handlers
+    event.register("add_contact", function(payload)
+        add_random_contact()
+    end)
+
+    event.register("delete_contact", function(payload)
+        if payload.id then
+            delete_contact(payload.id)
+        end
+    end)
+
+    -- Load initial data
+    load_contacts()
+end
+
+function update(dt)
+    -- Nothing to update continuously
+end
+
+function shutdown()
+    if database then
+        database:close()
+    end
+    print("SQLite demo shutting down")
+end

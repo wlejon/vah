@@ -1,0 +1,42 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "Manufold",
+      "description": "Data organization ecosystem for communities",
+      "status": "active",
+      "members": 3,
+      "tags": ["data", "visualization", "desktop"]
+    },
+    {
+      "id": 2,
+      "name": "Vah Foundation",
+      "description": "C++ and Lua foundation for building desktop applications",
+      "status": "active",
+      "members": 1,
+      "tags": ["c++", "lua", "rmlui", "threading"]
+    },
+    {
+      "id": 3,
+      "name": "Data Leaf - Birding",
+      "description": "Track bird sightings with maps and species data",
+      "status": "planned",
+      "members": 5,
+      "tags": ["birds", "mapping", "community"]
+    },
+    {
+      "id": 4,
+      "name": "Data Leaf - Climbing",
+      "description": "Rock climbing route database and tracking",
+      "status": "planned",
+      "members": 8,
+      "tags": ["climbing", "outdoor", "tracking"]
+    }
+  ],
+  "statistics": {
+    "total_projects": 4,
+    "active_projects": 2,
+    "total_members": 17,
+    "last_updated": "2025-01-15"
+  }
+}

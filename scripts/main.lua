@@ -4,13 +4,22 @@
 function startup()
     print("Main Lua thread started")
 
-    -- Load the streaming data demo UI
-    ui.load_document("ui/streaming.rml")
+    -- Choose which demo to run (comment/uncomment):
 
-    -- Spawn the data stream thread to continuously generate data
-    command.spawn_thread("scripts/data_stream.lua")
+    -- File browser demo
+    -- command.spawn_thread("scripts/file_browser.lua")
 
-    print("Streaming data demo initialized")
+    -- JSON data viewer demo
+    -- command.spawn_thread("scripts/json_demo.lua")
+
+    -- SQLite database demo
+    command.spawn_thread("scripts/sqlite_demo.lua")
+
+    -- Streaming data demo
+    -- ui.load_document("ui/streaming.rml")
+    -- command.spawn_thread("scripts/data_stream.lua")
+
+    print("Demo initialized")
 end
 
 function update(dt)
