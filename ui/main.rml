@@ -36,7 +36,6 @@
             margin: 10px 10px 10px 0;
             background: #89b4fa;
             color: #1e1e2e;
-            border: none;
             border-radius: 4px;
             cursor: pointer;
             font-family: Roboto;

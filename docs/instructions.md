@@ -24,16 +24,5 @@ we are building vah. this is a foundation to build manufold, a data organization
 ## current task
 this task is small enough that you should not use subagents.
 
-currently we're doing this in main.cpp:
 
-        // Load and show test UI
-        auto doc = rml_context_->LoadDocument("ui/main.rml");
-        if (doc) {
-            doc->Show();
-            LOG_INFO("Loaded test UI document");
-        } else {
-            LOG_WARN("Failed to load test UI document");
-        }
-
-what i'd like instead is to do that in lua. you can look at bb1 (../bb1 or D:/projects/bb1) to see how we exposed the rmlui api to lua. lua should load the ui documents through a command queue. after the application initializes, it loads the scripts/main.lua file in a thread. this thread should then ask the main thread to display the ui/main.rml file through a command queue (like the ones that exist already).
 
