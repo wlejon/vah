@@ -25,7 +25,7 @@ please read these documents first:
 
 ## RmlUi
 
-the application uses RmlUi for the UI. It does supports a subset of CSS3.
+the application uses RmlUi for the UI. It supports a subset of CSS3.
 
 for assistance, please read the code directly or the documentation. they can be found in these directories:
 - D:/projects/RmlUi
@@ -34,9 +34,7 @@ for assistance, please read the code directly or the documentation. they can be 
 ## current task
 this task is small enough that you should not use subagents.
 
-we're having issues with how the scrollbar renders on streaming.rml. i need you to read the documentation for how scrollbars are used and also read the code for how it's rendered. 
+we want to have complex UI components that we can feed data into for the purpose of displaying various types of data in an organized way. i want some standard components paired with data generators for them. i want a main UI that allows me to explore these various components and return to it. 
 
-
-
-please explore these two folders to figure out exactly how you're meant to use the scrollbar and then compare to how we're using it. our current implementation, as a whole, is incorrect and the scrollbar renders comically large. adjusting the size in css has had no impact. 
+we'll need to expose more rmlui functionality in c++ in order to build it in lua, i believe. please review what we have and figure out what we need. i want 5 initial data views. think about the most common ways we look at data and create UIs for those use cases. 
 
