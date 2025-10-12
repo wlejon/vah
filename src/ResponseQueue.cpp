@@ -2,7 +2,7 @@
 
 ResponseQueue::ResponseQueue() {
     // Create dummy node
-    Node* dummy = new Node(Response{0, sol::nil, ""});
+    Node* dummy = new Node(Response{0, PayloadMap{}, ""});
     head_.store(dummy, std::memory_order_relaxed);
     tail_.store(dummy, std::memory_order_relaxed);
     cached_head_ = dummy;

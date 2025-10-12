@@ -43,13 +43,6 @@ namespace Commands {
         std::string message;
     };
 
-    struct SendResponse {
-        int target_thread_id;
-        int request_id;
-        sol::object data;
-        std::string error;
-    };
-
     struct LoadUIDocument {
         std::string document_path;
         bool show = true;
@@ -117,7 +110,6 @@ using Command = std::variant<
     Commands::StopThread,
     Commands::SaveThread,
     Commands::Print,
-    Commands::SendResponse,
     Commands::LoadUIDocument,
     Commands::ShowUIDocument,
     Commands::HideUIDocument,

@@ -4,22 +4,18 @@
 #include <vector>
 #include <atomic>
 #include <memory>
-#include <optional>
-#include <sol/sol.hpp>
 #include "InputState.h"  // For PayloadMap
 
 // Response sent from main thread to lua thread
+// THREADING: PayloadMap is thread-safe and can cross thread boundaries
+// The receiving Lua thread converts PayloadMap to a Lua table
 struct Response {
     int request_id;
-    sol::object data;        // Lua object (table, string, number, etc.) or nil
+    PayloadMap data;         // Thread-safe data that can cross lua_State boundaries
     std::string error;       // Empty if success
-    std::optional<PayloadMap> payload_data;  // Alternative to sol::object for cross-thread data
 
-    Response(int id, sol::object d, const std::string& e = "")
-        : request_id(id), data(std::move(d)), error(e), payload_data(std::nullopt) {}
-
-    Response(int id, sol::object d, const std::string& e, PayloadMap&& payload)
-        : request_id(id), data(std::move(d)), error(e), payload_data(std::move(payload)) {}
+    Response(int id, PayloadMap&& d, const std::string& e = "")
+        : request_id(id), data(std::move(d)), error(e) {}
 };
 
 // Lock-free single-producer (main thread) single-consumer (lua thread) queue

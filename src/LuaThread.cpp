@@ -203,27 +203,20 @@ void LuaThread::ProcessResponses() {
             // Call the lua callback
             try {
                 if (response.error.empty()) {
-                    // Check if response has PayloadMap data (for cross-thread responses)
-                    if (response.payload_data.has_value()) {
-                        // Convert PayloadMap to Lua table
-                        auto payload_table = lua_->create_table();
-                        for (const auto& [key, value] : response.payload_data.value()) {
-                            std::visit([&](auto&& val) {
-                                using T = std::decay_t<decltype(val)>;
-                                if constexpr (std::is_same_v<T, std::monostate>) {
-                                    payload_table[key] = sol::nil;
-                                } else {
-                                    payload_table[key] = val;
-                                }
-                            }, value);
-                        }
-                        // Success: callback(data, nil)
-                        it->second.callback(payload_table, sol::nil);
-                    } else {
-                        // Normal sol::object response
-                        // Success: callback(data, nil)
-                        it->second.callback(response.data, sol::nil);
+                    // Convert PayloadMap to Lua table in this thread's lua_State
+                    auto data_table = lua_->create_table();
+                    for (const auto& [key, value] : response.data) {
+                        std::visit([&](auto&& val) {
+                            using T = std::decay_t<decltype(val)>;
+                            if constexpr (std::is_same_v<T, std::monostate>) {
+                                data_table[key] = sol::nil;
+                            } else {
+                                data_table[key] = val;
+                            }
+                        }, value);
                     }
+                    // Success: callback(data, nil)
+                    it->second.callback(data_table, sol::nil);
                 } else {
                     // Error: callback(nil, error)
                     it->second.callback(sol::nil, response.error);

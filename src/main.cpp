@@ -396,15 +396,6 @@ private:
                 else if constexpr (std::is_same_v<T, Commands::Print>) {
                     LOG_INFO("[Lua Thread {}] {}", command.thread_id, command.message);
                 }
-                else if constexpr (std::is_same_v<T, Commands::SendResponse>) {
-                    LOG_DEBUG("Processing SendResponse command to thread {}", command.target_thread_id);
-                    auto response_queue = thread_manager_->GetThreadResponseQueue(command.target_thread_id);
-                    if (response_queue) {
-                        response_queue->Push(Response{command.request_id, command.data, command.error});
-                    } else {
-                        LOG_WARN("Cannot send response to thread {}: thread not found", command.target_thread_id);
-                    }
-                }
                 else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
                     LOG_INFO("Processing LoadUIDocument command: {}", command.document_path);
                     auto doc = rml_context_->LoadDocument(command.document_path.c_str());
@@ -589,7 +580,7 @@ private:
                     // Send response with PayloadMap - Lua thread will convert to table
                     auto response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
                     if (response_queue) {
-                        Response response{command.request_id, sol::nil, "", std::move(edits)};
+                        Response response{command.request_id, std::move(edits), ""};
                         response_queue->Push(std::move(response));
                         LOG_DEBUG("Sent GetInputEdits response with PayloadMap to thread {}",
                                  command.requesting_thread_id);
