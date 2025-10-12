@@ -3,7 +3,6 @@
 #include <sqlite3.h>
 #include <string>
 #include <unordered_map>
-#include <mutex>
 #include "InputState.h"
 
 /**
@@ -17,10 +16,12 @@
  *   2. OnChange: User types -> update current value in cache only
  *   3. OnBlur: User leaves input -> if changed, write to DB and update current_edits
  *
- * Thread Safety:
- *   - Main thread calls OnFocus/OnChange/OnBlur
- *   - Command handlers (main thread) call GetEdits/ClearEdits
- *   - All access protected by mutex for future thread-safe reads
+ * Threading Model:
+ *   - MAIN THREAD ONLY - no synchronization needed
+ *   - OnFocus/OnChange/OnBlur called from RmlUi event callbacks (main thread)
+ *   - GetEdits/ClearEdits called from command queue processor (main thread)
+ *   - Lua threads access via Commands::GetInputEdits/ClearInputEdits
+ *   - Single sqlite3 handle accessed from single thread only
  *
  * Database Tables:
  *   - input_events: Transaction log of all input events
@@ -32,10 +33,9 @@ public:
     ~InputTracker();
 
     // Initialize database (creates tables if needed)
-    // db_path: Path to SQLite database file (creates data/ dir if needed)
     void Initialize(const std::string& db_path = "data/input_tracking.db");
 
-    // Called by InputEventListener callbacks (main thread only)
+    // Event callbacks from InputEventListener (main thread)
     void OnFocus(const std::string& model, const std::string& record_id,
                  const std::string& field, const std::string& initial_value);
     void OnChange(const std::string& model, const std::string& record_id,
@@ -43,41 +43,28 @@ public:
     void OnBlur(const std::string& model, const std::string& record_id,
                 const std::string& field, const std::string& final_value);
 
-    // Query API (thread-safe, will be used by command handlers)
-    // Returns map of field name -> current value for all modified fields
+    // Query current edits for a record (main thread via command handlers)
     PayloadMap GetEdits(const std::string& model, const std::string& record_id);
 
-    // Clear all edits for a record (e.g., after save)
+    // Clear all edits for a record (main thread via command handlers)
     void ClearEdits(const std::string& model, const std::string& record_id);
 
 private:
     sqlite3* db_;
-    std::mutex db_mutex_;  // Protect SQLite and cache access
 
-    // In-memory cache for tracking active edits (fields currently being edited)
     struct EditState {
-        std::string original_value;  // Value when focus occurred
-        std::string current_value;   // Last known value from OnChange
-        bool is_dirty;               // Has value changed from original?
-        uint64_t focus_timestamp;    // When focus occurred (milliseconds since epoch)
+        std::string original_value;
+        std::string current_value;
+        bool is_dirty;
+        uint64_t focus_timestamp;
     };
 
-    // Key format: "model:record_id:field"
     std::unordered_map<std::string, EditState> active_edits_;
 
-    // Helper to create cache key
     std::string MakeKey(const std::string& model, const std::string& record_id,
                         const std::string& field);
-
-    // Create database schema
     bool CreateTables();
-
-    // Get current time in milliseconds since epoch
     uint64_t GetTimestampMs();
-
-    // Serialize value to JSON (extensible format)
     std::string SerializeValue(const std::string& value);
-
-    // Deserialize JSON value
     std::string DeserializeValue(const std::string& json_str);
 };

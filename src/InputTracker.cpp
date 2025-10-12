@@ -17,9 +17,6 @@ InputTracker::~InputTracker() {
 }
 
 void InputTracker::Initialize(const std::string& db_path) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
-    // Create data directory if it doesn't exist
     std::filesystem::path path(db_path);
     std::filesystem::path dir = path.parent_path();
     if (!dir.empty() && !std::filesystem::exists(dir)) {
@@ -27,7 +24,6 @@ void InputTracker::Initialize(const std::string& db_path) {
         LOG_INFO("Created directory: {}", dir.string());
     }
 
-    // Open database
     int rc = sqlite3_open(db_path.c_str(), &db_);
     if (rc != SQLITE_OK) {
         LOG_ERROR("Failed to open InputTracker database at {}: {}", db_path, sqlite3_errmsg(db_));
@@ -38,7 +34,6 @@ void InputTracker::Initialize(const std::string& db_path) {
 
     LOG_INFO("Opened InputTracker database: {}", db_path);
 
-    // Create tables
     if (!CreateTables()) {
         LOG_ERROR("Failed to create InputTracker tables");
         sqlite3_close(db_);
@@ -50,8 +45,6 @@ void InputTracker::Initialize(const std::string& db_path) {
 }
 
 bool InputTracker::CreateTables() {
-    // Note: db_mutex_ should already be locked by caller
-
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS input_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,12 +121,9 @@ std::string InputTracker::MakeKey(const std::string& model, const std::string& r
 
 void InputTracker::OnFocus(const std::string& model, const std::string& record_id,
                            const std::string& field, const std::string& initial_value) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
     std::string key = MakeKey(model, record_id, field);
     uint64_t timestamp = GetTimestampMs();
 
-    // Store in cache
     EditState state;
     state.original_value = initial_value;
     state.current_value = initial_value;
@@ -144,7 +134,6 @@ void InputTracker::OnFocus(const std::string& model, const std::string& record_i
 
     LOG_DEBUG("InputTracker: FOCUS on {} = '{}'", key, initial_value);
 
-    // Record focus event in database
     if (!db_) return;
 
     std::string value_json = SerializeValue(initial_value);
@@ -174,11 +163,8 @@ void InputTracker::OnFocus(const std::string& model, const std::string& record_i
 
 void InputTracker::OnChange(const std::string& model, const std::string& record_id,
                             const std::string& field, const std::string& current_value) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
     std::string key = MakeKey(model, record_id, field);
 
-    // Update cache only - no DB write for change events
     auto it = active_edits_.find(key);
     if (it != active_edits_.end()) {
         it->second.current_value = current_value;
@@ -193,12 +179,9 @@ void InputTracker::OnChange(const std::string& model, const std::string& record_
 
 void InputTracker::OnBlur(const std::string& model, const std::string& record_id,
                           const std::string& field, const std::string& final_value) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
     std::string key = MakeKey(model, record_id, field);
     uint64_t timestamp = GetTimestampMs();
 
-    // Check cache
     auto it = active_edits_.find(key);
     if (it == active_edits_.end()) {
         LOG_WARN("InputTracker: BLUR on {} without prior FOCUS - ignoring", key);
@@ -212,7 +195,6 @@ void InputTracker::OnBlur(const std::string& model, const std::string& record_id
               key, final_value, value_changed);
 
     if (!db_) {
-        // Just remove from cache if DB not available
         active_edits_.erase(it);
         return;
     }
@@ -281,13 +263,10 @@ void InputTracker::OnBlur(const std::string& model, const std::string& record_id
 }
 
 PayloadMap InputTracker::GetEdits(const std::string& model, const std::string& record_id) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
     PayloadMap result;
 
     if (!db_) return result;
 
-    // Query current_edits table for this model/record
     const char* sql = "SELECT field, current_value FROM current_edits WHERE model = ? AND record_id = ?";
 
     sqlite3_stmt* stmt = nullptr;
@@ -321,11 +300,8 @@ PayloadMap InputTracker::GetEdits(const std::string& model, const std::string& r
 }
 
 void InputTracker::ClearEdits(const std::string& model, const std::string& record_id) {
-    std::lock_guard<std::mutex> lock(db_mutex_);
-
     if (!db_) return;
 
-    // Delete from current_edits table
     const char* sql = "DELETE FROM current_edits WHERE model = ? AND record_id = ?";
 
     sqlite3_stmt* stmt = nullptr;
