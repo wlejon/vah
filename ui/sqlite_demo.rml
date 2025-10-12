@@ -251,22 +251,22 @@
                 </div>
 
                 <!-- Table rows using data-for -->
-                <div data-for="contact : contacts">
-                    <div class="table-row">
+                <div data-for="contact, i : contacts">
+                    <div class="table-row" data-attr-id="'row_' + contact.id">
                         <div class="col-name">
-                            <input type="text" id="name_{{contact.id}}" data-attr-value="contact.name" />
+                            <input type="text" data-attr-id="'name_' + contact.id" data-value="contact.name" />
                         </div>
                         <div class="col-email">
-                            <input type="text" id="email_{{contact.id}}" data-attr-value="contact.email" />
+                            <input type="text" data-attr-id="'email_' + contact.id" data-value="contact.email" />
                         </div>
                         <div class="col-phone">
-                            <input type="text" id="phone_{{contact.id}}" data-attr-value="contact.phone" />
+                            <input type="text" data-attr-id="'phone_' + contact.id" data-value="contact.phone" />
                         </div>
                         <div class="col-company">
-                            <input type="text" id="company_{{contact.id}}" data-attr-value="contact.company" />
+                            <input type="text" data-attr-id="'company_' + contact.id" data-value="contact.company" />
                         </div>
                         <div class="col-actions">
-                            <button class="btn-save" data-event-click="trigger_save(contact.id)">Save</button>
+                            <button class="btn-save" data-event-click="trigger_save_with_inputs(contact.id)">Save</button>
                             <button class="btn-delete" data-event-click="trigger_delete(contact.id)">Delete</button>
                         </div>
                     </div>

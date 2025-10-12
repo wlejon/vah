@@ -48,9 +48,6 @@ struct InputState {
     // Keyboard state (key name -> pressed)
     std::unordered_map<std::string, bool> keyboard;
 
-    // UI events accumulated this frame
-    std::vector<UIEvent> ui_events;
-
     // SDL Input events accumulated this frame
     std::vector<MouseButtonEvent> mouse_button_events;
     std::vector<MouseMoveEvent> mouse_move_events;
@@ -61,7 +58,6 @@ struct InputState {
 
     // Clear events (called each frame after processing)
     void ClearEvents() {
-        ui_events.clear();
         mouse_button_events.clear();
         mouse_move_events.clear();
         key_events.clear();

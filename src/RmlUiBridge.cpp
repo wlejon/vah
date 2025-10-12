@@ -1,5 +1,6 @@
 #include "RmlUiBridge.h"
 #include "Logger.h"
+#include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
 
@@ -72,74 +73,83 @@ namespace {
         return 0;  // No return values
     }
 
+    // Lua callback for start_edit - user focused on an input
+    int lua_start_edit(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // Arguments: model_name, record_id, field_name, initial_value
+        if (!lua_isstring(L, 1) || !lua_isnumber(L, 2) || !lua_isstring(L, 3) || !lua_isstring(L, 4)) {
+            return luaL_error(L, "start_edit(model_name, record_id, field_name, initial_value) requires string, number, string, string");
+        }
+
+        std::string model_name = lua_tostring(L, 1);
+        int record_id = static_cast<int>(lua_tointeger(L, 2));
+        std::string field_name = lua_tostring(L, 3);
+        std::string initial_value = lua_tostring(L, 4);
+
+        g_bridge->StartEdit(model_name, record_id, field_name, initial_value);
+        return 0;
+    }
+
+    // Lua callback for end_edit - user blurred from an input
+    int lua_end_edit(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // Arguments: model_name, record_id, field_name, final_value
+        if (!lua_isstring(L, 1) || !lua_isnumber(L, 2) || !lua_isstring(L, 3) || !lua_isstring(L, 4)) {
+            return luaL_error(L, "end_edit(model_name, record_id, field_name, final_value) requires string, number, string, string");
+        }
+
+        std::string model_name = lua_tostring(L, 1);
+        int record_id = static_cast<int>(lua_tointeger(L, 2));
+        std::string field_name = lua_tostring(L, 3);
+        std::string final_value = lua_tostring(L, 4);
+
+        g_bridge->EndEdit(model_name, record_id, field_name, final_value);
+        return 0;
+    }
+
     // Lua callback for trigger_save function
     int lua_trigger_save(lua_State* L) {
         if (!g_bridge) {
             return luaL_error(L, "RmlUiBridge not initialized");
         }
 
-        // Single argument: contact ID (required)
-        if (!lua_isnumber(L, 1)) {
-            return luaL_error(L, "trigger_save() requires contact ID as first argument");
+        // Arguments: model_name, record_id
+        if (!lua_isstring(L, 1) || !lua_isnumber(L, 2)) {
+            return luaL_error(L, "trigger_save(model_name, record_id) requires string, number");
         }
 
-        int contact_id = static_cast<int>(lua_tointeger(L, 1));
+        std::string model_name = lua_tostring(L, 1);
+        int record_id = static_cast<int>(lua_tointeger(L, 2));
 
-        // Get the context
-        Rml::Context* context = g_bridge->GetContext();
-        if (!context) {
-            return luaL_error(L, "RmlUi context not available");
+        // Get pending edits for this record
+        PayloadMap payload = g_bridge->GetPendingEdits(model_name, record_id);
+        payload["id"] = record_id;
+
+        LOG_DEBUG("RmlUiBridge: trigger_save called for {} ID {} with {} edits",
+                  model_name, record_id, payload.size() - 1);
+
+        // Trigger save event with model-specific name (e.g., "save_contact")
+        std::string event_name = "save_" + model_name.substr(0, model_name.size() - 1); // Remove trailing 's'
+        if (model_name.back() == 's') {
+            event_name = "save_" + model_name.substr(0, model_name.size() - 1);
+        } else {
+            event_name = "save_" + model_name;
         }
 
-        // Get the active document
-        Rml::ElementDocument* document = context->GetDocument(0);
-        if (!document) {
-            return luaL_error(L, "No active document");
-        }
-
-        // Build element IDs based on contact_id
-        std::string name_id = "name_" + std::to_string(contact_id);
-        std::string email_id = "email_" + std::to_string(contact_id);
-        std::string phone_id = "phone_" + std::to_string(contact_id);
-        std::string company_id = "company_" + std::to_string(contact_id);
-
-        // Query input elements and extract values
-        PayloadMap payload;
-        payload["id"] = contact_id;
-
-        auto name_elem = document->GetElementById(name_id);
-        if (name_elem) {
-            auto value = name_elem->GetAttribute<Rml::String>("value", "");
-            payload["name"] = std::string(value.data(), value.size());
-        }
-
-        auto email_elem = document->GetElementById(email_id);
-        if (email_elem) {
-            auto value = email_elem->GetAttribute<Rml::String>("value", "");
-            payload["email"] = std::string(value.data(), value.size());
-        }
-
-        auto phone_elem = document->GetElementById(phone_id);
-        if (phone_elem) {
-            auto value = phone_elem->GetAttribute<Rml::String>("value", "");
-            payload["phone"] = std::string(value.data(), value.size());
-        }
-
-        auto company_elem = document->GetElementById(company_id);
-        if (company_elem) {
-            auto value = company_elem->GetAttribute<Rml::String>("value", "");
-            payload["company"] = std::string(value.data(), value.size());
-        }
-
-        // Trigger the save_contact event
-        g_bridge->TriggerEvent("save_contact", payload);
-
-        return 0;  // No return values
+        g_bridge->TriggerEvent(event_name, payload);
+        return 0;
     }
 }
 
-RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock)
+RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue)
     : input_seqlock_(input_seqlock)
+    , ui_event_queue_(ui_event_queue)
     , context_(nullptr)
 {
     g_bridge = this;
@@ -161,30 +171,54 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
     lua_pushcfunction(L, lua_trigger_save);
     lua_setglobal(L, "trigger_save");
 
+    // Register edit tracking functions
+    lua_pushcfunction(L, lua_start_edit);
+    lua_setglobal(L, "start_edit");
+
+    lua_pushcfunction(L, lua_end_edit);
+    lua_setglobal(L, "end_edit");
+
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger(), trigger_delete(), and trigger_save() functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger(), edit tracking, and convenience functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {
-    // Read current state
-    auto current_state = input_seqlock_->Read();
-
-    // Clear old ui_events to prevent accumulation
-    // (Main thread will read these events and process them next frame)
-    current_state.ui_events.clear();
-
-    // Add new event
     UIEvent event;
     event.name = event_name;
     event.payload = payload;
-    current_state.ui_events.push_back(event);
 
-    // Write back to seqlock
-    input_seqlock_->Write(current_state);
+    // Simple enqueue - no seqlock manipulation
+    ui_event_queue_->Push(std::move(event));
 
     LOG_DEBUG("RmlUiBridge: Triggered event '{}' with {} payload items", event_name, payload.size());
+}
+
+void RmlUiBridge::StartEdit(const std::string& model_name, int record_id, const std::string& field_name, const std::string& initial_value) {
+    EditKey key{model_name, record_id, field_name};
+    pending_edits_[key] = initial_value;
+    LOG_DEBUG("RmlUiBridge: Started edit for {}.{}.{} = '{}'", model_name, record_id, field_name, initial_value);
+}
+
+void RmlUiBridge::EndEdit(const std::string& model_name, int record_id, const std::string& field_name, const std::string& final_value) {
+    EditKey key{model_name, record_id, field_name};
+    pending_edits_[key] = final_value;
+    LOG_DEBUG("RmlUiBridge: Ended edit for {}.{}.{} = '{}'", model_name, record_id, field_name, final_value);
+}
+
+PayloadMap RmlUiBridge::GetPendingEdits(const std::string& model_name, int record_id) const {
+    PayloadMap edits;
+
+    // Find all edits for this record
+    for (const auto& [key, value] : pending_edits_) {
+        if (key.model_name == model_name && key.record_id == record_id) {
+            edits[key.field_name] = value;
+        }
+    }
+
+    LOG_DEBUG("RmlUiBridge: Retrieved {} pending edits for {}.{}", edits.size(), model_name, record_id);
+    return edits;
 }

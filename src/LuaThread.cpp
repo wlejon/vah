@@ -1,5 +1,6 @@
 #include "LuaThread.h"
 #include "CommandQueue.h"
+#include "UIEventQueue.h"
 #include "ResponseQueue.h"
 #include "Seqlock.h"
 #include "InputState.h"
@@ -89,6 +90,7 @@ namespace {
 LuaThread::LuaThread(int id, const std::string& script_path,
                      CommandQueue* command_queue,
                      Seqlock<InputState>* input_seqlock,
+                     UIEventQueue* ui_event_queue,
                      DataStore* data_store)
     : id_(id)
     , script_path_(script_path)
@@ -97,12 +99,12 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , is_paused_(false)
     , command_queue_(command_queue)
     , input_seqlock_(input_seqlock)
+    , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
     , response_queue_(std::make_unique<ResponseQueue>())
     , next_request_id_(1)
     , parent_thread_id_(0)
     , parent_request_id_(0)
-    , last_processed_frame_(0)
 {
 }
 
@@ -315,36 +317,33 @@ void LuaThread::ThreadMain() {
             ProcessInputEvents();
 
             // Dispatch UI events to registered event handlers
-            if (input_seqlock_) {
-                auto input_state = input_seqlock_->Read();
+            // Only consume from queue if this thread has handlers registered
+            // (prevents threads without handlers from stealing events)
+            if (ui_event_queue_ && !event_handlers_.empty()) {
+                auto ui_events = ui_event_queue_->PopAll();
 
-                // Only process events if this is a new frame (prevents processing same events twice)
-                if (input_state.frame_number != last_processed_frame_) {
-                    last_processed_frame_ = input_state.frame_number;
+                for (const auto& ui_event : ui_events) {
+                    auto it = event_handlers_.find(ui_event.name);
+                    if (it != event_handlers_.end()) {
+                        // Convert payload to lua table
+                        auto payload_table = lua_->create_table();
+                        for (const auto& [key, value] : ui_event.payload) {
+                            std::visit([&](auto&& val) {
+                                using T = std::decay_t<decltype(val)>;
+                                if constexpr (std::is_same_v<T, std::monostate>) {
+                                    payload_table[key] = sol::nil;
+                                } else {
+                                    payload_table[key] = val;
+                                }
+                            }, value);
+                        }
 
-                    for (const auto& ui_event : input_state.ui_events) {
-                        auto it = event_handlers_.find(ui_event.name);
-                        if (it != event_handlers_.end()) {
-                            // Convert payload to lua table
-                            auto payload_table = lua_->create_table();
-                            for (const auto& [key, value] : ui_event.payload) {
-                                std::visit([&](auto&& val) {
-                                    using T = std::decay_t<decltype(val)>;
-                                    if constexpr (std::is_same_v<T, std::monostate>) {
-                                        payload_table[key] = sol::nil;
-                                    } else {
-                                        payload_table[key] = val;
-                                    }
-                                }, value);
-                            }
-
-                            // Call registered handler
-                            try {
-                                it->second(payload_table);
-                            } catch (const sol::error& e) {
-                                LOG_ERROR("Lua thread {} error in event handler for '{}': {}",
-                                         id_, ui_event.name, e.what());
-                            }
+                        // Call registered handler
+                        try {
+                            it->second(payload_table);
+                        } catch (const sol::error& e) {
+                            LOG_ERROR("Lua thread {} error in event handler for '{}': {}",
+                                     id_, ui_event.name, e.what());
                         }
                     }
                 }
@@ -558,27 +557,6 @@ void LuaThread::SetupLuaBindings() {
 
         // Frame number
         table["frame"] = state.frame_number;
-
-        // UI Events
-        auto events = table["ui_events"] = lua_->create_table();
-        for (size_t i = 0; i < state.ui_events.size(); ++i) {
-            auto event = events[i + 1] = lua_->create_table();
-            event["name"] = state.ui_events[i].name;
-
-            // Convert PayloadMap to lua table
-            auto payload_table = lua_->create_table();
-            for (const auto& [key, value] : state.ui_events[i].payload) {
-                std::visit([&](auto&& val) {
-                    using T = std::decay_t<decltype(val)>;
-                    if constexpr (std::is_same_v<T, std::monostate>) {
-                        payload_table[key] = sol::nil;
-                    } else {
-                        payload_table[key] = val;
-                    }
-                }, value);
-            }
-            event["payload"] = payload_table;
-        }
 
         return table;
     };

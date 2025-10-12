@@ -182,16 +182,37 @@ function startup()
     end)
 
     event.register("save_contact", function(payload)
-        if payload.id and payload.name and payload.email then
+        if payload.id then
             local contact_id = payload.id
-            local name = payload.name or ""
-            local email = payload.email or ""
-            local phone = payload.phone or ""
-            local company = payload.company or ""
-            print("Saving contact ID: " .. tostring(contact_id))
-            save_contact(contact_id, name, email, phone, company)
+
+            -- Payload contains edited fields from pending_edits in C++
+            -- Fall back to current DB values if not edited
+            local contact = nil
+            for _, c in ipairs(contacts) do
+                if c.id == contact_id then
+                    contact = c
+                    break
+                end
+            end
+
+            if contact then
+                local name = payload.name or contact.name or ""
+                local email = payload.email or contact.email or ""
+                local phone = payload.phone or contact.phone or ""
+                local company = payload.company or contact.company or ""
+
+                print("Saving contact ID: " .. tostring(contact_id))
+                print("  name: " .. name)
+                print("  email: " .. email)
+                print("  phone: " .. phone)
+                print("  company: " .. company)
+
+                save_contact(contact_id, name, email, phone, company)
+            else
+                print("ERROR: Contact ID " .. tostring(contact_id) .. " not found in contacts array")
+            end
         else
-            print("ERROR: Missing required fields in save_contact payload")
+            print("ERROR: Missing id in save_contact payload")
         end
     end)
 

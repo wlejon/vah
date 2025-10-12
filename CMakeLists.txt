@@ -30,6 +30,7 @@ add_executable(vah
     src/Logger.cpp
     src/RmlUi_Renderer_GL3.cpp
     src/CommandQueue.cpp
+    src/UIEventQueue.cpp
     src/ResponseQueue.cpp
     src/LuaThread.cpp
     src/ThreadManager.cpp

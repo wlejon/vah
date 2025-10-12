@@ -10,6 +10,7 @@
 #include <sol/sol.hpp>
 
 class CommandQueue;
+class UIEventQueue;
 class ResponseQueue;
 class DataStore;
 template<typename T> class Seqlock;
@@ -29,6 +30,7 @@ public:
     LuaThread(int id, const std::string& script_path,
               CommandQueue* command_queue,
               Seqlock<InputState>* input_seqlock,
+              UIEventQueue* ui_event_queue,
               DataStore* data_store);
     ~LuaThread();
 
@@ -83,6 +85,7 @@ private:
 
     CommandQueue* command_queue_;
     Seqlock<InputState>* input_seqlock_;
+    UIEventQueue* ui_event_queue_;
     DataStore* data_store_;
     std::unique_ptr<ResponseQueue> response_queue_;
 
@@ -109,9 +112,6 @@ private:
 
     // Track which data models have been bound (to avoid re-binding)
     std::unordered_set<std::string> bound_models_;
-
-    // Track last processed input frame to avoid processing same events twice
-    uint64_t last_processed_frame_;
 
     std::string error_message_;
 };

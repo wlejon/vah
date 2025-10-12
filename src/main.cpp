@@ -14,6 +14,7 @@
 #include "ResponseQueue.h"
 #include "Seqlock.h"
 #include "InputState.h"
+#include "UIEventQueue.h"
 #include "ThreadManager.h"
 #include "RmlUiBridge.h"
 #include "DataStore.h"
@@ -126,9 +127,10 @@ public:
         // Initialize our systems
         command_queue_ = std::make_unique<CommandQueue>();
         input_seqlock_ = std::make_unique<Seqlock<InputState>>();
+        ui_event_queue_ = std::make_unique<UIEventQueue>();
         data_store_ = std::make_unique<DataStore>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get(), data_store_.get());
-        rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get());
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get(), ui_event_queue_.get(), data_store_.get());
+        rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get(), ui_event_queue_.get());
 
         // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
@@ -169,6 +171,7 @@ public:
         thread_manager_.reset();
         rmlui_bridge_.reset();
         data_store_.reset();
+        ui_event_queue_.reset();
         input_seqlock_.reset();
         command_queue_.reset();
 
@@ -309,15 +312,6 @@ private:
                         break;
                 }
             }
-        }
-
-        // Check if any UI events were triggered during SDL processing
-        // (RmlUiBridge writes directly to seqlock when trigger() is called)
-        auto state_after_triggers = input_seqlock_->Read();
-
-        // Copy any UI events that were added by trigger() during this frame
-        if (!state_after_triggers.ui_events.empty()) {
-            current_state.ui_events = state_after_triggers.ui_events;
         }
 
         // Write updated input state to seqlock
@@ -514,27 +508,80 @@ private:
                                 }
                             });
 
-                            constructor.BindEventCallback("trigger_save", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+                            constructor.BindEventCallback("trigger_save_with_inputs", [this](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& arguments) {
                                 if (arguments.size() >= 1) {
-                                    // Get the Lua state and call the global trigger_save function
-                                    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
-                                    lua_getglobal(L, "trigger_save");
-                                    if (lua_isfunction(L, -1)) {
-                                        // Push the contact ID argument
-                                        if (arguments[0].GetType() == Rml::Variant::INT) {
-                                            lua_pushinteger(L, arguments[0].Get<int>());
-                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                                            lua_pushinteger(L, arguments[0].Get<int64_t>());
-                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                                            lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
-                                        } else {
-                                            lua_pushinteger(L, 0);
-                                        }
-                                        // Call the function
-                                        lua_pcall(L, 1, 0, 0);
-                                    } else {
-                                        lua_pop(L, 1);
+                                    int contact_id = 0;
+                                    if (arguments[0].GetType() == Rml::Variant::INT) {
+                                        contact_id = arguments[0].Get<int>();
+                                    } else if (arguments[0].GetType() == Rml::Variant::INT64) {
+                                        contact_id = static_cast<int>(arguments[0].Get<int64_t>());
+                                    } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
+                                        contact_id = static_cast<int>(arguments[0].Get<float>());
                                     }
+
+                                    // Get the row element (button -> col-actions -> table-row)
+                                    Rml::Element* button = event.GetTargetElement();
+                                    if (!button) return;
+
+                                    Rml::Element* col_actions = button->GetParentNode();
+                                    if (!col_actions) return;
+
+                                    Rml::Element* row = col_actions->GetParentNode();
+                                    if (!row) return;
+
+                                    // Find input elements by traversing children
+                                    PayloadMap payload;
+                                    payload["id"] = contact_id;
+
+                                    // Helper to find input in a column div
+                                    auto find_input_value = [](Rml::Element* parent, const std::string& expected_id_prefix) -> std::string {
+                                        for (int i = 0; i < parent->GetNumChildren(); i++) {
+                                            Rml::Element* child = parent->GetChild(i);
+                                            if (child && child->GetNumChildren() > 0) {
+                                                Rml::Element* grandchild = child->GetChild(0);
+                                                if (grandchild && grandchild->GetTagName() == "input") {
+                                                    auto* form_control = dynamic_cast<Rml::ElementFormControl*>(grandchild);
+                                                    if (form_control) {
+                                                        auto value = form_control->GetValue();
+                                                        return std::string(value.data(), value.size());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        return "";
+                                    };
+
+                                    // Get values from each column (skip last one which is actions)
+                                    int child_idx = 0;
+                                    for (int i = 0; i < row->GetNumChildren(); i++) {
+                                        Rml::Element* col = row->GetChild(i);
+                                        if (!col) continue;
+
+                                        std::string class_name = col->GetClassNames();
+                                        Rml::Element* input = col->GetChild(0);
+                                        if (input && input->GetTagName() == "input") {
+                                            auto* form_control = dynamic_cast<Rml::ElementFormControl*>(input);
+                                            if (form_control) {
+                                                auto value = form_control->GetValue();
+                                                std::string value_str(value.data(), value.size());
+
+                                                if (class_name.find("col-name") != std::string::npos) {
+                                                    payload["name"] = value_str;
+                                                } else if (class_name.find("col-email") != std::string::npos) {
+                                                    payload["email"] = value_str;
+                                                } else if (class_name.find("col-phone") != std::string::npos) {
+                                                    payload["phone"] = value_str;
+                                                } else if (class_name.find("col-company") != std::string::npos) {
+                                                    payload["company"] = value_str;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    LOG_DEBUG("trigger_save_with_inputs: Read {} fields for contact {}", payload.size() - 1, contact_id);
+
+                                    // Trigger the event
+                                    rmlui_bridge_->TriggerEvent("save_contact", payload);
                                 }
                             });
 
@@ -602,6 +649,7 @@ private:
 
     std::unique_ptr<CommandQueue> command_queue_;
     std::unique_ptr<Seqlock<InputState>> input_seqlock_;
+    std::unique_ptr<UIEventQueue> ui_event_queue_;
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
