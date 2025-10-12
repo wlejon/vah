@@ -39,7 +39,8 @@ private:
     std::string model_name_;
 
     // Cached data snapshot (consistent within a render cycle)
-    DynamicTable cached_data_;
+    // Using shared_ptr keeps the data alive even if the model is updated mid-render
+    std::shared_ptr<const DynamicTable> cached_data_;
 
     // Arena allocator for DataPaths - cleared each render cycle
     std::vector<std::unique_ptr<DataPath>> path_arena_;

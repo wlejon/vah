@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <variant>
 #include <memory>
-#include "Seqlock.h"
+#include <atomic>
 
 // Forward declaration for recursive type
 struct DynamicMap;
@@ -32,7 +32,8 @@ using DynamicRow = std::unordered_map<std::string, DynamicValue>;
 using DynamicTable = std::vector<DynamicRow>;
 
 // Thread-safe data store for dynamic models
-// Uses Seqlock for lock-free single-writer, multiple-reader access
+// Uses atomic shared_ptr for lock-free single-writer, multiple-reader access
+// This is safe for complex types unlike Seqlock
 class DataStore {
 public:
     DataStore() = default;
@@ -42,7 +43,8 @@ public:
     void SetModel(const std::string& name, const DynamicTable& data);
 
     // Get a model's data (called from main thread)
-    DynamicTable GetModel(const std::string& name) const;
+    // Returns a shared_ptr to avoid copying large tables
+    std::shared_ptr<const DynamicTable> GetModel(const std::string& name) const;
 
     // Check if a model exists
     bool HasModel(const std::string& name) const;
@@ -51,6 +53,7 @@ public:
     void RemoveModel(const std::string& name);
 
 private:
-    // Each model has its own seqlock for independent updates
-    mutable std::unordered_map<std::string, Seqlock<DynamicTable>> models_;
+    // Each model is stored as a shared_ptr for safe concurrent access
+    // Writer creates new table, reader keeps reference to old table until done
+    mutable std::unordered_map<std::string, std::shared_ptr<DynamicTable>> models_;
 };

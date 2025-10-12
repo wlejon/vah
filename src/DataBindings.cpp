@@ -36,7 +36,7 @@ int DynamicTableDef::Size(void* ptr)
     if (ptr == nullptr) {
         RefreshCache();
         path_arena_.clear();  // Free all DataPaths from previous render cycle
-        return static_cast<int>(cached_data_.size());
+        return cached_data_ ? static_cast<int>(cached_data_->size()) : 0;
     }
 
     // Otherwise we're asking for the size of a nested structure
@@ -61,10 +61,14 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
 {
     // Root table access: table[index] -> get a row, or table.size -> get size
     if (ptr == nullptr) {
+        if (!cached_data_) {
+            return Rml::DataVariable();
+        }
+
         // Handle named field access (e.g., contacts.size)
         if (!address.name.empty() && address.index == -1) {
             if (address.name == "size") {
-                return Rml::MakeLiteralIntVariable(static_cast<int>(cached_data_.size()));
+                return Rml::MakeLiteralIntVariable(static_cast<int>(cached_data_->size()));
             }
             LOG_WARN("DataBindings: Unknown field '{}' on model '{}'", address.name, model_name_);
             return Rml::DataVariable();
@@ -72,10 +76,10 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
 
         // Handle indexed access (e.g., contacts[0])
         int index = address.index;
-        if (index < 0 || index >= static_cast<int>(cached_data_.size())) {
+        if (index < 0 || index >= static_cast<int>(cached_data_->size())) {
             // Out of bounds - this can happen during data updates, not an error
             LOG_DEBUG("DataBindings: Row index {} out of bounds for model '{}' (size: {})",
-                      index, model_name_, cached_data_.size());
+                      index, model_name_, cached_data_->size());
             return Rml::DataVariable();
         }
 
@@ -87,12 +91,16 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
     // Row or nested object access: obj.field or obj[index]
     const DataPath* parent_path = GetPath(ptr);
 
-    // Get the row this belongs to
-    if (parent_path->row_index < 0 || parent_path->row_index >= static_cast<int>(cached_data_.size())) {
+    if (!cached_data_) {
         return Rml::DataVariable();
     }
 
-    const DynamicRow& row = cached_data_[parent_path->row_index];
+    // Get the row this belongs to
+    if (parent_path->row_index < 0 || parent_path->row_index >= static_cast<int>(cached_data_->size())) {
+        return Rml::DataVariable();
+    }
+
+    const DynamicRow& row = (*cached_data_)[parent_path->row_index];
 
     // Build new path
     DataPath child_path = *parent_path;
@@ -119,7 +127,7 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
 
 const DynamicValue* DynamicTableDef::GetValueAtPath(const DataPath* path)
 {
-    if (!path) {
+    if (!path || !cached_data_) {
         return nullptr;
     }
 
@@ -128,11 +136,11 @@ const DynamicValue* DynamicTableDef::GetValueAtPath(const DataPath* path)
         return nullptr;
     }
 
-    if (path->row_index >= static_cast<int>(cached_data_.size())) {
+    if (path->row_index >= static_cast<int>(cached_data_->size())) {
         return nullptr;
     }
 
-    const DynamicRow& row = cached_data_[path->row_index];
+    const DynamicRow& row = (*cached_data_)[path->row_index];
 
     // If no path, return the whole row (but we can't return a row as a value)
     // This case shouldn't happen in practice
