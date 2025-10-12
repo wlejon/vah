@@ -63,7 +63,6 @@
         button {
             background: #89b4fa;
             color: #1e1e2e;
-            border: none;
             padding: 8px 16px;
             border-radius: 4px;
             font-family: Roboto;
@@ -127,7 +126,6 @@
 
         input[type=text]:focus {
             border-color: #89b4fa;
-            outline: none;
         }
 
         .col-name {

@@ -246,18 +246,18 @@ button, input[type=submit], input[type=button] {
 button:hover {
     background-color: #4a11d3;
     /* Shadow - elevation 4 */
-    box-shadow: rgba(0, 0, 0, 51) 0px 2px 4px -1px,
-                rgba(0, 0, 0, 36) 0px 4px 5px 0px,
-                rgba(0, 0, 0, 31) 0px 1px 10px 0px;
+    box-shadow: rgba(0, 0, 0, 51) 0px 1px 1px -1px,
+                rgba(0, 0, 0, 36) 0px 2px 2px 0px,
+                rgba(0, 0, 0, 31) 0px 1px 5px 0px;
 }
 
 button:active {
     background-color: #5b22e3;
     transform: scale(0.98);
     /* Shadow - elevation 8 */
-    box-shadow: rgba(0, 0, 0, 51) 0px 5px 5px -3px,
-                rgba(0, 0, 0, 36) 0px 8px 10px 1px,
-                rgba(0, 0, 0, 31) 0px 3px 14px 2px;
+    box-shadow: rgba(0, 0, 0, 51) 0px 1px 1px -1px,
+                rgba(0, 0, 0, 36) 0px 1px 2px 1px,
+                rgba(0, 0, 0, 31) 0px 1px 3px 2px;
 }
 
 button:disabled, input[type=submit]:disabled, input[type=button]:disabled {
