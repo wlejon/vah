@@ -74,9 +74,8 @@ namespace {
     }
 }
 
-RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue)
-    : input_seqlock_(input_seqlock)
-    , ui_event_queue_(ui_event_queue)
+RmlUiBridge::RmlUiBridge(UIEventQueue* ui_event_queue)
+    : ui_event_queue_(ui_event_queue)
     , context_(nullptr)
 {
     g_bridge = this;

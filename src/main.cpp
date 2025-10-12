@@ -12,7 +12,6 @@
 #include "RmlUiSystemInterface.h"
 #include "CommandQueue.h"
 #include "ResponseQueue.h"
-#include "Seqlock.h"
 #include "InputState.h"
 #include "UIEventQueue.h"
 #include "ThreadManager.h"
@@ -128,11 +127,10 @@ public:
 
         // Initialize our systems
         command_queue_ = std::make_unique<CommandQueue>();
-        input_seqlock_ = std::make_unique<Seqlock<InputState>>();
         ui_event_queue_ = std::make_unique<UIEventQueue>();
         data_store_ = std::make_unique<DataStore>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get(), ui_event_queue_.get(), data_store_.get());
-        rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get(), ui_event_queue_.get());
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get());
+        rmlui_bridge_ = std::make_unique<RmlUiBridge>(ui_event_queue_.get());
 
         // Initialize input tracker
         input_tracker_ = std::make_unique<InputTracker>();
@@ -218,7 +216,6 @@ public:
         input_tracker_.reset();
         data_store_.reset();
         ui_event_queue_.reset();
-        input_seqlock_.reset();
         command_queue_.reset();
 
         if (rml_context_) {
@@ -250,29 +247,6 @@ private:
     void ProcessInput() {
         SDL_Event event;
 
-        // Start with fresh state for this frame
-        InputState current_state;
-        auto old_state = input_seqlock_->Read();
-        current_state.frame_number = old_state.frame_number + 1;
-
-        // Clear old events - worker threads have had a full frame to read them
-        // (Events from frame N are processed by workers during frame N+1, cleared at frame N+2)
-
-        // Get actual SDL mouse and keyboard state (not from events)
-        int mouse_x, mouse_y;
-        Uint32 mouse_buttons = SDL_GetMouseState(&mouse_x, &mouse_y);
-        current_state.mouse_x = mouse_x;
-        current_state.mouse_y = mouse_y;
-        current_state.mouse_left = (mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
-        current_state.mouse_right = (mouse_buttons & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0;
-        current_state.mouse_middle = (mouse_buttons & SDL_BUTTON(SDL_BUTTON_MIDDLE)) != 0;
-
-        // Get keyboard state
-        const Uint8* keyboard_state = SDL_GetKeyboardState(nullptr);
-        // Copy previous frame's keyboard state
-        current_state.keyboard = old_state.keyboard;
-
-        // Process SDL events
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
@@ -280,45 +254,9 @@ private:
                     break;
 
                 case SDL_KEYDOWN:
-                    current_state.keyboard[SDL_GetKeyName(event.key.keysym.sym)] = true;
-                    current_state.key_events.push_back({SDL_GetKeyName(event.key.keysym.sym), true});
                     if (event.key.keysym.sym == SDLK_ESCAPE) {
                         running_ = false;
                     }
-                    break;
-
-                case SDL_KEYUP:
-                    current_state.keyboard[SDL_GetKeyName(event.key.keysym.sym)] = false;
-                    current_state.key_events.push_back({SDL_GetKeyName(event.key.keysym.sym), false});
-                    break;
-
-                case SDL_MOUSEBUTTONDOWN:
-                    {
-                        MouseButton btn = MouseButton::Left;
-                        if (event.button.button == SDL_BUTTON_LEFT) btn = MouseButton::Left;
-                        else if (event.button.button == SDL_BUTTON_RIGHT) btn = MouseButton::Right;
-                        else if (event.button.button == SDL_BUTTON_MIDDLE) btn = MouseButton::Middle;
-                        current_state.mouse_button_events.push_back({btn, event.button.x, event.button.y, true});
-                    }
-                    break;
-
-                case SDL_MOUSEBUTTONUP:
-                    {
-                        MouseButton btn = MouseButton::Left;
-                        if (event.button.button == SDL_BUTTON_LEFT) btn = MouseButton::Left;
-                        else if (event.button.button == SDL_BUTTON_RIGHT) btn = MouseButton::Right;
-                        else if (event.button.button == SDL_BUTTON_MIDDLE) btn = MouseButton::Middle;
-                        current_state.mouse_button_events.push_back({btn, event.button.x, event.button.y, false});
-                    }
-                    break;
-
-                case SDL_MOUSEMOTION:
-                    current_state.mouse_move_events.push_back({
-                        event.motion.x,
-                        event.motion.y,
-                        event.motion.xrel,
-                        event.motion.yrel
-                    });
                     break;
 
                 case SDL_WINDOWEVENT:
@@ -333,7 +271,6 @@ private:
                     break;
             }
 
-            // Pass events to RmlUI
             if (rml_context_) {
                 switch (event.type) {
                     case SDL_MOUSEBUTTONDOWN:
@@ -349,7 +286,6 @@ private:
                         rml_context_->ProcessMouseWheel(static_cast<float>(-event.wheel.y), 0);
                         break;
                     case SDL_TEXTINPUT:
-                        // Convert UTF-8 text to unicode codepoints for RmlUI
                         for (char* c = event.text.text; *c; c++) {
                             if ((*c & 0x80) == 0) {
                                 rml_context_->ProcessTextInput(static_cast<Rml::Character>(*c));
@@ -359,10 +295,6 @@ private:
                 }
             }
         }
-
-        // Write updated input state to seqlock
-        // Events will persist until next frame, giving worker threads time to read them
-        input_seqlock_->Write(current_state);
     }
 
     void ProcessCommands() {
@@ -633,7 +565,6 @@ private:
     Rml::Context* rml_context_ = nullptr;
 
     std::unique_ptr<CommandQueue> command_queue_;
-    std::unique_ptr<Seqlock<InputState>> input_seqlock_;
     std::unique_ptr<UIEventQueue> ui_event_queue_;
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;

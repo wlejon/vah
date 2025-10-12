@@ -13,8 +13,6 @@ class CommandQueue;
 class UIEventQueue;
 class ResponseQueue;
 class DataStore;
-template<typename T> class Seqlock;
-struct InputState;
 
 class LuaThread {
 public:
@@ -29,7 +27,6 @@ public:
 
     LuaThread(int id, const std::string& script_path,
               CommandQueue* command_queue,
-              Seqlock<InputState>* input_seqlock,
               UIEventQueue* ui_event_queue,
               DataStore* data_store);
     ~LuaThread();
@@ -72,7 +69,6 @@ private:
     void ThreadMain();
     void SetupLuaBindings();
     void ProcessResponses();
-    void ProcessInputEvents();
 
     int id_;
     std::string script_path_;
@@ -84,12 +80,10 @@ private:
     std::unique_ptr<sol::state> lua_;
 
     CommandQueue* command_queue_;
-    Seqlock<InputState>* input_seqlock_;
     UIEventQueue* ui_event_queue_;
     DataStore* data_store_;
     std::unique_ptr<ResponseQueue> response_queue_;
 
-    // Request tracking
     struct PendingRequest {
         int request_id;
         sol::function callback;
@@ -98,17 +92,10 @@ private:
     std::unordered_map<int, PendingRequest> pending_requests_;
     int next_request_id_;
 
-    // Parent tracking (for child threads)
     int parent_thread_id_;
     int parent_request_id_;
 
-    // Event registration
     std::unordered_map<std::string, sol::function> event_handlers_;
-
-    // Input event callbacks
-    sol::function on_mouse_button_;  // (button, x, y, pressed)
-    sol::function on_mouse_move_;    // (x, y, dx, dy)
-    sol::function on_key_;           // (key, pressed)
 
     std::string error_message_;
 };

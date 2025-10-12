@@ -1,7 +1,6 @@
 #include "ThreadManager.h"
 #include "CommandQueue.h"
 #include "ResponseQueue.h"
-#include "Seqlock.h"
 #include "InputState.h"
 #include "Logger.h"
 #include <fstream>
@@ -125,9 +124,8 @@ namespace {
     }
 }
 
-ThreadManager::ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue, DataStore* data_store)
+ThreadManager::ThreadManager(CommandQueue* command_queue, UIEventQueue* ui_event_queue, DataStore* data_store)
     : command_queue_(command_queue)
-    , input_seqlock_(input_seqlock)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
 {
@@ -147,7 +145,7 @@ LuaThread* ThreadManager::GetThread(int thread_id) const {
 int ThreadManager::SpawnThread(const std::string& script_path) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_);
     thread->Start();
 
     threads_.push_back(std::move(thread));
@@ -159,7 +157,7 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
 int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread_id, int parent_request_id) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_);
 
     if (parent_thread_id != 0) {
         thread->SetParent(parent_thread_id, parent_request_id);

@@ -8,16 +8,10 @@
 class CommandQueue;
 class UIEventQueue;
 class DataStore;
-template<typename T> class Seqlock;
-struct InputState;
 
-// Thread manager for Lua worker threads
-// THREADING: Main thread only - all operations via command queue
-// SpawnThread, StopThread, etc. are only called from ProcessCommands
-// No synchronization needed - single-threaded access
 class ThreadManager {
 public:
-    ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue, DataStore* data_store);
+    ThreadManager(CommandQueue* command_queue, UIEventQueue* ui_event_queue, DataStore* data_store);
     ~ThreadManager();
 
     // Thread lifecycle
@@ -52,11 +46,8 @@ private:
     LuaThread* GetThread(int thread_id) const;
 
     CommandQueue* command_queue_;
-    Seqlock<InputState>* input_seqlock_;
     UIEventQueue* ui_event_queue_;
     DataStore* data_store_;
 
-    // Simple vector of threads - thread_id is the index
-    // nullptr entries indicate stopped/removed threads
     std::vector<std::unique_ptr<LuaThread>> threads_;
 };

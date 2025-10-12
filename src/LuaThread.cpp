@@ -2,7 +2,6 @@
 #include "CommandQueue.h"
 #include "UIEventQueue.h"
 #include "ResponseQueue.h"
-#include "Seqlock.h"
 #include "InputState.h"
 #include "Logger.h"
 #include "FileSystem.h"
@@ -89,7 +88,6 @@ namespace {
 
 LuaThread::LuaThread(int id, const std::string& script_path,
                      CommandQueue* command_queue,
-                     Seqlock<InputState>* input_seqlock,
                      UIEventQueue* ui_event_queue,
                      DataStore* data_store)
     : id_(id)
@@ -98,7 +96,6 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , should_stop_(false)
     , is_paused_(false)
     , command_queue_(command_queue)
-    , input_seqlock_(input_seqlock)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
     , response_queue_(std::make_unique<ResponseQueue>())
@@ -232,46 +229,6 @@ void LuaThread::ProcessResponses() {
     }
 }
 
-void LuaThread::ProcessInputEvents() {
-    if (!lua_ || !input_seqlock_) return;
-
-    auto input_state = input_seqlock_->Read();
-
-    // Process mouse button events
-    if (on_mouse_button_) {
-        for (const auto& event : input_state.mouse_button_events) {
-            try {
-                int button = static_cast<int>(event.button);
-                on_mouse_button_(button, event.x, event.y, event.pressed);
-            } catch (const sol::error& e) {
-                LOG_ERROR("Lua thread {} error in on_mouse_button callback: {}", id_, e.what());
-            }
-        }
-    }
-
-    // Process mouse move events
-    if (on_mouse_move_) {
-        for (const auto& event : input_state.mouse_move_events) {
-            try {
-                on_mouse_move_(event.x, event.y, event.dx, event.dy);
-            } catch (const sol::error& e) {
-                LOG_ERROR("Lua thread {} error in on_mouse_move callback: {}", id_, e.what());
-            }
-        }
-    }
-
-    // Process key events
-    if (on_key_) {
-        for (const auto& event : input_state.key_events) {
-            try {
-                on_key_(event.key_name, event.pressed);
-            } catch (const sol::error& e) {
-                LOG_ERROR("Lua thread {} error in on_key callback: {}", id_, e.what());
-            }
-        }
-    }
-}
-
 void LuaThread::ThreadMain() {
     try {
         // Create lua state for this thread
@@ -322,11 +279,7 @@ void LuaThread::ThreadMain() {
 
             if (should_stop_) break;
 
-            // Process responses and fire callbacks
             ProcessResponses();
-
-            // Process SDL input events
-            ProcessInputEvents();
 
             // Dispatch UI events to registered event handlers
             // Only consume from queue if this thread has handlers registered
@@ -522,54 +475,6 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["data"] = data_table;
-
-    // Bind input state interface
-    auto input_table = lua_->create_table();
-
-    input_table["get_state"] = [this]() -> sol::table {
-        if (!input_seqlock_) {
-            return lua_->create_table();
-        }
-
-        auto state = input_seqlock_->Read();
-        auto table = lua_->create_table();
-
-        // Mouse
-        auto mouse = table["mouse"] = lua_->create_table();
-        mouse["x"] = state.mouse_x;
-        mouse["y"] = state.mouse_y;
-        mouse["left"] = state.mouse_left;
-        mouse["right"] = state.mouse_right;
-        mouse["middle"] = state.mouse_middle;
-
-        // Keyboard (simplified - add more as needed)
-        auto keyboard = table["keyboard"] = lua_->create_table();
-        for (const auto& [key, pressed] : state.keyboard) {
-            keyboard[key] = pressed;
-        }
-
-        // Frame number
-        table["frame"] = state.frame_number;
-
-        return table;
-    };
-
-    // Input event callbacks
-    input_table["on_mouse_button"] = [this](sol::function callback) {
-        on_mouse_button_ = callback;
-    };
-
-    input_table["on_mouse_move"] = [this](sol::function callback) {
-        on_mouse_move_ = callback;
-    };
-
-    input_table["on_key"] = [this](sol::function callback) {
-        on_key_ = callback;
-    };
-
-    (*lua_)["input"] = input_table;
-
-    // Bind input tracker interface
     auto tracker_table = lua_->create_table();
 
     tracker_table["get_edits"] = [this](const std::string& model, const std::string& record_id, sol::function callback) {
