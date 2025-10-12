@@ -203,8 +203,27 @@ void LuaThread::ProcessResponses() {
             // Call the lua callback
             try {
                 if (response.error.empty()) {
-                    // Success: callback(data, nil)
-                    it->second.callback(response.data, sol::nil);
+                    // Check if response has PayloadMap data (for cross-thread responses)
+                    if (response.payload_data.has_value()) {
+                        // Convert PayloadMap to Lua table
+                        auto payload_table = lua_->create_table();
+                        for (const auto& [key, value] : response.payload_data.value()) {
+                            std::visit([&](auto&& val) {
+                                using T = std::decay_t<decltype(val)>;
+                                if constexpr (std::is_same_v<T, std::monostate>) {
+                                    payload_table[key] = sol::nil;
+                                } else {
+                                    payload_table[key] = val;
+                                }
+                            }, value);
+                        }
+                        // Success: callback(data, nil)
+                        it->second.callback(payload_table, sol::nil);
+                    } else {
+                        // Normal sol::object response
+                        // Success: callback(data, nil)
+                        it->second.callback(response.data, sol::nil);
+                    }
                 } else {
                     // Error: callback(nil, error)
                     it->second.callback(sol::nil, response.error);
@@ -556,6 +575,44 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["input"] = input_table;
+
+    // Bind input tracker interface
+    auto tracker_table = lua_->create_table();
+
+    tracker_table["get_edits"] = [this](const std::string& model, const std::string& record_id, sol::function callback) {
+        // Generate request ID
+        int request_id = next_request_id_++;
+
+        // Store callback
+        pending_requests_[request_id] = PendingRequest{
+            request_id,
+            callback,
+            "get_input_edits"
+        };
+
+        // Send command
+        Commands::GetInputEdits cmd;
+        cmd.model = model;
+        cmd.record_id = record_id;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = request_id;
+
+        command_queue_->Push(std::move(cmd));
+
+        LOG_DEBUG("Lua thread {} requested input edits for {}.{}", id_, model, record_id);
+    };
+
+    tracker_table["clear"] = [this](const std::string& model, const std::string& record_id) {
+        Commands::ClearInputEdits cmd;
+        cmd.model = model;
+        cmd.record_id = record_id;
+
+        command_queue_->Push(std::move(cmd));
+
+        LOG_DEBUG("Lua thread {} cleared input edits for {}.{}", id_, model, record_id);
+    };
+
+    (*lua_)["tracker"] = tracker_table;
 
     // Bind thread info
     (*lua_)["thread_id"] = id_;

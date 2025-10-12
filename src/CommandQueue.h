@@ -95,6 +95,18 @@ namespace Commands {
         std::string model_name;
         DynamicTable data;
     };
+
+    struct GetInputEdits {
+        std::string model;
+        std::string record_id;
+        int requesting_thread_id;
+        int request_id;
+    };
+
+    struct ClearInputEdits {
+        std::string model;
+        std::string record_id;
+    };
 }
 
 // Variant holding all possible command types
@@ -114,7 +126,9 @@ using Command = std::variant<
     Commands::SetElementStyle,
     Commands::AddElementClass,
     Commands::RemoveElementClass,
-    Commands::UpdateDataModel
+    Commands::UpdateDataModel,
+    Commands::GetInputEdits,
+    Commands::ClearInputEdits
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

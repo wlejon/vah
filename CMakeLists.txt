@@ -40,6 +40,8 @@ add_executable(vah
     src/SqliteBindings.cpp
     src/DataBindings.cpp
     src/DataStore.cpp
+    src/InputEventListener.cpp
+    src/InputTracker.cpp
 )
 
 target_include_directories(vah PRIVATE

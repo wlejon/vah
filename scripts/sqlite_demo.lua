@@ -64,8 +64,6 @@ function load_contacts()
     contacts = results or {}
     print("Loaded " .. #contacts .. " contacts")
 
-    -- Note: delete is handled by trigger_delete() function registered in RmlUI's Lua state
-
     -- Bind data to the model (automatically updates and refreshes view)
     data.bind("contacts", contacts)
 end
@@ -182,8 +180,7 @@ function startup()
         if payload.id then
             local contact_id = payload.id
 
-            -- Payload contains edited fields from pending_edits in C++
-            -- Fall back to current DB values if not edited
+            -- Find the current contact data
             local contact = nil
             for _, c in ipairs(contacts) do
                 if c.id == contact_id then
@@ -192,22 +189,37 @@ function startup()
                 end
             end
 
-            if contact then
-                local name = payload.name or contact.name or ""
-                local email = payload.email or contact.email or ""
-                local phone = payload.phone or contact.phone or ""
-                local company = payload.company or contact.company or ""
+            if not contact then
+                print("ERROR: Contact ID " .. tostring(contact_id) .. " not found in contacts array")
+                return
+            end
+
+            -- Get edited fields from input tracker
+            tracker.get_edits("contacts", tostring(contact_id), function(edits, err)
+                if err then
+                    print("ERROR getting edits: " .. err)
+                    return
+                end
+
+                -- Merge edited fields with current contact data (edited fields override)
+                local name = edits.name or contact.name or ""
+                local email = edits.email or contact.email or ""
+                local phone = edits.phone or contact.phone or ""
+                local company = edits.company or contact.company or ""
 
                 print("Saving contact ID: " .. tostring(contact_id))
-                print("  name: " .. name)
-                print("  email: " .. email)
-                print("  phone: " .. phone)
-                print("  company: " .. company)
+                print("  name: " .. name .. (edits.name and " (edited)" or ""))
+                print("  email: " .. email .. (edits.email and " (edited)" or ""))
+                print("  phone: " .. phone .. (edits.phone and " (edited)" or ""))
+                print("  company: " .. company .. (edits.company and " (edited)" or ""))
 
-                save_contact(contact_id, name, email, phone, company)
-            else
-                print("ERROR: Contact ID " .. tostring(contact_id) .. " not found in contacts array")
-            end
+                -- Save to database
+                if save_contact(contact_id, name, email, phone, company) then
+                    -- Clear tracking after successful save
+                    tracker.clear("contacts", tostring(contact_id))
+                    print("Cleared edit tracking for contact " .. tostring(contact_id))
+                end
+            end)
         else
             print("ERROR: Missing id in save_contact payload")
         end

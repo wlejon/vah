@@ -19,6 +19,8 @@
 #include "RmlUiBridge.h"
 #include "DataStore.h"
 #include "DataBindings.h"
+#include "InputEventListener.h"
+#include "InputTracker.h"
 
 class VahEngine {
 public:
@@ -132,6 +134,41 @@ public:
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get(), ui_event_queue_.get(), data_store_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get(), ui_event_queue_.get());
 
+        // Initialize input tracker
+        input_tracker_ = std::make_unique<InputTracker>();
+        input_tracker_->Initialize("data/input_tracking.db");
+
+        // Initialize input event listener for automatic tracking
+        input_event_listener_ = std::make_unique<InputEventListener>();
+
+        // Setup callbacks - wire InputEventListener to InputTracker
+        input_event_listener_->SetOnFocus([this](const std::string& model, const std::string& record_id,
+                                                  const std::string& field, const std::string& value) {
+            if (input_tracker_) {
+                input_tracker_->OnFocus(model, record_id, field, value);
+            }
+        });
+
+        input_event_listener_->SetOnBlur([this](const std::string& model, const std::string& record_id,
+                                                 const std::string& field, const std::string& value) {
+            if (input_tracker_) {
+                input_tracker_->OnBlur(model, record_id, field, value);
+            }
+        });
+
+        input_event_listener_->SetOnChange([this](const std::string& model, const std::string& record_id,
+                                                   const std::string& field, const std::string& value) {
+            if (input_tracker_) {
+                input_tracker_->OnChange(model, record_id, field, value);
+            }
+        });
+
+        // Register the listener with the RmlUi context for all three event types
+        // Use capture phase (true) to catch events before they bubble
+        rml_context_->AddEventListener("focus", input_event_listener_.get(), true);
+        rml_context_->AddEventListener("blur", input_event_listener_.get(), true);
+        rml_context_->AddEventListener("change", input_event_listener_.get(), true);
+
         // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
 
@@ -168,8 +205,17 @@ public:
         // Clean up data model definitions before context is destroyed
         data_model_defs_.clear();
 
+        // Unregister input event listener before destroying context
+        if (rml_context_ && input_event_listener_) {
+            rml_context_->RemoveEventListener("focus", input_event_listener_.get(), true);
+            rml_context_->RemoveEventListener("blur", input_event_listener_.get(), true);
+            rml_context_->RemoveEventListener("change", input_event_listener_.get(), true);
+        }
+
         thread_manager_.reset();
         rmlui_bridge_.reset();
+        input_event_listener_.reset();
+        input_tracker_.reset();
         data_store_.reset();
         ui_event_queue_.reset();
         input_seqlock_.reset();
@@ -512,61 +558,6 @@ private:
                                     }
                                 });
 
-                                constructor.BindEventCallback("trigger_save_with_inputs", [this](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& arguments) {
-                                    if (arguments.size() >= 1) {
-                                        int contact_id = 0;
-                                        if (arguments[0].GetType() == Rml::Variant::INT) {
-                                            contact_id = arguments[0].Get<int>();
-                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                                            contact_id = static_cast<int>(arguments[0].Get<int64_t>());
-                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                                            contact_id = static_cast<int>(arguments[0].Get<float>());
-                                        }
-
-                                        Rml::Element* button = event.GetTargetElement();
-                                        if (!button) return;
-
-                                        Rml::Element* col_actions = button->GetParentNode();
-                                        if (!col_actions) return;
-
-                                        Rml::Element* row = col_actions->GetParentNode();
-                                        if (!row) return;
-
-                                        PayloadMap payload;
-                                        payload["id"] = contact_id;
-
-                                        for (int i = 0; i < row->GetNumChildren(); i++) {
-                                            Rml::Element* col = row->GetChild(i);
-                                            if (!col) continue;
-
-                                            std::string class_name = col->GetClassNames();
-                                            Rml::Element* input = col->GetChild(0);
-                                            if (input && input->GetTagName() == "input") {
-                                                auto* form_control = dynamic_cast<Rml::ElementFormControl*>(input);
-                                                if (form_control) {
-                                                    auto value = form_control->GetValue();
-                                                    std::string value_str(value.data(), value.size());
-
-                                                    if (class_name.find("col-name") != std::string::npos) {
-                                                        payload["name"] = value_str;
-                                                    } else if (class_name.find("col-email") != std::string::npos) {
-                                                        payload["email"] = value_str;
-                                                    } else if (class_name.find("col-phone") != std::string::npos) {
-                                                        payload["phone"] = value_str;
-                                                    } else if (class_name.find("col-company") != std::string::npos) {
-                                                        payload["company"] = value_str;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        LOG_DEBUG("trigger_save_with_inputs: Read {} fields for contact {}",
-                                                  payload.size() - 1, contact_id);
-
-                                        rmlui_bridge_->TriggerEvent("save_contact", payload);
-                                    }
-                                });
-
                                 // Store the definition so it stays alive
                                 data_model_defs_[command.model_name] = std::move(table_def);
 
@@ -587,6 +578,30 @@ private:
                             LOG_DEBUG("Marked data model '{}' as dirty", command.model_name);
                         }
                     }
+                }
+                else if constexpr (std::is_same_v<T, Commands::GetInputEdits>) {
+                    LOG_DEBUG("Processing GetInputEdits command: model={}, record_id={}",
+                              command.model, command.record_id);
+
+                    // Query InputTracker for edits
+                    PayloadMap edits = input_tracker_->GetEdits(command.model, command.record_id);
+
+                    // Send response with PayloadMap - Lua thread will convert to table
+                    auto response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
+                    if (response_queue) {
+                        Response response{command.request_id, sol::nil, "", std::move(edits)};
+                        response_queue->Push(std::move(response));
+                        LOG_DEBUG("Sent GetInputEdits response with PayloadMap to thread {}",
+                                 command.requesting_thread_id);
+                    } else {
+                        LOG_WARN("Cannot send GetInputEdits response: thread {} not found",
+                                command.requesting_thread_id);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::ClearInputEdits>) {
+                    LOG_DEBUG("Processing ClearInputEdits command: model={}, record_id={}",
+                              command.model, command.record_id);
+                    input_tracker_->ClearEdits(command.model, command.record_id);
                 }
 
             }, cmd);
@@ -632,6 +647,8 @@ private:
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
+    std::unique_ptr<InputEventListener> input_event_listener_;
+    std::unique_ptr<InputTracker> input_tracker_;
 
     // Track loaded documents by ID
     std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
