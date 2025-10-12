@@ -22,6 +22,7 @@ find_package(Lua REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
+find_package(httplib CONFIG REQUIRED)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
@@ -38,6 +39,7 @@ add_executable(vah
     src/FileSystem.cpp
     src/JsonBindings.cpp
     src/SqliteBindings.cpp
+    src/HttpBindings.cpp
     src/DataBindings.cpp
     src/DataStore.cpp
     src/InputEventListener.cpp
@@ -63,6 +65,7 @@ target_link_libraries(vah PRIVATE
     sol2::sol2
     nlohmann_json::nlohmann_json
     unofficial::sqlite3::sqlite3
+    httplib::httplib
 )
 
 

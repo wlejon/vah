@@ -7,7 +7,9 @@
 #include "FileSystem.h"
 #include "JsonBindings.h"
 #include "SqliteBindings.h"
+#include "HttpBindings.h"
 #include "DataStore.h"
+#include <httplib.h>
 #include <chrono>
 
 namespace {
@@ -102,6 +104,7 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , next_request_id_(1)
     , parent_thread_id_(0)
     , parent_request_id_(0)
+    , active_http_server_(nullptr)
 {
 }
 
@@ -117,6 +120,12 @@ void LuaThread::Start() {
 void LuaThread::Stop() {
     should_stop_ = true;
     state_ = State::Stopping;
+
+    // Stop any HTTP server running on this thread (lock-free)
+    httplib::Server* server = active_http_server_.load(std::memory_order_acquire);
+    if (server) {
+        server->stop();  // Thread-safe call to unblock listen()
+    }
 }
 
 void LuaThread::Pause() {
@@ -362,6 +371,9 @@ void LuaThread::SetupLuaBindings() {
     // Setup SQLite bindings
     SqliteBindings::SetupBindings(*lua_);
 
+    // Setup HTTP bindings (pass this pointer for lock-free server registration)
+    HttpBindings::SetupBindings(*lua_, this);
+
     // Bind event registration system
     auto event_table = lua_->create_table();
 
@@ -515,6 +527,11 @@ void LuaThread::SetupLuaBindings() {
     // Bind thread info
     (*lua_)["thread_id"] = id_;
     (*lua_)["thread_name"] = script_path_;
+
+    // Bind sleep function
+    (*lua_)["sleep"] = [](double seconds) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
+    };
 
     // Override print to send to main thread via command queue
     (*lua_)["print"] = [this](sol::variadic_args va) {

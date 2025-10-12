@@ -34,5 +34,84 @@ for assistance, please read the code directly or the documentation. they can be 
 
 ## current task
 
-please review the C++ code. please provide a comprehensive review.
+we are introducing httplib to the codebase. we are exposing it to lua and building a client and a server to demonstrate it. it's currently building and running but the server does not send messages and the client reports disconnected. 
+
+## code impacted so far
+
+PS D:\projects\vah> git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   CMakeLists.txt
+        modified:   docs/instructions.md
+        modified:   scripts/main.lua
+        modified:   src/JsonBindings.h
+        modified:   src/LuaThread.cpp
+        modified:   src/LuaThread.h
+        modified:   src/UIEventQueue.cpp
+        modified:   src/UIEventQueue.h
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        scripts/http_client.lua
+        scripts/http_server.lua
+        src/HttpBindings.cpp
+        src/HttpBindings.h
+        ui/http_demo.rml
+
+## current log
+
+[2025-10-12 16:18:20.637] [info] Initializing Vah Engine...
+[2025-10-12 16:18:20.839] [info] RmlGL3: 
+[2025-10-12 16:18:20.845] [info] [RmlUi] Loaded font face 'Roboto' [regular] from 'ui/fonts/roboto-static/Roboto-Regular.ttf'.
+[2025-10-12 16:18:20.845] [info] [RmlUi] Loaded font face 'Roboto' [bold] from 'ui/fonts/roboto-static/Roboto-Bold.ttf'.
+[2025-10-12 16:18:20.845] [info] [RmlUi] Loaded font face 'Roboto' [italic] from 'ui/fonts/roboto-static/Roboto-Italic.ttf'.
+[2025-10-12 16:18:20.845] [info] [RmlUi] Loaded font face 'Roboto' [weight=300] from 'ui/fonts/roboto-static/Roboto-Light.ttf'.
+[2025-10-12 16:18:20.845] [info] [RmlUi] Loaded font face 'Roboto' [weight=500] from 'ui/fonts/roboto-static/Roboto-Medium.ttf'.
+[2025-10-12 16:18:20.846] [info] [RmlUi] Loading Lua plugin using a new Lua state.
+[2025-10-12 16:18:20.846] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [regular] from 'memory'.
+[2025-10-12 16:18:20.846] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [italic] from 'memory'.
+[2025-10-12 16:18:20.852] [info] Opened InputTracker database: data/input_tracking.db
+[2025-10-12 16:18:20.852] [debug] InputTracker tables created/verified
+[2025-10-12 16:18:20.852] [info] InputTracker initialized successfully
+[2025-10-12 16:18:20.852] [info] RmlUiBridge: Registered trigger() and convenience functions in RmlUI lua state
+[2025-10-12 16:18:20.853] [info] ThreadManager: Spawned thread 0 for script 'scripts/main.lua'
+[2025-10-12 16:18:20.853] [info] Vah Engine initialized successfully
+[2025-10-12 16:18:20.853] [info] FileSystem bindings initialized
+[2025-10-12 16:18:20.853] [info] JSON bindings initialized
+[2025-10-12 16:18:20.853] [info] SQLite bindings initialized
+[2025-10-12 16:18:20.853] [info] HTTP bindings initialized
+[2025-10-12 16:18:20.854] [info] Lua thread 0 running
+[2025-10-12 16:18:20.858] [info] [Lua Thread 0] Main Lua thread started
+[2025-10-12 16:18:20.858] [info] Processing SpawnThread command: scripts/http_server.lua (parent: 0)
+[2025-10-12 16:18:20.858] [info] ThreadManager: Spawned thread 1 for script 'scripts/http_server.lua'
+[2025-10-12 16:18:20.858] [info] Processing SpawnThread command: scripts/http_client.lua (parent: 0)
+[2025-10-12 16:18:20.858] [info] ThreadManager: Spawned thread 2 for script 'scripts/http_client.lua'
+[2025-10-12 16:18:20.858] [info] [Lua Thread 0] Demo initialized
+[2025-10-12 16:18:20.858] [info] FileSystem bindings initialized
+[2025-10-12 16:18:20.858] [info] JSON bindings initialized
+[2025-10-12 16:18:20.858] [info] FileSystem bindings initialized
+[2025-10-12 16:18:20.858] [info] JSON bindings initialized
+[2025-10-12 16:18:20.859] [info] SQLite bindings initialized
+[2025-10-12 16:18:20.859] [info] SQLite bindings initialized
+[2025-10-12 16:18:20.859] [info] HTTP bindings initialized
+[2025-10-12 16:18:20.859] [info] HTTP bindings initialized
+[2025-10-12 16:18:20.859] [debug] Lua thread 1 queued LoadUIDocument: ui/http_demo.rml
+[2025-10-12 16:18:20.859] [info] Registering route: GET /events
+[2025-10-12 16:18:20.859] [info] Starting HTTP server on 127.0.0.1:8080
+[2025-10-12 16:18:20.860] [error] Lua thread 1 exception: lua: error: stack index 1, expected string, received userdata
+[2025-10-12 16:18:20.878] [info] [Lua Thread 1] Starting HTTP server...
+[2025-10-12 16:18:20.878] [info] [Lua Thread 2] Starting HTTP client...
+[2025-10-12 16:18:20.878] [info] [Lua Thread 2] Waiting 3 seconds for server to start...
+[2025-10-12 16:18:20.878] [info] Processing LoadUIDocument command: ui/http_demo.rml
+[2025-10-12 16:18:20.886] [info] Stored document with ID: http_demo
+[2025-10-12 16:18:20.886] [info] Loaded UI document: ui/http_demo.rml
+[2025-10-12 16:18:20.886] [info] [Lua Thread 1] Calling server:listen() - this will block...
+[2025-10-12 16:18:23.631] [info] Shutting down Vah Engine...
+[2025-10-12 16:18:23.632] [info] ThreadManager: Stopping all 3 threads
+[2025-10-12 16:18:23.660] [info] Lua thread 0 finished normally
+[2025-10-12 16:18:25.899] [info] Lua thread 2 running
+[2025-10-12 16:18:25.899] [info] Lua thread 2 finished normally
+
 

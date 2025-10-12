@@ -19,7 +19,6 @@ UIEventQueue::~UIEventQueue() {
 }
 
 void UIEventQueue::Push(UIEvent&& event) {
-    // Multi-producer (RmlUi thread)
     Node* new_node = new Node(std::move(event));
 
     // Use CAS loop to append to tail (lock-free)
@@ -55,7 +54,6 @@ std::vector<UIEvent> UIEventQueue::PopAll() {
 }
 
 std::vector<UIEvent> UIEventQueue::PopAllInternal() {
-    // Consumer (worker threads) only
     std::vector<UIEvent> events;
 
     Node* current = cached_head_;

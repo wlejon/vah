@@ -4,19 +4,14 @@
 #include <atomic>
 #include <vector>
 
-// Lock-free multi-producer (RmlUi thread) single-consumer (worker threads) queue
+// Lock-free queue
 class UIEventQueue {
 public:
     UIEventQueue();
     ~UIEventQueue();
 
-    // Thread-safe push (called from RmlUi thread via RmlUiBridge)
     void Push(UIEvent&& event);
-
-    // Drain all pending events (called from worker threads only)
     std::vector<UIEvent> PopAll();
-
-    // Check if queue is empty
     bool Empty() const;
 
 private:

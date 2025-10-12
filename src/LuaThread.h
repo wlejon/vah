@@ -9,6 +9,9 @@
 #include <unordered_set>
 #include <sol/sol.hpp>
 
+// Forward declarations
+namespace httplib { class Server; }
+
 class CommandQueue;
 class UIEventQueue;
 class ResponseQueue;
@@ -50,6 +53,7 @@ public:
     int GetId() const { return id_; }
     State GetState() const { return state_.load(); }
     bool IsRunning() const { return state_.load() == State::Running; }
+    bool ShouldStop() const { return should_stop_.load(); }
     std::string GetError() const { return error_message_; }
     std::string GetScriptPath() const { return script_path_; }
 
@@ -61,6 +65,10 @@ public:
 
     // Response queue access (for main thread to push responses)
     ResponseQueue* GetResponseQueue() { return response_queue_.get(); }
+
+    // HTTP server management (for stopping blocking server on shutdown)
+    void SetActiveHttpServer(httplib::Server* server) { active_http_server_.store(server, std::memory_order_release); }
+    void ClearActiveHttpServer() { active_http_server_.store(nullptr, std::memory_order_release); }
 
     // Wait for thread to finish
     void Join();
@@ -98,4 +106,7 @@ private:
     std::unordered_map<std::string, sol::function> event_handlers_;
 
     std::string error_message_;
+
+    // Active HTTP server (if any) for this thread - used to stop blocking listen() during shutdown
+    std::atomic<httplib::Server*> active_http_server_;
 };
