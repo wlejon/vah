@@ -110,8 +110,5 @@ private:
     sol::function on_mouse_move_;    // (x, y, dx, dy)
     sol::function on_key_;           // (key, pressed)
 
-    // Track which data models have been bound (to avoid re-binding)
-    std::unordered_set<std::string> bound_models_;
-
     std::string error_message_;
 };

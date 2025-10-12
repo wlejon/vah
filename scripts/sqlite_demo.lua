@@ -66,11 +66,8 @@ function load_contacts()
 
     -- Note: delete is handled by trigger_delete() function registered in RmlUI's Lua state
 
-    -- Bind data to the model (first time creates the model)
+    -- Bind data to the model (automatically updates and refreshes view)
     data.bind("contacts", contacts)
-
-    -- Trigger update to refresh the view
-    data.update("contacts")
 end
 
 function add_contact(name, email, phone, company, notes)

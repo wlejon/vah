@@ -31,18 +31,20 @@ using DynamicRow = std::unordered_map<std::string, DynamicValue>;
 // A table is a vector of rows
 using DynamicTable = std::vector<DynamicRow>;
 
-// Thread-safe data store for dynamic models
-// Uses atomic shared_ptr for lock-free single-writer, multiple-reader access
-// This is safe for complex types unlike Seqlock
+// Data store for dynamic models
+// THREADING: Main thread only - all writes via command queue
+// SetModel() is called only from main thread in ProcessCommands
+// GetModel() is called only from main thread during RmlUi render
+// No synchronization needed - single-threaded access
 class DataStore {
 public:
     DataStore() = default;
     ~DataStore() = default;
 
-    // Set a model's data (called from worker threads)
+    // Set a model's data (main thread only)
     void SetModel(const std::string& name, const DynamicTable& data);
 
-    // Get a model's data (called from main thread)
+    // Get a model's data (main thread only)
     // Returns a shared_ptr to avoid copying large tables
     std::shared_ptr<const DynamicTable> GetModel(const std::string& name) const;
 
@@ -53,7 +55,7 @@ public:
     void RemoveModel(const std::string& name);
 
 private:
-    // Each model is stored as a shared_ptr for safe concurrent access
-    // Writer creates new table, reader keeps reference to old table until done
-    mutable std::unordered_map<std::string, std::shared_ptr<DynamicTable>> models_;
+    // Simple map - no synchronization needed (single-threaded)
+    // shared_ptr used to keep data alive during render cycle
+    std::unordered_map<std::string, std::shared_ptr<DynamicTable>> models_;
 };

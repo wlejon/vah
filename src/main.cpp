@@ -468,145 +468,124 @@ private:
                         }
                     }
                 }
-                else if constexpr (std::is_same_v<T, Commands::BindDataModel>) {
-                    LOG_INFO("Processing BindDataModel command: {}", command.model_name);
+                else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
+                    LOG_DEBUG("Processing UpdateDataModel command: {} ({} rows)",
+                              command.model_name, command.data.size());
 
                     if (rml_context_ && data_store_) {
-                        // Create a data model in RmlUi
-                        Rml::DataModelConstructor constructor = rml_context_->CreateDataModel(command.model_name);
+                        // Update the data in DataStore (main thread only - no races)
+                        data_store_->SetModel(command.model_name, command.data);
 
-                        if (constructor) {
-                            // Create our custom variable definition
-                            auto table_def = std::make_unique<DynamicTableDef>(data_store_.get(), command.model_name);
+                        // Check if we need to create the RmlUi model or just dirty it
+                        auto it = data_model_handles_.find(command.model_name);
+                        if (it == data_model_handles_.end()) {
+                            // First time - create the RmlUi data model
+                            Rml::DataModelConstructor constructor = rml_context_->CreateDataModel(command.model_name);
 
-                            // Bind the model (using nullptr as root pointer for the whole table)
-                            constructor.BindCustomDataVariable(command.model_name, Rml::DataVariable(table_def.get(), nullptr));
+                            if (constructor) {
+                                // Create our custom variable definition
+                                auto table_def = std::make_unique<DynamicTableDef>(data_store_.get(), command.model_name);
 
-                            // Register event callbacks that use RmlUI's Lua state
-                            // These callbacks can access the global trigger functions
-                            constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
-                                if (arguments.size() >= 1) {
-                                    // Get the Lua state and call the global trigger_delete function
-                                    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
-                                    lua_getglobal(L, "trigger_delete");
-                                    if (lua_isfunction(L, -1)) {
-                                        // Push the contact ID argument
-                                        if (arguments[0].GetType() == Rml::Variant::INT) {
-                                            lua_pushinteger(L, arguments[0].Get<int>());
-                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                                            lua_pushinteger(L, arguments[0].Get<int64_t>());
-                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                                            lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
+                                // Bind the model (using nullptr as root pointer for the whole table)
+                                constructor.BindCustomDataVariable(command.model_name,
+                                                                  Rml::DataVariable(table_def.get(), nullptr));
+
+                                // Register event callbacks that use RmlUI's Lua state
+                                constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+                                    if (arguments.size() >= 1) {
+                                        lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+                                        lua_getglobal(L, "trigger_delete");
+                                        if (lua_isfunction(L, -1)) {
+                                            if (arguments[0].GetType() == Rml::Variant::INT) {
+                                                lua_pushinteger(L, arguments[0].Get<int>());
+                                            } else if (arguments[0].GetType() == Rml::Variant::INT64) {
+                                                lua_pushinteger(L, arguments[0].Get<int64_t>());
+                                            } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
+                                                lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
+                                            } else {
+                                                lua_pushinteger(L, 0);
+                                            }
+                                            lua_pcall(L, 1, 0, 0);
                                         } else {
-                                            lua_pushinteger(L, 0);
+                                            lua_pop(L, 1);
                                         }
-                                        // Call the function
-                                        lua_pcall(L, 1, 0, 0);
-                                    } else {
-                                        lua_pop(L, 1);
                                     }
-                                }
-                            });
+                                });
 
-                            constructor.BindEventCallback("trigger_save_with_inputs", [this](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& arguments) {
-                                if (arguments.size() >= 1) {
-                                    int contact_id = 0;
-                                    if (arguments[0].GetType() == Rml::Variant::INT) {
-                                        contact_id = arguments[0].Get<int>();
-                                    } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                                        contact_id = static_cast<int>(arguments[0].Get<int64_t>());
-                                    } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                                        contact_id = static_cast<int>(arguments[0].Get<float>());
-                                    }
+                                constructor.BindEventCallback("trigger_save_with_inputs", [this](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& arguments) {
+                                    if (arguments.size() >= 1) {
+                                        int contact_id = 0;
+                                        if (arguments[0].GetType() == Rml::Variant::INT) {
+                                            contact_id = arguments[0].Get<int>();
+                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
+                                            contact_id = static_cast<int>(arguments[0].Get<int64_t>());
+                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
+                                            contact_id = static_cast<int>(arguments[0].Get<float>());
+                                        }
 
-                                    // Get the row element (button -> col-actions -> table-row)
-                                    Rml::Element* button = event.GetTargetElement();
-                                    if (!button) return;
+                                        Rml::Element* button = event.GetTargetElement();
+                                        if (!button) return;
 
-                                    Rml::Element* col_actions = button->GetParentNode();
-                                    if (!col_actions) return;
+                                        Rml::Element* col_actions = button->GetParentNode();
+                                        if (!col_actions) return;
 
-                                    Rml::Element* row = col_actions->GetParentNode();
-                                    if (!row) return;
+                                        Rml::Element* row = col_actions->GetParentNode();
+                                        if (!row) return;
 
-                                    // Find input elements by traversing children
-                                    PayloadMap payload;
-                                    payload["id"] = contact_id;
+                                        PayloadMap payload;
+                                        payload["id"] = contact_id;
 
-                                    // Helper to find input in a column div
-                                    auto find_input_value = [](Rml::Element* parent, const std::string& expected_id_prefix) -> std::string {
-                                        for (int i = 0; i < parent->GetNumChildren(); i++) {
-                                            Rml::Element* child = parent->GetChild(i);
-                                            if (child && child->GetNumChildren() > 0) {
-                                                Rml::Element* grandchild = child->GetChild(0);
-                                                if (grandchild && grandchild->GetTagName() == "input") {
-                                                    auto* form_control = dynamic_cast<Rml::ElementFormControl*>(grandchild);
-                                                    if (form_control) {
-                                                        auto value = form_control->GetValue();
-                                                        return std::string(value.data(), value.size());
+                                        for (int i = 0; i < row->GetNumChildren(); i++) {
+                                            Rml::Element* col = row->GetChild(i);
+                                            if (!col) continue;
+
+                                            std::string class_name = col->GetClassNames();
+                                            Rml::Element* input = col->GetChild(0);
+                                            if (input && input->GetTagName() == "input") {
+                                                auto* form_control = dynamic_cast<Rml::ElementFormControl*>(input);
+                                                if (form_control) {
+                                                    auto value = form_control->GetValue();
+                                                    std::string value_str(value.data(), value.size());
+
+                                                    if (class_name.find("col-name") != std::string::npos) {
+                                                        payload["name"] = value_str;
+                                                    } else if (class_name.find("col-email") != std::string::npos) {
+                                                        payload["email"] = value_str;
+                                                    } else if (class_name.find("col-phone") != std::string::npos) {
+                                                        payload["phone"] = value_str;
+                                                    } else if (class_name.find("col-company") != std::string::npos) {
+                                                        payload["company"] = value_str;
                                                     }
                                                 }
                                             }
                                         }
-                                        return "";
-                                    };
 
-                                    // Get values from each column (skip last one which is actions)
-                                    int child_idx = 0;
-                                    for (int i = 0; i < row->GetNumChildren(); i++) {
-                                        Rml::Element* col = row->GetChild(i);
-                                        if (!col) continue;
+                                        LOG_DEBUG("trigger_save_with_inputs: Read {} fields for contact {}",
+                                                  payload.size() - 1, contact_id);
 
-                                        std::string class_name = col->GetClassNames();
-                                        Rml::Element* input = col->GetChild(0);
-                                        if (input && input->GetTagName() == "input") {
-                                            auto* form_control = dynamic_cast<Rml::ElementFormControl*>(input);
-                                            if (form_control) {
-                                                auto value = form_control->GetValue();
-                                                std::string value_str(value.data(), value.size());
-
-                                                if (class_name.find("col-name") != std::string::npos) {
-                                                    payload["name"] = value_str;
-                                                } else if (class_name.find("col-email") != std::string::npos) {
-                                                    payload["email"] = value_str;
-                                                } else if (class_name.find("col-phone") != std::string::npos) {
-                                                    payload["phone"] = value_str;
-                                                } else if (class_name.find("col-company") != std::string::npos) {
-                                                    payload["company"] = value_str;
-                                                }
-                                            }
-                                        }
+                                        rmlui_bridge_->TriggerEvent("save_contact", payload);
                                     }
+                                });
 
-                                    LOG_DEBUG("trigger_save_with_inputs: Read {} fields for contact {}", payload.size() - 1, contact_id);
+                                // Store the definition so it stays alive
+                                data_model_defs_[command.model_name] = std::move(table_def);
 
-                                    // Trigger the event
-                                    rmlui_bridge_->TriggerEvent("save_contact", payload);
-                                }
-                            });
+                                // Get and store the model handle
+                                Rml::DataModelHandle model_handle = constructor.GetModelHandle();
+                                data_model_handles_[command.model_name] = model_handle;
 
-                            // Store the definition so it stays alive
-                            data_model_defs_[command.model_name] = std::move(table_def);
+                                // Mark as dirty to trigger initial render
+                                model_handle.DirtyVariable(command.model_name);
 
-                            // Get and store the model handle
-                            data_model_handles_[command.model_name] = constructor.GetModelHandle();
-
-                            LOG_INFO("Successfully bound data model '{}'", command.model_name);
+                                LOG_INFO("Created data model '{}' (marked dirty for initial render)", command.model_name);
+                            } else {
+                                LOG_WARN("Failed to create data model '{}'", command.model_name);
+                            }
                         } else {
-                            LOG_WARN("Failed to create data model '{}'", command.model_name);
+                            // Model already exists - just mark it dirty to trigger re-render
+                            it->second.DirtyVariable(command.model_name);
+                            LOG_DEBUG("Marked data model '{}' as dirty", command.model_name);
                         }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::DirtyDataModel>) {
-                    LOG_DEBUG("Processing DirtyDataModel command: {}", command.model_name);
-
-                    // Mark the model as dirty so RmlUi re-renders
-                    auto it = data_model_handles_.find(command.model_name);
-                    if (it != data_model_handles_.end()) {
-                        it->second.DirtyVariable(command.model_name);
-                        LOG_DEBUG("Marked data model '{}' as dirty", command.model_name);
-                    } else {
-                        LOG_WARN("Data model '{}' not found for dirty marking", command.model_name);
                     }
                 }
 

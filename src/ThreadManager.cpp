@@ -126,156 +126,69 @@ namespace {
 }
 
 ThreadManager::ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue, DataStore* data_store)
-    : next_thread_id_(1)
-    , command_queue_(command_queue)
+    : command_queue_(command_queue)
     , input_seqlock_(input_seqlock)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
-    , capacity_(1024)
 {
-    // Allocate initial array of atomic pointers
-    size_t initial_capacity = capacity_.load(std::memory_order_relaxed);
-    std::atomic<LuaThread*>* array = new std::atomic<LuaThread*>[initial_capacity];
-
-    // Initialize all pointers to nullptr
-    for (size_t i = 0; i < initial_capacity; ++i) {
-        array[i].store(nullptr, std::memory_order_relaxed);
-    }
-
-    threads_.store(array, std::memory_order_release);
 }
 
 ThreadManager::~ThreadManager() {
     StopAll();
-
-    // Clean up the array
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    delete[] array;
 }
 
 LuaThread* ThreadManager::GetThread(int thread_id) const {
-    if (thread_id < 0 || static_cast<size_t>(thread_id) >= capacity_.load(std::memory_order_acquire)) {
+    if (thread_id < 0 || thread_id >= static_cast<int>(threads_.size())) {
         return nullptr;
     }
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    return array[thread_id].load(std::memory_order_acquire);
-}
-
-void ThreadManager::EnsureCapacity(int thread_id) {
-    size_t required_capacity = static_cast<size_t>(thread_id) + 1;
-    size_t current_capacity = capacity_.load(std::memory_order_acquire);
-
-    while (required_capacity > current_capacity) {
-        // Calculate new capacity (double the size)
-        size_t new_capacity = current_capacity * 2;
-        if (new_capacity < required_capacity) {
-            new_capacity = required_capacity;
-        }
-
-        // Allocate new array
-        std::atomic<LuaThread*>* new_array = new std::atomic<LuaThread*>[new_capacity];
-
-        // Get current array
-        std::atomic<LuaThread*>* old_array = threads_.load(std::memory_order_acquire);
-
-        // Copy existing pointers from old array
-        for (size_t i = 0; i < current_capacity; ++i) {
-            new_array[i].store(old_array[i].load(std::memory_order_acquire), std::memory_order_relaxed);
-        }
-
-        // Initialize new slots to nullptr
-        for (size_t i = current_capacity; i < new_capacity; ++i) {
-            new_array[i].store(nullptr, std::memory_order_relaxed);
-        }
-
-        // Try to atomically swap the array pointer
-        if (threads_.compare_exchange_strong(old_array, new_array,
-                                            std::memory_order_release,
-                                            std::memory_order_acquire)) {
-            // Update capacity
-            capacity_.store(new_capacity, std::memory_order_release);
-
-            // We successfully swapped, old_array can be deleted
-            // Note: In a production system, you'd want to use hazard pointers or
-            // epoch-based reclamation to safely delete the old array
-            delete[] old_array;
-            break;
-        } else {
-            // Another thread beat us to it, delete our new array and retry
-            delete[] new_array;
-            current_capacity = capacity_.load(std::memory_order_acquire);
-        }
-    }
+    return threads_[thread_id].get();
 }
 
 int ThreadManager::SpawnThread(const std::string& script_path) {
-    // Atomically get next thread ID
-    int thread_id = next_thread_id_.fetch_add(1, std::memory_order_relaxed);
+    int thread_id = static_cast<int>(threads_.size());
 
-    // Ensure we have capacity
-    EnsureCapacity(thread_id);
-
-    // Create and start the thread
-    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
     thread->Start();
 
-    // Store the thread pointer atomically
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    array[thread_id].store(thread, std::memory_order_release);
+    threads_.push_back(std::move(thread));
 
     LOG_INFO("ThreadManager: Spawned thread {} for script '{}'", thread_id, script_path);
     return thread_id;
 }
 
 int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread_id, int parent_request_id) {
-    // Atomically get next thread ID
-    int thread_id = next_thread_id_.fetch_add(1, std::memory_order_relaxed);
+    int thread_id = static_cast<int>(threads_.size());
 
-    // Ensure we have capacity
-    EnsureCapacity(thread_id);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
 
-    // Create the thread
-    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_, ui_event_queue_, data_store_);
-
-    // Set parent information
     if (parent_thread_id != 0) {
         thread->SetParent(parent_thread_id, parent_request_id);
     }
 
     thread->Start();
 
-    // Store the thread pointer atomically
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    array[thread_id].store(thread, std::memory_order_release);
+    threads_.push_back(std::move(thread));
 
     LOG_INFO("ThreadManager: Spawned thread {} for script '{}' (parent: {})", thread_id, script_path, parent_thread_id);
     return thread_id;
 }
 
 void ThreadManager::StopThread(int thread_id) {
-    // Atomically swap out the thread pointer
-    LuaThread* thread = nullptr;
-    if (thread_id >= 0 && static_cast<size_t>(thread_id) < capacity_.load(std::memory_order_acquire)) {
-        std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-        thread = array[thread_id].exchange(nullptr, std::memory_order_acq_rel);
-    }
+    LuaThread* thread = GetThread(thread_id);
 
     if (thread != nullptr) {
         thread->Stop();
         thread->Join();
-        delete thread;
+        threads_[thread_id].reset();  // Set to nullptr
         LOG_INFO("ThreadManager: Stopped thread {}", thread_id);
     }
 }
 
 void ThreadManager::StopAll() {
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    size_t cap = capacity_.load(std::memory_order_acquire);
     size_t thread_count = 0;
 
     // First pass: stop all threads
-    for (size_t i = 0; i < cap; ++i) {
-        LuaThread* thread = array[i].load(std::memory_order_acquire);
+    for (auto& thread : threads_) {
         if (thread != nullptr) {
             thread->Stop();
             ++thread_count;
@@ -285,11 +198,10 @@ void ThreadManager::StopAll() {
     LOG_INFO("ThreadManager: Stopping all {} threads", thread_count);
 
     // Second pass: join and delete all threads
-    for (size_t i = 0; i < cap; ++i) {
-        LuaThread* thread = array[i].exchange(nullptr, std::memory_order_acq_rel);
+    for (auto& thread : threads_) {
         if (thread != nullptr) {
             thread->Join();
-            delete thread;
+            thread.reset();
         }
     }
 }
@@ -313,11 +225,7 @@ void ThreadManager::ResumeThread(int thread_id) {
 void ThreadManager::PauseAll() {
     LOG_INFO("ThreadManager: Pausing all threads");
 
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    size_t cap = capacity_.load(std::memory_order_acquire);
-
-    for (size_t i = 0; i < cap; ++i) {
-        LuaThread* thread = array[i].load(std::memory_order_acquire);
+    for (auto& thread : threads_) {
         if (thread != nullptr) {
             thread->Pause();
         }
@@ -327,11 +235,7 @@ void ThreadManager::PauseAll() {
 void ThreadManager::ResumeAll() {
     LOG_INFO("ThreadManager: Resuming all threads");
 
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    size_t cap = capacity_.load(std::memory_order_acquire);
-
-    for (size_t i = 0; i < cap; ++i) {
-        LuaThread* thread = array[i].load(std::memory_order_acquire);
+    for (auto& thread : threads_) {
         if (thread != nullptr) {
             thread->Resume();
         }
@@ -409,12 +313,9 @@ std::string ThreadManager::GetThreadError(int thread_id) const {
 }
 
 size_t ThreadManager::GetThreadCount() const {
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    size_t cap = capacity_.load(std::memory_order_acquire);
     size_t count = 0;
-
-    for (size_t i = 0; i < cap; ++i) {
-        if (array[i].load(std::memory_order_acquire) != nullptr) {
+    for (const auto& thread : threads_) {
+        if (thread != nullptr) {
             ++count;
         }
     }
@@ -422,12 +323,9 @@ size_t ThreadManager::GetThreadCount() const {
 }
 
 std::vector<int> ThreadManager::GetAllThreadIds() const {
-    std::atomic<LuaThread*>* array = threads_.load(std::memory_order_acquire);
-    size_t cap = capacity_.load(std::memory_order_acquire);
     std::vector<int> ids;
-
-    for (size_t i = 0; i < cap; ++i) {
-        if (array[i].load(std::memory_order_acquire) != nullptr) {
+    for (size_t i = 0; i < threads_.size(); ++i) {
+        if (threads_[i] != nullptr) {
             ids.push_back(static_cast<int>(i));
         }
     }

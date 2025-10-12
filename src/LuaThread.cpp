@@ -496,36 +496,17 @@ void LuaThread::SetupLuaBindings() {
     auto data_table = lua_->create_table();
 
     data_table["bind"] = [this](const std::string& model_name, sol::table data) {
-        if (!data_store_) {
-            LOG_ERROR("LuaThread {}: DataStore not available", id_);
-            return;
-        }
-
         // Convert Lua table to DynamicTable
         DynamicTable dynamic_data = TableToDynamicTable(data);
 
-        // Store in DataStore (updates data for existing or new models)
-        data_store_->SetModel(model_name, dynamic_data);
-
-        // Only send BindDataModel command if this is the first time binding this model
-        if (bound_models_.find(model_name) == bound_models_.end()) {
-            Commands::BindDataModel cmd;
-            cmd.model_name = model_name;
-            command_queue_->Push(std::move(cmd));
-            bound_models_.insert(model_name);
-            LOG_DEBUG("LuaThread {}: Bound data model '{}' with {} rows", id_, model_name, dynamic_data.size());
-        } else {
-            LOG_DEBUG("LuaThread {}: Updated data model '{}' with {} rows", id_, model_name, dynamic_data.size());
-        }
-    };
-
-    data_table["update"] = [this](const std::string& model_name) {
-        // Send command to main thread to mark the model as dirty
-        Commands::DirtyDataModel cmd;
+        // Send command to main thread to update DataStore and dirty the model
+        Commands::UpdateDataModel cmd;
         cmd.model_name = model_name;
+        cmd.data = std::move(dynamic_data);
         command_queue_->Push(std::move(cmd));
 
-        LOG_DEBUG("LuaThread {}: Marked data model '{}' as dirty", id_, model_name);
+        LOG_DEBUG("LuaThread {}: Queued data model '{}' update with {} rows",
+                  id_, model_name, cmd.data.size());
     };
 
     (*lua_)["data"] = data_table;

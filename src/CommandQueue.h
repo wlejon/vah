@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <sol/sol.hpp>
 #include "InputState.h"
+#include "DataStore.h"
 
 // Command types that lua threads can send to the main thread
 namespace Commands {
@@ -90,12 +91,9 @@ namespace Commands {
         std::string class_name;
     };
 
-    struct BindDataModel {
+    struct UpdateDataModel {
         std::string model_name;
-    };
-
-    struct DirtyDataModel {
-        std::string model_name;
+        DynamicTable data;
     };
 }
 
@@ -116,8 +114,7 @@ using Command = std::variant<
     Commands::SetElementStyle,
     Commands::AddElementClass,
     Commands::RemoveElementClass,
-    Commands::BindDataModel,
-    Commands::DirtyDataModel
+    Commands::UpdateDataModel
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

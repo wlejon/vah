@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <atomic>
 #include "LuaThread.h"
 
 class CommandQueue;
@@ -12,6 +11,10 @@ class DataStore;
 template<typename T> class Seqlock;
 struct InputState;
 
+// Thread manager for Lua worker threads
+// THREADING: Main thread only - all operations via command queue
+// SpawnThread, StopThread, etc. are only called from ProcessCommands
+// No synchronization needed - single-threaded access
 class ThreadManager {
 public:
     ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, UIEventQueue* ui_event_queue, DataStore* data_store);
@@ -47,16 +50,13 @@ public:
 
 private:
     LuaThread* GetThread(int thread_id) const;
-    void EnsureCapacity(int thread_id);
 
-    std::atomic<int> next_thread_id_;
     CommandQueue* command_queue_;
     Seqlock<InputState>* input_seqlock_;
     UIEventQueue* ui_event_queue_;
     DataStore* data_store_;
 
-    // Lock-free thread storage: array of atomic pointers indexed by thread_id
-    // Note: We use raw pointers with atomic operations for lock-free access
-    std::atomic<std::atomic<LuaThread*>*> threads_;
-    std::atomic<size_t> capacity_;
+    // Simple vector of threads - thread_id is the index
+    // nullptr entries indicate stopped/removed threads
+    std::vector<std::unique_ptr<LuaThread>> threads_;
 };
