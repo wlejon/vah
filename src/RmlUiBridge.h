@@ -17,7 +17,11 @@ public:
     // Add a UI event to the input state
     void TriggerEvent(const std::string& event_name, const PayloadMap& payload);
 
+    // Get the RmlUi context
+    Rml::Context* GetContext() const { return context_; }
+
 private:
     Seqlock<InputState>* input_seqlock_;
     InputState pending_state_;
+    Rml::Context* context_;
 };

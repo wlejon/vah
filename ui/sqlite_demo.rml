@@ -113,6 +113,23 @@
             background: #1e1e2e;
         }
 
+        input[type=text] {
+            background: #11111b;
+            color: #cdd6f4;
+            border: 1px #45475a;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: Roboto;
+            font-size: 13px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input[type=text]:focus {
+            border-color: #89b4fa;
+            outline: none;
+        }
+
         .col-name {
             flex: 2;
             min-width: 150px;
@@ -134,18 +151,32 @@
         }
 
         .col-actions {
-            flex: 1;
-            min-width: 100px;
+            flex: 1.5;
+            min-width: 120px;
             text-align: right;
+            display: flex;
+            gap: 4px;
+            justify-content: flex-end;
         }
 
         .col-actions button {
-            background: #f38ba8;
             padding: 4px 12px;
             font-size: 11px;
         }
 
-        .col-actions button:hover {
+        .btn-save {
+            background: #a6e3a1;
+        }
+
+        .btn-save:hover {
+            background: #94e2d5;
+        }
+
+        .btn-delete {
+            background: #f38ba8;
+        }
+
+        .btn-delete:hover {
             background: #f5c2e7;
         }
 
@@ -222,12 +253,21 @@
                 <!-- Table rows using data-for -->
                 <div data-for="contact : contacts">
                     <div class="table-row">
-                        <div class="col-name">{{contact.name}}</div>
-                        <div class="col-email">{{contact.email}}</div>
-                        <div class="col-phone">{{contact.phone}}</div>
-                        <div class="col-company">{{contact.company}}</div>
+                        <div class="col-name">
+                            <input type="text" id="name_{{contact.id}}" data-attr-value="contact.name" />
+                        </div>
+                        <div class="col-email">
+                            <input type="text" id="email_{{contact.id}}" data-attr-value="contact.email" />
+                        </div>
+                        <div class="col-phone">
+                            <input type="text" id="phone_{{contact.id}}" data-attr-value="contact.phone" />
+                        </div>
+                        <div class="col-company">
+                            <input type="text" id="company_{{contact.id}}" data-attr-value="contact.company" />
+                        </div>
                         <div class="col-actions">
-                            <button data-event-click="trigger_delete(contact.id)">Delete</button>
+                            <button class="btn-save" data-event-click="trigger_save(contact.id)">Save</button>
+                            <button class="btn-delete" data-event-click="trigger_delete(contact.id)">Delete</button>
                         </div>
                     </div>
                 </div>

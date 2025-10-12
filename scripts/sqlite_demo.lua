@@ -101,6 +101,35 @@ function add_contact(name, email, phone, company, notes)
     return true
 end
 
+function save_contact(contact_id, name, email, phone, company)
+    if not database then
+        return false
+    end
+
+    -- Escape single quotes for SQL
+    local escaped_name = name:gsub("'", "''")
+    local escaped_email = email:gsub("'", "''")
+    local escaped_phone = phone:gsub("'", "''")
+    local escaped_company = company:gsub("'", "''")
+
+    local sql = string.format([[
+        UPDATE contacts
+        SET name = '%s', email = '%s', phone = '%s', company = '%s'
+        WHERE id = %d
+    ]], escaped_name, escaped_email, escaped_phone, escaped_company, contact_id)
+
+    local success, error = database:execute(sql)
+
+    if not success then
+        print("Error updating contact: " .. error)
+        return false
+    end
+
+    print("Updated contact with id: " .. contact_id)
+    load_contacts()  -- This will re-query and update the data model
+    return true
+end
+
 function delete_contact(contact_id)
     if not database then
         return false
@@ -150,6 +179,20 @@ function startup()
     -- Register event handlers
     event.register("add_contact", function(payload)
         add_random_contact()
+    end)
+
+    event.register("save_contact", function(payload)
+        if payload.id and payload.name and payload.email then
+            local contact_id = payload.id
+            local name = payload.name or ""
+            local email = payload.email or ""
+            local phone = payload.phone or ""
+            local company = payload.company or ""
+            print("Saving contact ID: " .. tostring(contact_id))
+            save_contact(contact_id, name, email, phone, company)
+        else
+            print("ERROR: Missing required fields in save_contact payload")
+        end
     end)
 
     event.register("delete_contact", function(payload)

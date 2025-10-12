@@ -71,15 +71,84 @@ namespace {
 
         return 0;  // No return values
     }
+
+    // Lua callback for trigger_save function
+    int lua_trigger_save(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // Single argument: contact ID (required)
+        if (!lua_isnumber(L, 1)) {
+            return luaL_error(L, "trigger_save() requires contact ID as first argument");
+        }
+
+        int contact_id = static_cast<int>(lua_tointeger(L, 1));
+
+        // Get the context
+        Rml::Context* context = g_bridge->GetContext();
+        if (!context) {
+            return luaL_error(L, "RmlUi context not available");
+        }
+
+        // Get the active document
+        Rml::ElementDocument* document = context->GetDocument(0);
+        if (!document) {
+            return luaL_error(L, "No active document");
+        }
+
+        // Build element IDs based on contact_id
+        std::string name_id = "name_" + std::to_string(contact_id);
+        std::string email_id = "email_" + std::to_string(contact_id);
+        std::string phone_id = "phone_" + std::to_string(contact_id);
+        std::string company_id = "company_" + std::to_string(contact_id);
+
+        // Query input elements and extract values
+        PayloadMap payload;
+        payload["id"] = contact_id;
+
+        auto name_elem = document->GetElementById(name_id);
+        if (name_elem) {
+            auto value = name_elem->GetAttribute<Rml::String>("value", "");
+            payload["name"] = std::string(value.data(), value.size());
+        }
+
+        auto email_elem = document->GetElementById(email_id);
+        if (email_elem) {
+            auto value = email_elem->GetAttribute<Rml::String>("value", "");
+            payload["email"] = std::string(value.data(), value.size());
+        }
+
+        auto phone_elem = document->GetElementById(phone_id);
+        if (phone_elem) {
+            auto value = phone_elem->GetAttribute<Rml::String>("value", "");
+            payload["phone"] = std::string(value.data(), value.size());
+        }
+
+        auto company_elem = document->GetElementById(company_id);
+        if (company_elem) {
+            auto value = company_elem->GetAttribute<Rml::String>("value", "");
+            payload["company"] = std::string(value.data(), value.size());
+        }
+
+        // Trigger the save_contact event
+        g_bridge->TriggerEvent("save_contact", payload);
+
+        return 0;  // No return values
+    }
 }
 
 RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock)
     : input_seqlock_(input_seqlock)
+    , context_(nullptr)
 {
     g_bridge = this;
 }
 
 void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
+    // Store the context
+    context_ = context;
+
     // Register the trigger function globally in RmlUI's lua state
     lua_pushcfunction(L, lua_trigger);
     lua_setglobal(L, "trigger");
@@ -88,17 +157,25 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
     lua_pushcfunction(L, lua_trigger_delete);
     lua_setglobal(L, "trigger_delete");
 
+    // Register the trigger_save convenience function
+    lua_pushcfunction(L, lua_trigger_save);
+    lua_setglobal(L, "trigger_save");
+
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger(), trigger_delete() and update_data_model() functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger(), trigger_delete(), and trigger_save() functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {
     // Read current state
     auto current_state = input_seqlock_->Read();
+
+    // Clear old ui_events to prevent accumulation
+    // (Main thread will read these events and process them next frame)
+    current_state.ui_events.clear();
 
     // Add new event
     UIEvent event;

@@ -206,7 +206,8 @@ private:
         auto old_state = input_seqlock_->Read();
         current_state.frame_number = old_state.frame_number + 1;
 
-        // DON'T clear events yet - let worker threads read them first
+        // Clear old events - worker threads have had a full frame to read them
+        // (Events from frame N are processed by workers during frame N+1, cleared at frame N+2)
 
         // Get actual SDL mouse and keyboard state (not from events)
         int mouse_x, mouse_y;
@@ -488,12 +489,36 @@ private:
                             constructor.BindCustomDataVariable(command.model_name, Rml::DataVariable(table_def.get(), nullptr));
 
                             // Register event callbacks that use RmlUI's Lua state
-                            // These callbacks can access the global trigger_delete function
+                            // These callbacks can access the global trigger functions
                             constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
                                 if (arguments.size() >= 1) {
                                     // Get the Lua state and call the global trigger_delete function
                                     lua_State* L = Rml::Lua::Interpreter::GetLuaState();
                                     lua_getglobal(L, "trigger_delete");
+                                    if (lua_isfunction(L, -1)) {
+                                        // Push the contact ID argument
+                                        if (arguments[0].GetType() == Rml::Variant::INT) {
+                                            lua_pushinteger(L, arguments[0].Get<int>());
+                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
+                                            lua_pushinteger(L, arguments[0].Get<int64_t>());
+                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
+                                            lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
+                                        } else {
+                                            lua_pushinteger(L, 0);
+                                        }
+                                        // Call the function
+                                        lua_pcall(L, 1, 0, 0);
+                                    } else {
+                                        lua_pop(L, 1);
+                                    }
+                                }
+                            });
+
+                            constructor.BindEventCallback("trigger_save", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+                                if (arguments.size() >= 1) {
+                                    // Get the Lua state and call the global trigger_save function
+                                    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+                                    lua_getglobal(L, "trigger_save");
                                     if (lua_isfunction(L, -1)) {
                                         // Push the contact ID argument
                                         if (arguments[0].GetType() == Rml::Variant::INT) {
