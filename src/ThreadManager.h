@@ -7,12 +7,13 @@
 #include "LuaThread.h"
 
 class CommandQueue;
+class DataStore;
 template<typename T> class Seqlock;
 struct InputState;
 
 class ThreadManager {
 public:
-    ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock);
+    ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, DataStore* data_store);
     ~ThreadManager();
 
     // Thread lifecycle
@@ -50,6 +51,7 @@ private:
     std::atomic<int> next_thread_id_;
     CommandQueue* command_queue_;
     Seqlock<InputState>* input_seqlock_;
+    DataStore* data_store_;
 
     // Lock-free thread storage: array of atomic pointers indexed by thread_id
     // Note: We use raw pointers with atomic operations for lock-free access

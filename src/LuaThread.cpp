@@ -7,6 +7,7 @@
 #include "FileSystem.h"
 #include "JsonBindings.h"
 #include "SqliteBindings.h"
+#include "DataStore.h"
 #include <chrono>
 
 namespace {
@@ -29,11 +30,66 @@ namespace {
         }
         return result;
     }
+
+    // Helper to convert sol::object to DynamicValue
+    DynamicValue ObjectToDynamicValue(const sol::object& obj) {
+        if (obj.is<bool>()) {
+            return obj.as<bool>();
+        } else if (obj.is<int>()) {
+            return static_cast<int64_t>(obj.as<int>());
+        } else if (obj.is<int64_t>()) {
+            return obj.as<int64_t>();
+        } else if (obj.is<double>()) {
+            return obj.as<double>();
+        } else if (obj.is<std::string>()) {
+            return obj.as<std::string>();
+        } else if (obj.is<sol::table>()) {
+            // Nested table - convert to DynamicMap
+            auto nested_map = std::make_shared<DynamicMap>();
+            sol::table nested_table = obj.as<sol::table>();
+            for (const auto& [key, value] : nested_table) {
+                if (key.is<std::string>()) {
+                    std::string key_str = key.as<std::string>();
+                    nested_map->fields[key_str] = ObjectToDynamicValue(value);
+                }
+            }
+            return nested_map;
+        } else {
+            return std::monostate{};
+        }
+    }
+
+    // Helper to convert Lua table (array of tables) to DynamicTable
+    DynamicTable TableToDynamicTable(const sol::table& table) {
+        DynamicTable result;
+
+        // Iterate through array elements (1-indexed in Lua)
+        for (size_t i = 1; i <= table.size(); ++i) {
+            sol::object elem = table[i];
+            if (elem.is<sol::table>()) {
+                sol::table row_table = elem.as<sol::table>();
+                DynamicRow row;
+
+                // Convert each field in the row
+                for (const auto& [key, value] : row_table) {
+                    if (key.is<std::string>()) {
+                        std::string key_str = key.as<std::string>();
+                        row[key_str] = ObjectToDynamicValue(value);
+                    }
+                }
+
+                result.push_back(std::move(row));
+            }
+        }
+
+        return result;
+    }
 }
 
 LuaThread::LuaThread(int id, const std::string& script_path,
                      CommandQueue* command_queue,
-                     Seqlock<InputState>* input_seqlock)
+                     Seqlock<InputState>* input_seqlock,
+                     DataStore* data_store)
     : id_(id)
     , script_path_(script_path)
     , state_(State::Starting)
@@ -41,10 +97,12 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , is_paused_(false)
     , command_queue_(command_queue)
     , input_seqlock_(input_seqlock)
+    , data_store_(data_store)
     , response_queue_(std::make_unique<ResponseQueue>())
     , next_request_id_(1)
     , parent_thread_id_(0)
     , parent_request_id_(0)
+    , last_processed_frame_(0)
 {
 }
 
@@ -259,28 +317,34 @@ void LuaThread::ThreadMain() {
             // Dispatch UI events to registered event handlers
             if (input_seqlock_) {
                 auto input_state = input_seqlock_->Read();
-                for (const auto& ui_event : input_state.ui_events) {
-                    auto it = event_handlers_.find(ui_event.name);
-                    if (it != event_handlers_.end()) {
-                        // Convert payload to lua table
-                        auto payload_table = lua_->create_table();
-                        for (const auto& [key, value] : ui_event.payload) {
-                            std::visit([&](auto&& val) {
-                                using T = std::decay_t<decltype(val)>;
-                                if constexpr (std::is_same_v<T, std::monostate>) {
-                                    payload_table[key] = sol::nil;
-                                } else {
-                                    payload_table[key] = val;
-                                }
-                            }, value);
-                        }
 
-                        // Call registered handler
-                        try {
-                            it->second(payload_table);
-                        } catch (const sol::error& e) {
-                            LOG_ERROR("Lua thread {} error in event handler for '{}': {}",
-                                     id_, ui_event.name, e.what());
+                // Only process events if this is a new frame (prevents processing same events twice)
+                if (input_state.frame_number != last_processed_frame_) {
+                    last_processed_frame_ = input_state.frame_number;
+
+                    for (const auto& ui_event : input_state.ui_events) {
+                        auto it = event_handlers_.find(ui_event.name);
+                        if (it != event_handlers_.end()) {
+                            // Convert payload to lua table
+                            auto payload_table = lua_->create_table();
+                            for (const auto& [key, value] : ui_event.payload) {
+                                std::visit([&](auto&& val) {
+                                    using T = std::decay_t<decltype(val)>;
+                                    if constexpr (std::is_same_v<T, std::monostate>) {
+                                        payload_table[key] = sol::nil;
+                                    } else {
+                                        payload_table[key] = val;
+                                    }
+                                }, value);
+                            }
+
+                            // Call registered handler
+                            try {
+                                it->second(payload_table);
+                            } catch (const sol::error& e) {
+                                LOG_ERROR("Lua thread {} error in event handler for '{}': {}",
+                                         id_, ui_event.name, e.what());
+                            }
                         }
                     }
                 }
@@ -428,6 +492,44 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["ui"] = ui_table;
+
+    // Bind data model operations
+    auto data_table = lua_->create_table();
+
+    data_table["bind"] = [this](const std::string& model_name, sol::table data) {
+        if (!data_store_) {
+            LOG_ERROR("LuaThread {}: DataStore not available", id_);
+            return;
+        }
+
+        // Convert Lua table to DynamicTable
+        DynamicTable dynamic_data = TableToDynamicTable(data);
+
+        // Store in DataStore (updates data for existing or new models)
+        data_store_->SetModel(model_name, dynamic_data);
+
+        // Only send BindDataModel command if this is the first time binding this model
+        if (bound_models_.find(model_name) == bound_models_.end()) {
+            Commands::BindDataModel cmd;
+            cmd.model_name = model_name;
+            command_queue_->Push(std::move(cmd));
+            bound_models_.insert(model_name);
+            LOG_DEBUG("LuaThread {}: Bound data model '{}' with {} rows", id_, model_name, dynamic_data.size());
+        } else {
+            LOG_DEBUG("LuaThread {}: Updated data model '{}' with {} rows", id_, model_name, dynamic_data.size());
+        }
+    };
+
+    data_table["update"] = [this](const std::string& model_name) {
+        // Send command to main thread to mark the model as dirty
+        Commands::DirtyDataModel cmd;
+        cmd.model_name = model_name;
+        command_queue_->Push(std::move(cmd));
+
+        LOG_DEBUG("LuaThread {}: Marked data model '{}' as dirty", id_, model_name);
+    };
+
+    (*lua_)["data"] = data_table;
 
     // Bind input state interface
     auto input_table = lua_->create_table();

@@ -48,6 +48,29 @@ namespace {
 
         return 0;  // No return values
     }
+
+    // Lua callback for trigger_delete function (convenience wrapper)
+    int lua_trigger_delete(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // Single argument: contact ID (required)
+        if (!lua_isnumber(L, 1)) {
+            return luaL_error(L, "trigger_delete() requires contact ID as first argument");
+        }
+
+        int contact_id = static_cast<int>(lua_tointeger(L, 1));
+
+        // Create payload with id
+        PayloadMap payload;
+        payload["id"] = contact_id;
+
+        // Trigger the delete_contact event
+        g_bridge->TriggerEvent("delete_contact", payload);
+
+        return 0;  // No return values
+    }
 }
 
 RmlUiBridge::RmlUiBridge(Seqlock<InputState>* input_seqlock)
@@ -61,12 +84,16 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
     lua_pushcfunction(L, lua_trigger);
     lua_setglobal(L, "trigger");
 
+    // Register the trigger_delete convenience function
+    lua_pushcfunction(L, lua_trigger_delete);
+    lua_setglobal(L, "trigger_delete");
+
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger() and update_data_model() functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger(), trigger_delete() and update_data_model() functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {

@@ -16,6 +16,8 @@
 #include "InputState.h"
 #include "ThreadManager.h"
 #include "RmlUiBridge.h"
+#include "DataStore.h"
+#include "DataBindings.h"
 
 class VahEngine {
 public:
@@ -124,7 +126,8 @@ public:
         // Initialize our systems
         command_queue_ = std::make_unique<CommandQueue>();
         input_seqlock_ = std::make_unique<Seqlock<InputState>>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get());
+        data_store_ = std::make_unique<DataStore>();
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), input_seqlock_.get(), data_store_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(input_seqlock_.get());
 
         // Setup RmlUI lua bindings - pass context so we can create data models
@@ -160,8 +163,12 @@ public:
     void Shutdown() {
         LOG_INFO("Shutting down Vah Engine...");
 
+        // Clean up data model definitions before context is destroyed
+        data_model_defs_.clear();
+
         thread_manager_.reset();
         rmlui_bridge_.reset();
+        data_store_.reset();
         input_seqlock_.reset();
         command_queue_.reset();
 
@@ -198,6 +205,8 @@ private:
         InputState current_state;
         auto old_state = input_seqlock_->Read();
         current_state.frame_number = old_state.frame_number + 1;
+
+        // DON'T clear events yet - let worker threads read them first
 
         // Get actual SDL mouse and keyboard state (not from events)
         int mouse_x, mouse_y;
@@ -301,12 +310,17 @@ private:
             }
         }
 
-        auto state_after_events = input_seqlock_->Read();
-        current_state.ui_events = state_after_events.ui_events;
+        // Check if any UI events were triggered during SDL processing
+        // (RmlUiBridge writes directly to seqlock when trigger() is called)
+        auto state_after_triggers = input_seqlock_->Read();
+
+        // Copy any UI events that were added by trigger() during this frame
+        if (!state_after_triggers.ui_events.empty()) {
+            current_state.ui_events = state_after_triggers.ui_events;
+        }
 
         // Write updated input state to seqlock
-        input_seqlock_->Write(current_state);
-        current_state.ui_events.clear();
+        // Events will persist until next frame, giving worker threads time to read them
         input_seqlock_->Write(current_state);
     }
 
@@ -459,6 +473,70 @@ private:
                         }
                     }
                 }
+                else if constexpr (std::is_same_v<T, Commands::BindDataModel>) {
+                    LOG_INFO("Processing BindDataModel command: {}", command.model_name);
+
+                    if (rml_context_ && data_store_) {
+                        // Create a data model in RmlUi
+                        Rml::DataModelConstructor constructor = rml_context_->CreateDataModel(command.model_name);
+
+                        if (constructor) {
+                            // Create our custom variable definition
+                            auto table_def = std::make_unique<DynamicTableDef>(data_store_.get(), command.model_name);
+
+                            // Bind the model (using nullptr as root pointer for the whole table)
+                            constructor.BindCustomDataVariable(command.model_name, Rml::DataVariable(table_def.get(), nullptr));
+
+                            // Register event callbacks that use RmlUI's Lua state
+                            // These callbacks can access the global trigger_delete function
+                            constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+                                if (arguments.size() >= 1) {
+                                    // Get the Lua state and call the global trigger_delete function
+                                    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+                                    lua_getglobal(L, "trigger_delete");
+                                    if (lua_isfunction(L, -1)) {
+                                        // Push the contact ID argument
+                                        if (arguments[0].GetType() == Rml::Variant::INT) {
+                                            lua_pushinteger(L, arguments[0].Get<int>());
+                                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
+                                            lua_pushinteger(L, arguments[0].Get<int64_t>());
+                                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
+                                            lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
+                                        } else {
+                                            lua_pushinteger(L, 0);
+                                        }
+                                        // Call the function
+                                        lua_pcall(L, 1, 0, 0);
+                                    } else {
+                                        lua_pop(L, 1);
+                                    }
+                                }
+                            });
+
+                            // Store the definition so it stays alive
+                            data_model_defs_[command.model_name] = std::move(table_def);
+
+                            // Get and store the model handle
+                            data_model_handles_[command.model_name] = constructor.GetModelHandle();
+
+                            LOG_INFO("Successfully bound data model '{}'", command.model_name);
+                        } else {
+                            LOG_WARN("Failed to create data model '{}'", command.model_name);
+                        }
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::DirtyDataModel>) {
+                    LOG_DEBUG("Processing DirtyDataModel command: {}", command.model_name);
+
+                    // Mark the model as dirty so RmlUi re-renders
+                    auto it = data_model_handles_.find(command.model_name);
+                    if (it != data_model_handles_.end()) {
+                        it->second.DirtyVariable(command.model_name);
+                        LOG_DEBUG("Marked data model '{}' as dirty", command.model_name);
+                    } else {
+                        LOG_WARN("Data model '{}' not found for dirty marking", command.model_name);
+                    }
+                }
 
             }, cmd);
         });
@@ -499,11 +577,16 @@ private:
 
     std::unique_ptr<CommandQueue> command_queue_;
     std::unique_ptr<Seqlock<InputState>> input_seqlock_;
+    std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
 
     // Track loaded documents by ID
     std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
+
+    // Track data models and their definitions
+    std::unordered_map<std::string, std::unique_ptr<DynamicTableDef>> data_model_defs_;
+    std::unordered_map<std::string, Rml::DataModelHandle> data_model_handles_;
 };
 
 int main(int argc, char* argv[]) {

@@ -37,6 +37,8 @@ add_executable(vah
     src/FileSystem.cpp
     src/JsonBindings.cpp
     src/SqliteBindings.cpp
+    src/DataBindings.cpp
+    src/DataStore.cpp
 )
 
 target_include_directories(vah PRIVATE

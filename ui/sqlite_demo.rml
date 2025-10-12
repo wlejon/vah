@@ -80,6 +80,8 @@
             background: #313244;
             border-radius: 8px;
             padding: 16px;
+            max-height: 600px;
+            overflow-y: auto;
             overflow-x: auto;
         }
 
@@ -195,18 +197,40 @@
         </div>
 
         <div class="toolbar">
-            <div id="contact_count" class="toolbar-left">
-                Loading...
+            <div class="toolbar-left" data-model="contacts">
+                Total: {{contacts.size}} contacts
             </div>
             <div class="toolbar-right">
                 <button onclick="trigger('add_contact', {})">Add Random Contact</button>
             </div>
         </div>
 
-        <div class="table-container">
-            <div id="contacts_table">
-                <!-- Contacts table will be populated here -->
-                <div class="empty-state">Loading contacts...</div>
+        <div class="table-container" data-model="contacts">
+            <div data-if="contacts.size == 0">
+                <div class="empty-state">No contacts yet. Click "Add Random Contact" to create one.</div>
+            </div>
+            <div data-if="contacts.size > 0">
+                <!-- Table header -->
+                <div class="table-header">
+                    <div class="col-name">Name</div>
+                    <div class="col-email">Email</div>
+                    <div class="col-phone">Phone</div>
+                    <div class="col-company">Company</div>
+                    <div class="col-actions">Actions</div>
+                </div>
+
+                <!-- Table rows using data-for -->
+                <div data-for="contact : contacts">
+                    <div class="table-row">
+                        <div class="col-name">{{contact.name}}</div>
+                        <div class="col-email">{{contact.email}}</div>
+                        <div class="col-phone">{{contact.phone}}</div>
+                        <div class="col-company">{{contact.company}}</div>
+                        <div class="col-actions">
+                            <button data-event-click="trigger_delete(contact.id)">Delete</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

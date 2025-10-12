@@ -63,41 +63,14 @@ function load_contacts()
 
     contacts = results or {}
     print("Loaded " .. #contacts .. " contacts")
-    render_contacts()
-end
 
-function render_contacts()
-    local html = ""
+    -- Note: delete is handled by trigger_delete() function registered in RmlUI's Lua state
 
-    if #contacts == 0 then
-        html = '<div class="empty-state">No contacts yet. Click "Add Contact" to create one.</div>'
-    else
-        -- Table header
-        html = html .. '<div class="table-header">'
-        html = html .. '<div class="col-name">Name</div>'
-        html = html .. '<div class="col-email">Email</div>'
-        html = html .. '<div class="col-phone">Phone</div>'
-        html = html .. '<div class="col-company">Company</div>'
-        html = html .. '<div class="col-actions">Actions</div>'
-        html = html .. '</div>'
+    -- Bind data to the model (first time creates the model)
+    data.bind("contacts", contacts)
 
-        -- Table rows
-        for _, contact in ipairs(contacts) do
-            html = html .. '<div class="table-row">'
-            html = html .. string.format('<div class="col-name">%s</div>', contact.name or "")
-            html = html .. string.format('<div class="col-email">%s</div>', contact.email or "")
-            html = html .. string.format('<div class="col-phone">%s</div>', contact.phone or "")
-            html = html .. string.format('<div class="col-company">%s</div>', contact.company or "")
-            html = html .. string.format(
-                '<div class="col-actions"><button onclick="trigger(\'delete_contact\', {id = %d})">Delete</button></div>',
-                contact.id
-            )
-            html = html .. '</div>'
-        end
-    end
-
-    ui.set_element_text("contacts_table", html)
-    ui.set_element_text("contact_count", string.format("Total: %d contacts", #contacts))
+    -- Trigger update to refresh the view
+    data.update("contacts")
 end
 
 function add_contact(name, email, phone, company, notes)
@@ -124,7 +97,7 @@ function add_contact(name, email, phone, company, notes)
     end
 
     print("Added contact: " .. name)
-    load_contacts()
+    load_contacts()  -- This will re-query and update the data model
     return true
 end
 
@@ -142,7 +115,7 @@ function delete_contact(contact_id)
     end
 
     print("Deleted contact with id: " .. contact_id)
-    load_contacts()
+    load_contacts()  -- This will re-query and update the data model
     return true
 end
 
@@ -167,12 +140,10 @@ function startup()
     -- Seed random number generator
     math.randomseed(os.time())
 
-    -- Load UI
-    ui.load_document("ui/sqlite_demo.rml")
-
-    -- Initialize database
+    -- Initialize database FIRST
     if not init_database() then
-        ui.set_element_text("contacts_table", '<div class="error">Failed to initialize database</div>')
+        -- Can't show error in UI since we haven't loaded the document yet
+        print("ERROR: Failed to initialize database")
         return
     end
 
@@ -183,12 +154,19 @@ function startup()
 
     event.register("delete_contact", function(payload)
         if payload.id then
-            delete_contact(payload.id)
+            local contact_id = payload.id
+            print("Deleting contact ID: " .. tostring(contact_id))
+            delete_contact(contact_id)
+        else
+            print("ERROR: No id in delete_contact payload")
         end
     end)
 
-    -- Load initial data
+    -- Bind data BEFORE loading UI (so data model exists when document loads)
     load_contacts()
+
+    -- Load UI AFTER data is bound
+    ui.load_document("ui/sqlite_demo.rml")
 end
 
 function update(dt)

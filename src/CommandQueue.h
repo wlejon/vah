@@ -89,6 +89,14 @@ namespace Commands {
         std::string element_id;
         std::string class_name;
     };
+
+    struct BindDataModel {
+        std::string model_name;
+    };
+
+    struct DirtyDataModel {
+        std::string model_name;
+    };
 }
 
 // Variant holding all possible command types
@@ -107,7 +115,9 @@ using Command = std::variant<
     Commands::SetElementAttribute,
     Commands::SetElementStyle,
     Commands::AddElementClass,
-    Commands::RemoveElementClass
+    Commands::RemoveElementClass,
+    Commands::BindDataModel,
+    Commands::DirtyDataModel
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

@@ -125,10 +125,11 @@ namespace {
     }
 }
 
-ThreadManager::ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock)
+ThreadManager::ThreadManager(CommandQueue* command_queue, Seqlock<InputState>* input_seqlock, DataStore* data_store)
     : next_thread_id_(1)
     , command_queue_(command_queue)
     , input_seqlock_(input_seqlock)
+    , data_store_(data_store)
     , capacity_(1024)
 {
     // Allocate initial array of atomic pointers
@@ -214,7 +215,7 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
     EnsureCapacity(thread_id);
 
     // Create and start the thread
-    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_);
+    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_, data_store_);
     thread->Start();
 
     // Store the thread pointer atomically
@@ -233,7 +234,7 @@ int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread
     EnsureCapacity(thread_id);
 
     // Create the thread
-    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_);
+    auto thread = new LuaThread(thread_id, script_path, command_queue_, input_seqlock_, data_store_);
 
     // Set parent information
     if (parent_thread_id != 0) {
