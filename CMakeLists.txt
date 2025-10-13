@@ -46,6 +46,9 @@ add_executable(vah
     src/InputEventListener.cpp
     src/InputTracker.cpp
     src/FileWatcherBindings.cpp
+    src/DocumentManager.cpp
+    src/DataModelManager.cpp
+    src/CommandProcessor.cpp
 )
 
 target_include_directories(vah PRIVATE

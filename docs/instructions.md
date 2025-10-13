@@ -38,4 +38,35 @@ this task is small enough you don't need to use subagents. please complete the w
 
 after understanding the long term goals (idea and manufold-client) please review the c++ code so far. we're still building the foundation. 
 
-you're working on integrating efsw. we're going to watch the rml/rcss files and reload documents when they change. this is the starting point. we'll also want to expose efsw to lua threads. we can likely give each thread it's own watcher it can configure. so far, we have included efsw in the cmake.
+i want to replace any usages we have of a concurrent queue with this library:
+
+PS D:\vcpkg> .\vcpkg.exe install ConcurrentQueue
+Computing installation plan...
+The following packages will be built and installed:
+    concurrentqueue:x64-windows@1.0.4#1
+Detecting compiler hash for triplet x64-windows...
+Compiler found: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe
+Restored 0 package(s) from C:\Users\jonny\AppData\Local\vcpkg\archives in 136 us. Use --debug to see more details.
+Installing 1/1 concurrentqueue:x64-windows@1.0.4#1...
+Building concurrentqueue:x64-windows@1.0.4#1...
+Downloading https://github.com/cameron314/concurrentqueue/archive/v1.0.4.tar.gz -> cameron314-concurrentqueue-v1.0.4.tar.gz
+Successfully downloaded cameron314-concurrentqueue-v1.0.4.tar.gz
+-- Extracting source D:/vcpkg/downloads/cameron314-concurrentqueue-v1.0.4.tar.gz
+-- Using source at D:/vcpkg/buildtrees/concurrentqueue/src/v1.0.4-ec5e592afa.clean
+-- Configuring x64-windows
+-- Building x64-windows-rel
+-- Performing post-build validation
+Starting submission of concurrentqueue:x64-windows@1.0.4#1 to 1 binary cache(s) in the background
+Elapsed time to handle concurrentqueue:x64-windows: 8.1 s
+concurrentqueue:x64-windows package ABI: 9d01e94b02f01b201361d88f2d31bb98f23500570347a8256189aa649a07d1db
+Total install time: 8.1 s
+concurrentqueue provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(concurrentqueue CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE concurrentqueue::concurrentqueue)
+
+Waiting for 1 remaining binary cache submissions...
+Completed submission of concurrentqueue:x64-windows@1.0.4#1 to 1 binary cache(s) in 45.6 ms (1/1)
+All requested installations completed successfully in: 8.1 s
+

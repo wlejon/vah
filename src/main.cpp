@@ -20,6 +20,9 @@
 #include "DataBindings.h"
 #include "InputEventListener.h"
 #include "InputTracker.h"
+#include "DocumentManager.h"
+#include "DataModelManager.h"
+#include "CommandProcessor.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -169,9 +172,21 @@ public:
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(ui_event_queue_.get());
 
+        // Initialize managers
+        document_manager_ = std::make_unique<DocumentManager>(rml_context_);
+        data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get());
+
         // Initialize input tracker
         input_tracker_ = std::make_unique<InputTracker>();
         input_tracker_->Initialize("data/input_tracking.db");
+
+        // Initialize command processor (needs all managers and input tracker)
+        command_processor_ = std::make_unique<CommandProcessor>(
+            thread_manager_.get(),
+            document_manager_.get(),
+            data_model_manager_.get(),
+            input_tracker_.get()
+        );
 
         // Initialize input event listener for automatic tracking
         input_event_listener_ = std::make_unique<InputEventListener>();
@@ -254,8 +269,8 @@ public:
         ui_file_watch_listener_.reset();
         ui_file_watcher_.reset();
 
-        // Clean up data model definitions before context is destroyed
-        data_model_defs_.clear();
+        // Shutdown managers (in reverse order of initialization)
+        command_processor_.reset();
 
         // Unregister input event listener before destroying context
         if (rml_context_ && input_event_listener_) {
@@ -268,6 +283,11 @@ public:
         rmlui_bridge_.reset();
         input_event_listener_.reset();
         input_tracker_.reset();
+
+        // Clean up managers before destroying context
+        data_model_manager_.reset();
+        document_manager_.reset();
+
         data_store_.reset();
         ui_event_queue_.reset();
         command_queue_.reset();
@@ -383,336 +403,29 @@ private:
 
     void ProcessCommands() {
         command_queue_->ProcessAll([this](const Command& cmd) {
-            std::visit([this](auto&& command) {
-                using T = std::decay_t<decltype(command)>;
+            // Handle FileChanged specially (needs custom path processing logic)
+            if (std::holds_alternative<Commands::FileChanged>(cmd)) {
+                const auto& command = std::get<Commands::FileChanged>(cmd);
 
-                if constexpr (std::is_same_v<T, Commands::SpawnThread>) {
-                    LOG_INFO("Processing SpawnThread command: {} (parent: {})", command.script_path, command.parent_thread_id);
-                    if (command.parent_thread_id != 0) {
-                        thread_manager_->SpawnThread(command.script_path, command.parent_thread_id, command.parent_request_id);
-                    } else {
-                        thread_manager_->SpawnThread(command.script_path);
+                if (command.event_type == "modified" && document_manager_) {
+                    std::string lower_path = command.path;
+                    std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
+
+                    // Normalize path separators to forward slashes
+                    std::string normalized_path = command.path;
+                    std::replace(normalized_path.begin(), normalized_path.end(), '\\', '/');
+
+                    if (lower_path.ends_with(".rml")) {
+                        document_manager_->HandleRmlFileChanged(normalized_path);
+                    } else if (lower_path.ends_with(".rcss")) {
+                        LOG_INFO("RCSS file changed: {}, clearing cache and reloading all documents", command.path);
+                        document_manager_->HandleRcssFileChanged();
                     }
                 }
-                else if constexpr (std::is_same_v<T, Commands::StopThread>) {
-                    LOG_INFO("Processing StopThread command: {}", command.thread_id);
-                    thread_manager_->StopThread(command.thread_id);
-                }
-                else if constexpr (std::is_same_v<T, Commands::TriggerUI>) {
-                    LOG_INFO("Processing TriggerUI command: {}", command.event_name);
-                    // UI events are already handled by RmlUiBridge
-                }
-                else if constexpr (std::is_same_v<T, Commands::CallMainThread>) {
-                    command.callback();
-                }
-                else if constexpr (std::is_same_v<T, Commands::SaveThread>) {
-                    LOG_INFO("Processing SaveThread command: {} -> {}", command.thread_id, command.save_path);
-                    thread_manager_->SaveThread(command.thread_id, command.save_path);
-                }
-                else if constexpr (std::is_same_v<T, Commands::Print>) {
-                    LOG_INFO("[Lua Thread {}] {}", command.thread_id, command.message);
-                }
-                else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
-                    LOG_INFO("Processing LoadUIDocument command: {}", command.document_path);
-                    auto doc = rml_context_->LoadDocument(command.document_path.c_str());
-                    if (doc) {
-                        // Store document if ID provided
-                        if (!command.document_id.empty()) {
-                            loaded_documents_[command.document_id] = doc;
-                            LOG_INFO("Stored document with ID: {}", command.document_id);
-                        }
-
-                        if (command.show) {
-                            doc->Show();
-                        } else {
-                            doc->Hide();
-                        }
-                        LOG_INFO("Loaded UI document: {}", command.document_path);
-                    } else {
-                        LOG_WARN("Failed to load UI document: {}", command.document_path);
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::ShowUIDocument>) {
-                    auto it = loaded_documents_.find(command.document_id);
-                    if (it != loaded_documents_.end()) {
-                        it->second->Show();
-                        LOG_INFO("Showing document: {}", command.document_id);
-                    } else {
-                        LOG_WARN("Document not found: {}", command.document_id);
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::HideUIDocument>) {
-                    auto it = loaded_documents_.find(command.document_id);
-                    if (it != loaded_documents_.end()) {
-                        it->second->Hide();
-                        LOG_INFO("Hiding document: {}", command.document_id);
-                    } else {
-                        LOG_WARN("Document not found: {}", command.document_id);
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::SetElementText>) {
-                    if (rml_context_) {
-                        // Search all documents for the element
-                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
-                            auto doc = rml_context_->GetDocument(i);
-                            if (doc) {
-                                auto element = doc->GetElementById(command.element_id.c_str());
-                                if (element) {
-                                    element->SetInnerRML(command.text.c_str());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::SetElementAttribute>) {
-                    if (rml_context_) {
-                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
-                            auto doc = rml_context_->GetDocument(i);
-                            if (doc) {
-                                auto element = doc->GetElementById(command.element_id.c_str());
-                                if (element) {
-                                    element->SetAttribute(command.attribute_name.c_str(), command.value.c_str());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::SetElementStyle>) {
-                    if (rml_context_) {
-                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
-                            auto doc = rml_context_->GetDocument(i);
-                            if (doc) {
-                                auto element = doc->GetElementById(command.element_id.c_str());
-                                if (element) {
-                                    element->SetProperty(command.property.c_str(), command.value.c_str());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::AddElementClass>) {
-                    if (rml_context_) {
-                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
-                            auto doc = rml_context_->GetDocument(i);
-                            if (doc) {
-                                auto element = doc->GetElementById(command.element_id.c_str());
-                                if (element) {
-                                    element->SetClass(command.class_name.c_str(), true);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::RemoveElementClass>) {
-                    if (rml_context_) {
-                        for (int i = 0; i < rml_context_->GetNumDocuments(); i++) {
-                            auto doc = rml_context_->GetDocument(i);
-                            if (doc) {
-                                auto element = doc->GetElementById(command.element_id.c_str());
-                                if (element) {
-                                    element->SetClass(command.class_name.c_str(), false);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
-                    LOG_DEBUG("Processing UpdateDataModel command: {} ({} rows)",
-                              command.model_name, command.data.size());
-
-                    if (rml_context_ && data_store_) {
-                        // Update the data in DataStore (main thread only - no races)
-                        data_store_->SetModel(command.model_name, command.data);
-
-                        // Check if we need to create the RmlUi model or just dirty it
-                        auto it = data_model_handles_.find(command.model_name);
-                        if (it == data_model_handles_.end()) {
-                            // First time - create the RmlUi data model
-                            Rml::DataModelConstructor constructor = rml_context_->CreateDataModel(command.model_name);
-
-                            if (constructor) {
-                                // Create our custom variable definition
-                                auto table_def = std::make_unique<DynamicTableDef>(data_store_.get(), command.model_name);
-
-                                // Bind the model (using nullptr as root pointer for the whole table)
-                                constructor.BindCustomDataVariable(command.model_name,
-                                                                  Rml::DataVariable(table_def.get(), nullptr));
-
-                                // Register event callbacks that use RmlUI's Lua state
-                                constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
-                                    if (arguments.size() >= 1) {
-                                        lua_State* L = Rml::Lua::Interpreter::GetLuaState();
-                                        lua_getglobal(L, "trigger_delete");
-                                        if (lua_isfunction(L, -1)) {
-                                            if (arguments[0].GetType() == Rml::Variant::INT) {
-                                                lua_pushinteger(L, arguments[0].Get<int>());
-                                            } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                                                lua_pushinteger(L, arguments[0].Get<int64_t>());
-                                            } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                                                lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
-                                            } else {
-                                                lua_pushinteger(L, 0);
-                                            }
-                                            lua_pcall(L, 1, 0, 0);
-                                        } else {
-                                            lua_pop(L, 1);
-                                        }
-                                    }
-                                });
-
-                                // Store the definition so it stays alive
-                                data_model_defs_[command.model_name] = std::move(table_def);
-
-                                // Get and store the model handle
-                                Rml::DataModelHandle model_handle = constructor.GetModelHandle();
-                                data_model_handles_[command.model_name] = model_handle;
-
-                                // Mark as dirty to trigger initial render
-                                model_handle.DirtyVariable(command.model_name);
-
-                                LOG_INFO("Created data model '{}' (marked dirty for initial render)", command.model_name);
-                            } else {
-                                LOG_WARN("Failed to create data model '{}'", command.model_name);
-                            }
-                        } else {
-                            // Model already exists - just mark it dirty to trigger re-render
-                            it->second.DirtyVariable(command.model_name);
-                            LOG_DEBUG("Marked data model '{}' as dirty", command.model_name);
-                        }
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::GetInputEdits>) {
-                    LOG_DEBUG("Processing GetInputEdits command: model={}, record_id={}",
-                              command.model, command.record_id);
-
-                    // Query InputTracker for edits
-                    PayloadMap edits = input_tracker_->GetEdits(command.model, command.record_id);
-
-                    // Send response with PayloadMap - Lua thread will convert to table
-                    auto response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-                    if (response_queue) {
-                        Response response{command.request_id, std::move(edits), ""};
-                        response_queue->Push(std::move(response));
-                        LOG_DEBUG("Sent GetInputEdits response with PayloadMap to thread {}",
-                                 command.requesting_thread_id);
-                    } else {
-                        LOG_WARN("Cannot send GetInputEdits response: thread {} not found",
-                                command.requesting_thread_id);
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::ClearInputEdits>) {
-                    LOG_DEBUG("Processing ClearInputEdits command: model={}, record_id={}",
-                              command.model, command.record_id);
-                    input_tracker_->ClearEdits(command.model, command.record_id);
-                }
-                else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
-                    auto it = loaded_documents_.find(command.document_id);
-                    if (it != loaded_documents_.end() && rml_context_) {
-                        LOG_INFO("Reloading UI document: {}", command.document_id);
-                        auto doc = it->second;
-                        std::string src = doc->GetSourceURL();
-
-                        // Close the old document
-                        doc->Close();
-                        loaded_documents_.erase(it);
-
-                        // Reload it
-                        auto new_doc = rml_context_->LoadDocument(src.c_str());
-                        if (new_doc) {
-                            loaded_documents_[command.document_id] = new_doc;
-                            new_doc->Show();
-                            LOG_INFO("Reloaded UI document: {}", src);
-                        } else {
-                            LOG_ERROR("Failed to reload UI document: {}", src);
-                        }
-                    } else {
-                        LOG_WARN("Cannot reload document: {} not found", command.document_id);
-                    }
-                }
-                else if constexpr (std::is_same_v<T, Commands::FileChanged>) {
-                    // Handle RML file changes for hot reload
-                    if (command.event_type == "modified" && rml_context_) {
-                        std::string lower_path = command.path;
-                        std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
-
-                        // Normalize path separators to forward slashes
-                        std::string normalized_path = command.path;
-                        std::replace(normalized_path.begin(), normalized_path.end(), '\\', '/');
-
-                        if (lower_path.ends_with(".rml")) {
-                            // Iterate through ALL documents in context (not just tracked ones)
-                            int num_docs = rml_context_->GetNumDocuments();
-                            for (int i = 0; i < num_docs; i++) {
-                                auto doc = rml_context_->GetDocument(i);
-                                if (!doc) continue;
-
-                                std::string src = doc->GetSourceURL();
-
-                                // Check if the changed file matches this document
-                                // Compare with both absolute and relative paths
-                                if (src == normalized_path ||
-                                    normalized_path.ends_with(src) ||
-                                    src.ends_with(normalized_path)) {
-
-                                    LOG_INFO("Auto-reloading document: {}", src);
-                                    bool was_visible = doc->IsVisible();
-
-                                    doc->Close();
-                                    auto new_doc = rml_context_->LoadDocument(src.c_str());
-                                    if (new_doc && was_visible) {
-                                        new_doc->Show();
-                                    }
-
-                                    // Update tracked documents map if this doc has an ID
-                                    for (auto& [doc_id, tracked_doc] : loaded_documents_) {
-                                        if (tracked_doc == doc) {
-                                            loaded_documents_[doc_id] = new_doc;
-                                            break;
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                        } else if (lower_path.ends_with(".rcss")) {
-                            // For RCSS changes, clear stylesheet cache and reload all documents
-                            LOG_INFO("RCSS file changed: {}, clearing cache and reloading all documents", command.path);
-
-                            // Clear the stylesheet cache so RmlUi reloads the CSS
-                            Rml::Factory::ClearStyleSheetCache();
-
-                            int num_docs = rml_context_->GetNumDocuments();
-                            for (int i = 0; i < num_docs; i++) {
-                                auto doc = rml_context_->GetDocument(i);
-                                if (!doc) continue;
-
-                                std::string src = doc->GetSourceURL();
-                                bool was_visible = doc->IsVisible();
-
-                                doc->Close();
-                                auto new_doc = rml_context_->LoadDocument(src.c_str());
-
-                                // Update tracked documents
-                                for (auto& [doc_id, tracked_doc] : loaded_documents_) {
-                                    if (tracked_doc == doc) {
-                                        loaded_documents_[doc_id] = new_doc;
-                                        break;
-                                    }
-                                }
-
-                                if (new_doc && was_visible) {
-                                    new_doc->Show();
-                                }
-                            }
-                        }
-                    }
-                }
-
-            }, cmd);
+            } else {
+                // Delegate all other commands to CommandProcessor
+                command_processor_->ProcessCommand(cmd);
+            }
         });
     }
 
@@ -757,12 +470,10 @@ private:
     std::unique_ptr<InputEventListener> input_event_listener_;
     std::unique_ptr<InputTracker> input_tracker_;
 
-    // Track loaded documents by ID
-    std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
-
-    // Track data models and their definitions
-    std::unordered_map<std::string, std::unique_ptr<DynamicTableDef>> data_model_defs_;
-    std::unordered_map<std::string, Rml::DataModelHandle> data_model_handles_;
+    // Managers
+    std::unique_ptr<DocumentManager> document_manager_;
+    std::unique_ptr<DataModelManager> data_model_manager_;
+    std::unique_ptr<CommandProcessor> command_processor_;
 
     // File watcher for RML/RCSS hot reload
     std::unique_ptr<efsw::FileWatcher> ui_file_watcher_;
