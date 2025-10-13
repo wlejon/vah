@@ -2,10 +2,10 @@
 
 #include <string>
 #include <unordered_map>
-#include <variant>
+#include "DataStore.h"
 
-using PayloadValue = std::variant<std::monostate, bool, int, double, std::string>;
-using PayloadMap = std::unordered_map<std::string, PayloadValue>;
+// Reuse DynamicValue for payload - supports nested objects
+using PayloadMap = std::unordered_map<std::string, DynamicValue>;
 
 struct UIEvent {
     std::string name;

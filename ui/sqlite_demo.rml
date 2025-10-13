@@ -36,7 +36,7 @@
 
                 <!-- Table rows using data-for -->
                 <div data-for="contact, i : contacts">
-                    <div class="table-row" data-attr-id="'row_' + contact.id">
+                    <div class="table-row" data-attr-id="'row_' + contact.id" data-model="contacts" data-attr-data-row-index="i">
                         <div class="col-name">
                             <input type="text"
                                    data-attr-value="contact.name"
@@ -66,8 +66,8 @@
                                    data-attr-data-field="'company'" />
                         </div>
                         <div class="col-actions">
-                            <button class="btn-save" data-event-click="trigger('save_contact', contact.id)">Save</button>
-                            <button class="btn-delete" data-event-click="trigger('delete_contact', contact.id)">Delete</button>
+                            <button class="btn-save" data-event-click="trigger('save_contact')">Save</button>
+                            <button class="btn-delete" data-event-click="trigger('delete_contact')">Delete</button>
                         </div>
                     </div>
                 </div>

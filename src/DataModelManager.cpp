@@ -40,7 +40,7 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                                               Rml::DataVariable(table_def.get(), nullptr));
 
             // Register generic trigger event callback
-            constructor.BindEventCallback("trigger", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+            constructor.BindEventCallback("trigger", [this](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& arguments) {
                 if (arguments.size() < 1) {
                     LOG_WARN("trigger() requires at least event name argument");
                     return;
@@ -55,9 +55,67 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                     return;
                 }
 
-                // Build payload from remaining arguments
+                // Build payload starting with context from data-for (if present)
                 PayloadMap payload;
 
+                // Try to extract data context from DOM
+                Rml::Element* element = event.GetTargetElement();
+                std::string context_model;
+                int context_row = -1;
+
+                // Walk up the DOM to find data-model and data-row-index attributes
+                while (element) {
+                    if (context_model.empty()) {
+                        const Rml::Variant* model_attr = element->GetAttribute("data-model");
+                        if (model_attr && model_attr->GetType() == Rml::Variant::STRING) {
+                            context_model = std::string(model_attr->Get<Rml::String>());
+                        }
+                    }
+
+                    if (context_row == -1) {
+                        const Rml::Variant* row_attr = element->GetAttribute("data-row-index");
+                        if (row_attr) {
+                            if (row_attr->GetType() == Rml::Variant::INT) {
+                                context_row = row_attr->Get<int>();
+                            } else if (row_attr->GetType() == Rml::Variant::INT64) {
+                                context_row = static_cast<int>(row_attr->Get<int64_t>());
+                            } else if (row_attr->GetType() == Rml::Variant::STRING) {
+                                // Parse string to int (from data-attr-data-row-index binding)
+                                std::string row_str = std::string(row_attr->Get<Rml::String>());
+                                try {
+                                    context_row = std::stoi(row_str);
+                                } catch (...) {
+                                    LOG_WARN("trigger('{}') couldn't parse data-row-index: '{}'", event_name, row_str);
+                                }
+                            }
+                        }
+                    }
+
+                    // If we found both, stop searching (innermost data-for wins)
+                    if (!context_model.empty() && context_row != -1) {
+                        break;
+                    }
+
+                    element = element->GetParentNode();
+                }
+
+                // If we found a data context, inject the full row into payload
+                if (!context_model.empty() && context_row != -1) {
+                    auto model_data = data_store_->GetModel(context_model);
+                    if (model_data && context_row >= 0 && context_row < static_cast<int>(model_data->size())) {
+                        const DynamicRow& row = (*model_data)[context_row];
+
+                        // Copy all row fields to payload (this is the base object)
+                        for (const auto& [key, value] : row) {
+                            payload[key] = value;
+                        }
+
+                        LOG_DEBUG("trigger('{}') injected row {} from model '{}' ({} fields)",
+                                 event_name, context_row, context_model, row.size());
+                    }
+                }
+
+                // Add explicit arguments on top (may override row fields)
                 // Use smart key assignment:
                 // - Second argument (index 1) → "id"
                 // - Third+ arguments → numbered keys "1", "2", etc.
@@ -70,10 +128,10 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                             payload[key] = arg.Get<bool>();
                             break;
                         case Rml::Variant::INT:
-                            payload[key] = arg.Get<int>();
+                            payload[key] = static_cast<int64_t>(arg.Get<int>());
                             break;
                         case Rml::Variant::INT64:
-                            payload[key] = static_cast<int>(arg.Get<int64_t>());
+                            payload[key] = arg.Get<int64_t>();
                             break;
                         case Rml::Variant::FLOAT:
                             payload[key] = static_cast<double>(arg.Get<float>());
@@ -91,8 +149,8 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                 }
 
                 // Enqueue to UIEvent queue for Lua threads to consume
-                UIEvent event{event_name, payload};
-                ui_event_queue_->enqueue(std::move(event));
+                UIEvent ui_event{event_name, payload};
+                ui_event_queue_->enqueue(std::move(ui_event));
 
                 LOG_DEBUG("DataModelManager: Triggered event '{}' with {} payload items", event_name, payload.size());
             });

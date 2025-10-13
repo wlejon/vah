@@ -10,24 +10,44 @@
 #include <chrono>
 
 namespace {
-    // Helper to convert sol::table to PayloadMap
-    PayloadMap TableToPayloadMap(const sol::table& table) {
-        PayloadMap result;
-        for (const auto& [key, value] : table) {
-            if (!key.is<std::string>()) continue;
-            std::string key_str = key.as<std::string>();
+    // Forward declaration for recursion
+    sol::object DynamicValueToLua(sol::state& lua, const DynamicValue& value);
 
-            if (value.is<bool>()) {
-                result[key_str] = value.as<bool>();
-            } else if (value.is<int>()) {
-                result[key_str] = value.as<int>();
-            } else if (value.is<double>()) {
-                result[key_str] = value.as<double>();
-            } else if (value.is<std::string>()) {
-                result[key_str] = value.as<std::string>();
+    // Helper to recursively convert DynamicValue to Lua object
+    sol::object DynamicValueToLua(sol::state& lua, const DynamicValue& value) {
+        return std::visit([&](auto&& val) -> sol::object {
+            using T = std::decay_t<decltype(val)>;
+
+            if constexpr (std::is_same_v<T, std::monostate>) {
+                return sol::make_object(lua, sol::nil);
             }
-        }
-        return result;
+            else if constexpr (std::is_same_v<T, bool>) {
+                return sol::make_object(lua, val);
+            }
+            else if constexpr (std::is_same_v<T, int64_t>) {
+                return sol::make_object(lua, val);
+            }
+            else if constexpr (std::is_same_v<T, double>) {
+                return sol::make_object(lua, val);
+            }
+            else if constexpr (std::is_same_v<T, std::string>) {
+                return sol::make_object(lua, val);
+            }
+            else if constexpr (std::is_same_v<T, std::shared_ptr<DynamicMap>>) {
+                // Nested object - recursively convert to Lua table
+                if (!val) {
+                    return sol::make_object(lua, sol::nil);
+                }
+                auto nested_table = lua.create_table();
+                for (const auto& [key, nested_value] : val->fields) {
+                    nested_table[key] = DynamicValueToLua(lua, nested_value);
+                }
+                return nested_table;
+            }
+            else {
+                return sol::make_object(lua, sol::nil);
+            }
+        }, value);
     }
 
     // Helper to convert sol::object to DynamicValue
@@ -88,6 +108,18 @@ namespace {
             }
         }
 
+        return result;
+    }
+
+    // Helper to convert Lua table to PayloadMap (for configs, params, etc.)
+    PayloadMap TableToPayloadMap(const sol::table& table) {
+        PayloadMap result;
+        for (const auto& [key, value] : table) {
+            if (key.is<std::string>()) {
+                std::string key_str = key.as<std::string>();
+                result[key_str] = ObjectToDynamicValue(value);
+            }
+        }
         return result;
     }
 }
@@ -217,17 +249,10 @@ void LuaThread::ProcessResponses() {
             // Call the lua callback
             try {
                 if (response.error.empty()) {
-                    // Convert PayloadMap to Lua table in this thread's lua_State
+                    // Convert PayloadMap to Lua table (handles nested objects)
                     auto data_table = lua_->create_table();
                     for (const auto& [key, value] : response.data) {
-                        std::visit([&](auto&& val) {
-                            using T = std::decay_t<decltype(val)>;
-                            if constexpr (std::is_same_v<T, std::monostate>) {
-                                data_table[key] = sol::nil;
-                            } else {
-                                data_table[key] = val;
-                            }
-                        }, value);
+                        data_table[key] = DynamicValueToLua(*lua_, value);
                     }
                     // Success: callback(data, nil)
                     it->second.callback(data_table, sol::nil);
@@ -311,17 +336,10 @@ void LuaThread::ThreadMain() {
                 for (const auto& ui_event : ui_events) {
                     auto it = event_handlers_.find(ui_event.name);
                     if (it != event_handlers_.end()) {
-                        // Convert payload to lua table
+                        // Convert payload to lua table (handles nested objects)
                         auto payload_table = lua_->create_table();
                         for (const auto& [key, value] : ui_event.payload) {
-                            std::visit([&](auto&& val) {
-                                using T = std::decay_t<decltype(val)>;
-                                if constexpr (std::is_same_v<T, std::monostate>) {
-                                    payload_table[key] = sol::nil;
-                                } else {
-                                    payload_table[key] = val;
-                                }
-                            }, value);
+                            payload_table[key] = DynamicValueToLua(*lua_, value);
                         }
 
                         // Call registered handler

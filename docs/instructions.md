@@ -34,8 +34,3 @@ for assistance, please read the code directly or the documentation. they can be 
 
 ## current task
 
-this task is small enough you don't need to use subagents. please complete the work yourself.
-
-after understanding the long term goals (idea and manufold-client) please review the c++ code so far. we're still building the foundation. 
-
-
