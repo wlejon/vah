@@ -3,7 +3,6 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "InputTracker.h"
-#include "ResponseQueue.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
@@ -87,7 +86,7 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
             auto response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
             if (response_queue) {
                 Response response{command.request_id, std::move(edits), ""};
-                response_queue->Push(std::move(response));
+                response_queue->enqueue(std::move(response));
                 LOG_DEBUG("Sent GetInputEdits response with PayloadMap to thread {}", command.requesting_thread_id);
             } else {
                 LOG_WARN("Cannot send GetInputEdits response: thread {} not found", command.requesting_thread_id);

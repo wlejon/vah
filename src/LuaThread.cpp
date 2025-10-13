@@ -1,8 +1,4 @@
 #include "LuaThread.h"
-#include "CommandQueue.h"
-#include "UIEventQueue.h"
-#include "ResponseQueue.h"
-#include "InputState.h"
 #include "Logger.h"
 #include "FileSystem.h"
 #include "JsonBindings.h"
@@ -97,8 +93,8 @@ namespace {
 }
 
 LuaThread::LuaThread(int id, const std::string& script_path,
-                     CommandQueue* command_queue,
-                     UIEventQueue* ui_event_queue,
+                     moodycamel::ConcurrentQueue<Command>* command_queue,
+                     moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
                      DataStore* data_store)
     : id_(id)
     , script_path_(script_path)
@@ -108,7 +104,7 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , command_queue_(command_queue)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
-    , response_queue_(std::make_unique<ResponseQueue>())
+    , response_queue_(std::make_unique<moodycamel::ConcurrentQueue<Response>>())
     , next_request_id_(1)
     , parent_thread_id_(0)
     , parent_request_id_(0)
@@ -209,7 +205,11 @@ void LuaThread::ProcessResponses() {
     if (!lua_) return;
 
     // Get all pending responses (lock-free read)
-    auto responses = response_queue_->PopAll();
+    std::vector<Response> responses;
+    Response response{0, PayloadMap{}, ""};
+    while (response_queue_->try_dequeue(response)) {
+        responses.push_back(std::move(response));
+    }
 
     for (auto& response : responses) {
         auto it = pending_requests_.find(response.request_id);
@@ -302,7 +302,11 @@ void LuaThread::ThreadMain() {
             // Only consume from queue if this thread has handlers registered
             // (prevents threads without handlers from stealing events)
             if (ui_event_queue_ && !event_handlers_.empty()) {
-                auto ui_events = ui_event_queue_->PopAll();
+                std::vector<UIEvent> ui_events;
+                UIEvent ui_event;
+                while (ui_event_queue_->try_dequeue(ui_event)) {
+                    ui_events.push_back(std::move(ui_event));
+                }
 
                 for (const auto& ui_event : ui_events) {
                     auto it = event_handlers_.find(ui_event.name);
@@ -406,13 +410,13 @@ void LuaThread::SetupLuaBindings() {
         }
         cmd.parent_thread_id = id_;
         cmd.requesting_thread_id = id_;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     command_table["stop_thread"] = [this](int thread_id) {
         Commands::StopThread cmd;
         cmd.thread_id = thread_id;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     (*lua_)["command"] = command_table;
@@ -425,27 +429,27 @@ void LuaThread::SetupLuaBindings() {
         cmd.document_path = path;
         cmd.show = show.value_or(true);
         cmd.document_id = doc_id.value_or("");
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
         LOG_DEBUG("Lua thread {} queued LoadUIDocument: {}", id_, path);
     };
 
     ui_table["show_document"] = [this](const std::string& doc_id) {
         Commands::ShowUIDocument cmd;
         cmd.document_id = doc_id;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["hide_document"] = [this](const std::string& doc_id) {
         Commands::HideUIDocument cmd;
         cmd.document_id = doc_id;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["set_element_text"] = [this](const std::string& element_id, const std::string& text) {
         Commands::SetElementText cmd;
         cmd.element_id = element_id;
         cmd.text = text;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["set_element_attribute"] = [this](const std::string& element_id, const std::string& attribute_name, const std::string& value) {
@@ -453,7 +457,7 @@ void LuaThread::SetupLuaBindings() {
         cmd.element_id = element_id;
         cmd.attribute_name = attribute_name;
         cmd.value = value;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["set_element_style"] = [this](const std::string& element_id, const std::string& property, const std::string& value) {
@@ -461,21 +465,21 @@ void LuaThread::SetupLuaBindings() {
         cmd.element_id = element_id;
         cmd.property = property;
         cmd.value = value;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["add_element_class"] = [this](const std::string& element_id, const std::string& class_name) {
         Commands::AddElementClass cmd;
         cmd.element_id = element_id;
         cmd.class_name = class_name;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     ui_table["remove_element_class"] = [this](const std::string& element_id, const std::string& class_name) {
         Commands::RemoveElementClass cmd;
         cmd.element_id = element_id;
         cmd.class_name = class_name;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     (*lua_)["ui"] = ui_table;
@@ -491,7 +495,7 @@ void LuaThread::SetupLuaBindings() {
         Commands::UpdateDataModel cmd;
         cmd.model_name = model_name;
         cmd.data = std::move(dynamic_data);
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 
     (*lua_)["data"] = data_table;
@@ -515,7 +519,7 @@ void LuaThread::SetupLuaBindings() {
         cmd.requesting_thread_id = id_;
         cmd.request_id = request_id;
 
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
 
         LOG_DEBUG("Lua thread {} requested input edits for {}.{}", id_, model, record_id);
     };
@@ -525,7 +529,7 @@ void LuaThread::SetupLuaBindings() {
         cmd.model = model;
         cmd.record_id = record_id;
 
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
 
         LOG_DEBUG("Lua thread {} cleared input edits for {}.{}", id_, model, record_id);
     };
@@ -565,6 +569,6 @@ void LuaThread::SetupLuaBindings() {
         Commands::Print cmd;
         cmd.thread_id = id_;
         cmd.message = message;
-        command_queue_->Push(std::move(cmd));
+        command_queue_->enqueue(std::move(cmd));
     };
 }

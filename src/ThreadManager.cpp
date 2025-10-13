@@ -1,7 +1,4 @@
 #include "ThreadManager.h"
-#include "CommandQueue.h"
-#include "ResponseQueue.h"
-#include "InputState.h"
 #include "Logger.h"
 #include <fstream>
 #include <sstream>
@@ -124,7 +121,9 @@ namespace {
     }
 }
 
-ThreadManager::ThreadManager(CommandQueue* command_queue, UIEventQueue* ui_event_queue, DataStore* data_store)
+ThreadManager::ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
+                             moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
+                             DataStore* data_store)
     : command_queue_(command_queue)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
@@ -330,7 +329,7 @@ std::vector<int> ThreadManager::GetAllThreadIds() const {
     return ids;
 }
 
-ResponseQueue* ThreadManager::GetThreadResponseQueue(int thread_id) {
+moodycamel::ConcurrentQueue<Response>* ThreadManager::GetThreadResponseQueue(int thread_id) {
     LuaThread* thread = GetThread(thread_id);
     if (thread != nullptr) {
         return thread->GetResponseQueue();

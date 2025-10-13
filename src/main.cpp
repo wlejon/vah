@@ -10,10 +10,9 @@
 #include "Logger.h"
 #include "RmlUi_Renderer_GL3.h"
 #include "RmlUiSystemInterface.h"
-#include "CommandQueue.h"
-#include "ResponseQueue.h"
+#include <moodycamel/concurrentqueue.h>
+#include "Commands.h"
 #include "InputState.h"
-#include "UIEventQueue.h"
 #include "ThreadManager.h"
 #include "RmlUiBridge.h"
 #include "DataStore.h"
@@ -28,7 +27,7 @@
 // File watcher listener for RML/RCSS hot reload
 class UIFileWatchListener : public efsw::FileWatchListener {
 public:
-    UIFileWatchListener(CommandQueue* command_queue) : command_queue_(command_queue) {}
+    UIFileWatchListener(moodycamel::ConcurrentQueue<Command>* command_queue) : command_queue_(command_queue) {}
 
     void handleFileAction(efsw::WatchID watch_id,
                          const std::string& dir,
@@ -53,12 +52,12 @@ public:
             Commands::FileChanged cmd;
             cmd.path = full_path;
             cmd.event_type = "modified";
-            command_queue_->Push(std::move(cmd));
+            command_queue_->enqueue(std::move(cmd));
         }
     }
 
 private:
-    CommandQueue* command_queue_;
+    moodycamel::ConcurrentQueue<Command>* command_queue_;
 };
 
 class VahEngine {
@@ -166,8 +165,8 @@ public:
         Rml::Debugger::Initialise(rml_context_);
 
         // Initialize our systems
-        command_queue_ = std::make_unique<CommandQueue>();
-        ui_event_queue_ = std::make_unique<UIEventQueue>();
+        command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
+        ui_event_queue_ = std::make_unique<moodycamel::ConcurrentQueue<UIEvent>>();
         data_store_ = std::make_unique<DataStore>();
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(ui_event_queue_.get());
@@ -343,7 +342,7 @@ private:
                                 // Trigger UI event with clipboard text
                                 PayloadMap payload;
                                 payload["text"] = text;
-                                ui_event_queue_->Push(UIEvent{"clipboard_paste", payload});
+                                ui_event_queue_->enqueue(UIEvent{"clipboard_paste", payload});
                             }
                         }
                     }
@@ -359,7 +358,7 @@ private:
                         // Trigger UI event with file path
                         PayloadMap payload;
                         payload["path"] = dropped_file;
-                        ui_event_queue_->Push(UIEvent{"file_drop", payload});
+                        ui_event_queue_->enqueue(UIEvent{"file_drop", payload});
                     }
                     break;
 
@@ -402,7 +401,15 @@ private:
     }
 
     void ProcessCommands() {
-        command_queue_->ProcessAll([this](const Command& cmd) {
+        // Dequeue all pending commands
+        std::vector<Command> commands;
+        Command cmd;
+        while (command_queue_->try_dequeue(cmd)) {
+            commands.push_back(std::move(cmd));
+        }
+
+        // Process each command
+        for (const auto& cmd : commands) {
             // Handle FileChanged specially (needs custom path processing logic)
             if (std::holds_alternative<Commands::FileChanged>(cmd)) {
                 const auto& command = std::get<Commands::FileChanged>(cmd);
@@ -426,7 +433,7 @@ private:
                 // Delegate all other commands to CommandProcessor
                 command_processor_->ProcessCommand(cmd);
             }
-        });
+        }
     }
 
     void Update() {
@@ -462,8 +469,8 @@ private:
     std::unique_ptr<RmlUiSystemInterface> rml_system_interface_;
     Rml::Context* rml_context_ = nullptr;
 
-    std::unique_ptr<CommandQueue> command_queue_;
-    std::unique_ptr<UIEventQueue> ui_event_queue_;
+    std::unique_ptr<moodycamel::ConcurrentQueue<Command>> command_queue_;
+    std::unique_ptr<moodycamel::ConcurrentQueue<UIEvent>> ui_event_queue_;
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;

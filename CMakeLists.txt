@@ -24,6 +24,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(efsw CONFIG REQUIRED)
+find_package(concurrentqueue CONFIG REQUIRED)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
@@ -31,9 +32,6 @@ add_executable(vah
     src/main.cpp
     src/Logger.cpp
     src/RmlUi_Renderer_GL3.cpp
-    src/CommandQueue.cpp
-    src/UIEventQueue.cpp
-    src/ResponseQueue.cpp
     src/LuaThread.cpp
     src/ThreadManager.cpp
     src/RmlUiBridge.cpp
@@ -72,6 +70,7 @@ target_link_libraries(vah PRIVATE
     unofficial::sqlite3::sqlite3
     httplib::httplib
     efsw::efsw
+    concurrentqueue::concurrentqueue
 )
 
 

@@ -74,7 +74,7 @@ namespace {
     }
 }
 
-RmlUiBridge::RmlUiBridge(UIEventQueue* ui_event_queue)
+RmlUiBridge::RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
     : ui_event_queue_(ui_event_queue)
     , context_(nullptr)
 {
@@ -106,8 +106,8 @@ void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& 
     event.name = event_name;
     event.payload = payload;
 
-    // Simple enqueue - no seqlock manipulation
-    ui_event_queue_->Push(std::move(event));
+    // Simple enqueue
+    ui_event_queue_->enqueue(std::move(event));
 
     LOG_DEBUG("RmlUiBridge: Triggered event '{}' with {} payload items", event_name, payload.size());
 }

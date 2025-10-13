@@ -8,13 +8,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <sol/sol.hpp>
+#include <moodycamel/concurrentqueue.h>
+#include "Commands.h"
+#include "InputState.h"
 
 // Forward declarations
 namespace httplib { class Server; }
-
-class CommandQueue;
-class UIEventQueue;
-class ResponseQueue;
 class DataStore;
 
 class LuaThread {
@@ -29,8 +28,8 @@ public:
     };
 
     LuaThread(int id, const std::string& script_path,
-              CommandQueue* command_queue,
-              UIEventQueue* ui_event_queue,
+              moodycamel::ConcurrentQueue<Command>* command_queue,
+              moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
               DataStore* data_store);
     ~LuaThread();
 
@@ -64,7 +63,7 @@ public:
     int GetParentRequestId() const { return parent_request_id_; }
 
     // Response queue access (for main thread to push responses)
-    ResponseQueue* GetResponseQueue() { return response_queue_.get(); }
+    moodycamel::ConcurrentQueue<Response>* GetResponseQueue() { return response_queue_.get(); }
 
     // HTTP server management (for stopping blocking server on shutdown)
     void SetActiveHttpServer(httplib::Server* server) { active_http_server_.store(server, std::memory_order_release); }
@@ -87,10 +86,10 @@ private:
     std::unique_ptr<std::thread> thread_;
     std::unique_ptr<sol::state> lua_;
 
-    CommandQueue* command_queue_;
-    UIEventQueue* ui_event_queue_;
+    moodycamel::ConcurrentQueue<Command>* command_queue_;
+    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
     DataStore* data_store_;
-    std::unique_ptr<ResponseQueue> response_queue_;
+    std::unique_ptr<moodycamel::ConcurrentQueue<Response>> response_queue_;
 
     struct PendingRequest {
         int request_id;

@@ -3,15 +3,18 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <moodycamel/concurrentqueue.h>
 #include "LuaThread.h"
+#include "Commands.h"
+#include "InputState.h"
 
-class CommandQueue;
-class UIEventQueue;
 class DataStore;
 
 class ThreadManager {
 public:
-    ThreadManager(CommandQueue* command_queue, UIEventQueue* ui_event_queue, DataStore* data_store);
+    ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
+                  moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
+                  DataStore* data_store);
     ~ThreadManager();
 
     // Thread lifecycle
@@ -40,13 +43,13 @@ public:
     std::vector<int> GetAllThreadIds() const;
 
     // Get thread's response queue (for sending responses)
-    class ResponseQueue* GetThreadResponseQueue(int thread_id);
+    moodycamel::ConcurrentQueue<Response>* GetThreadResponseQueue(int thread_id);
 
 private:
     LuaThread* GetThread(int thread_id) const;
 
-    CommandQueue* command_queue_;
-    UIEventQueue* ui_event_queue_;
+    moodycamel::ConcurrentQueue<Command>* command_queue_;
+    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
     DataStore* data_store_;
 
     std::vector<std::unique_ptr<LuaThread>> threads_;

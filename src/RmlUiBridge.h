@@ -3,12 +3,12 @@
 #include <RmlUi/Core.h>
 #include <RmlUi/Lua.h>
 #include <string>
+#include <moodycamel/concurrentqueue.h>
 #include "InputState.h"
-#include "UIEventQueue.h"
 
 class RmlUiBridge {
 public:
-    RmlUiBridge(UIEventQueue* ui_event_queue);
+    RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue);
     ~RmlUiBridge() = default;
 
     void SetupLuaBindings(lua_State* L, Rml::Context* context);
@@ -16,6 +16,6 @@ public:
     Rml::Context* GetContext() const { return context_; }
 
 private:
-    UIEventQueue* ui_event_queue_;
+    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
     Rml::Context* context_;
 };

@@ -2,10 +2,7 @@
 
 #include <variant>
 #include <string>
-#include <vector>
-#include <atomic>
 #include <functional>
-#include <unordered_map>
 #include <sol/sol.hpp>
 #include "InputState.h"
 #include "DataStore.h"
@@ -145,38 +142,14 @@ using Command = std::variant<
     Commands::RemoveFileWatch
 >;
 
-// Lock-free multi-producer (lua threads) single-consumer (main thread) queue
-class CommandQueue {
-public:
-    CommandQueue();
-    ~CommandQueue();
+// Response sent from main thread to lua thread
+// THREADING: PayloadMap is thread-safe and can cross thread boundaries
+// The receiving Lua thread converts PayloadMap to a Lua table
+struct Response {
+    int request_id;
+    PayloadMap data;         // Thread-safe data that can cross lua_State boundaries
+    std::string error;       // Empty if success
 
-    // Thread-safe push (called from any lua thread)
-    void Push(Command&& cmd);
-
-    // Pop and process all pending commands (called from main thread only)
-    template<typename Visitor>
-    void ProcessAll(Visitor&& visitor) {
-        auto commands = PopAll();
-        for (auto& cmd : commands) {
-            std::visit(std::forward<Visitor>(visitor), cmd);
-        }
-    }
-
-    // Check if queue is empty
-    bool Empty() const;
-
-private:
-    struct Node {
-        Command data;
-        std::atomic<Node*> next;
-
-        Node(Command&& cmd) : data(std::move(cmd)), next(nullptr) {}
-    };
-
-    std::vector<Command> PopAll();
-
-    std::atomic<Node*> head_;  // Consumer reads from head
-    std::atomic<Node*> tail_;  // Producers write to tail
-    Node* cached_head_;        // Consumer's cached head pointer
+    Response(int id, PayloadMap&& d, const std::string& e = "")
+        : request_id(id), data(std::move(d)), error(e) {}
 };
