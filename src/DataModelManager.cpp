@@ -3,9 +3,10 @@
 #include <RmlUi/Lua/Interpreter.h>
 #include <lua.hpp>
 
-DataModelManager::DataModelManager(Rml::Context* context, DataStore* data_store)
+DataModelManager::DataModelManager(Rml::Context* context, DataStore* data_store, moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
     : context_(context)
     , data_store_(data_store)
+    , ui_event_queue_(ui_event_queue)
 {
 }
 
@@ -38,26 +39,62 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
             constructor.BindCustomDataVariable(model_name,
                                               Rml::DataVariable(table_def.get(), nullptr));
 
-            // Register event callbacks that use RmlUI's Lua state
-            constructor.BindEventCallback("trigger_delete", [](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
-                if (arguments.size() >= 1) {
-                    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
-                    lua_getglobal(L, "trigger_delete");
-                    if (lua_isfunction(L, -1)) {
-                        if (arguments[0].GetType() == Rml::Variant::INT) {
-                            lua_pushinteger(L, arguments[0].Get<int>());
-                        } else if (arguments[0].GetType() == Rml::Variant::INT64) {
-                            lua_pushinteger(L, arguments[0].Get<int64_t>());
-                        } else if (arguments[0].GetType() == Rml::Variant::FLOAT) {
-                            lua_pushinteger(L, static_cast<int>(arguments[0].Get<float>()));
-                        } else {
-                            lua_pushinteger(L, 0);
-                        }
-                        lua_pcall(L, 1, 0, 0);
-                    } else {
-                        lua_pop(L, 1);
+            // Register generic trigger event callback
+            constructor.BindEventCallback("trigger", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& arguments) {
+                if (arguments.size() < 1) {
+                    LOG_WARN("trigger() requires at least event name argument");
+                    return;
+                }
+
+                // First argument is the event name
+                std::string event_name;
+                if (arguments[0].GetType() == Rml::Variant::STRING) {
+                    event_name = arguments[0].Get<Rml::String>();
+                } else {
+                    LOG_WARN("trigger() first argument must be event name (string)");
+                    return;
+                }
+
+                // Build payload from remaining arguments
+                PayloadMap payload;
+
+                // Use smart key assignment:
+                // - Second argument (index 1) → "id"
+                // - Third+ arguments → numbered keys "1", "2", etc.
+                for (size_t i = 1; i < arguments.size(); ++i) {
+                    std::string key = (i == 1) ? "id" : std::to_string(i);
+
+                    const auto& arg = arguments[i];
+                    switch (arg.GetType()) {
+                        case Rml::Variant::BOOL:
+                            payload[key] = arg.Get<bool>();
+                            break;
+                        case Rml::Variant::INT:
+                            payload[key] = arg.Get<int>();
+                            break;
+                        case Rml::Variant::INT64:
+                            payload[key] = static_cast<int>(arg.Get<int64_t>());
+                            break;
+                        case Rml::Variant::FLOAT:
+                            payload[key] = static_cast<double>(arg.Get<float>());
+                            break;
+                        case Rml::Variant::DOUBLE:
+                            payload[key] = arg.Get<double>();
+                            break;
+                        case Rml::Variant::STRING:
+                            payload[key] = std::string(arg.Get<Rml::String>());
+                            break;
+                        default:
+                            // Skip unsupported types
+                            break;
                     }
                 }
+
+                // Enqueue to UIEvent queue for Lua threads to consume
+                UIEvent event{event_name, payload};
+                ui_event_queue_->enqueue(std::move(event));
+
+                LOG_DEBUG("DataModelManager: Triggered event '{}' with {} payload items", event_name, payload.size());
             });
 
             // Store the definition so it stays alive

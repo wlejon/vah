@@ -13,15 +13,15 @@ function startup()
     -- command.spawn_thread("scripts/json_demo.lua")
 
     -- SQLite database demo
-    -- command.spawn_thread("scripts/sqlite_demo.lua")
+    command.spawn_thread("scripts/sqlite_demo.lua")
 
     -- Streaming data demo
     -- ui.load_document("ui/streaming.rml")
     -- command.spawn_thread("scripts/data_stream.lua")
 
     -- HTTP SSE demo (server and client)
-    command.spawn_thread("scripts/http_server.lua")
-    command.spawn_thread("scripts/http_client.lua")
+    --command.spawn_thread("scripts/http_server.lua")
+    --command.spawn_thread("scripts/http_client.lua")
 
     print("Demo initialized")
 end

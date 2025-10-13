@@ -173,7 +173,7 @@ public:
 
         // Initialize managers
         document_manager_ = std::make_unique<DocumentManager>(rml_context_);
-        data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get());
+        data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), ui_event_queue_.get());
 
         // Initialize input tracker
         input_tracker_ = std::make_unique<InputTracker>();

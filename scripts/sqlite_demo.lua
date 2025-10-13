@@ -226,6 +226,7 @@ function startup()
     end)
 
     event.register("delete_contact", function(payload)
+        print(payload)
         if payload.id then
             local contact_id = payload.id
             print("Deleting contact ID: " .. tostring(contact_id))
