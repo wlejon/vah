@@ -191,6 +191,105 @@ std::tuple<bool, std::string> Delete(const std::string& path) {
     }
 }
 
+// Recursively walk directory tree
+std::tuple<bool, std::string> Walk(const std::string& path, sol::function callback) {
+    try {
+        if (!fs::exists(path)) {
+            return {false, "Path does not exist: " + path};
+        }
+
+        if (!fs::is_directory(path)) {
+            return {false, "Path is not a directory: " + path};
+        }
+
+        for (const auto& entry : fs::recursive_directory_iterator(path)) {
+            try {
+                std::string entry_path = entry.path().string();
+                bool is_dir = entry.is_directory();
+                size_t size = 0;
+
+                if (entry.is_regular_file()) {
+                    try {
+                        size = entry.file_size();
+                    } catch (...) {
+                        size = 0;
+                    }
+                }
+
+                // Call Lua callback with (path, is_dir, size)
+                auto result = callback(entry_path, is_dir, static_cast<double>(size));
+
+                // If callback returns false, stop walking
+                if (result.valid() && result.get_type() == sol::type::boolean) {
+                    if (!result.get<bool>()) {
+                        break;
+                    }
+                }
+            }
+            catch (const std::exception&) {
+                // Skip entries that cause errors (permissions, etc)
+                continue;
+            }
+        }
+
+        return {true, ""};
+    }
+    catch (const std::exception& e) {
+        return {false, std::string("Error walking directory: ") + e.what()};
+    }
+}
+
+// Join path components
+std::string Join(sol::variadic_args args) {
+    fs::path result;
+    for (auto arg : args) {
+        if (arg.is<std::string>()) {
+            result /= arg.as<std::string>();
+        }
+    }
+    return result.string();
+}
+
+// Get directory name (parent path)
+std::string DirName(const std::string& path) {
+    try {
+        return fs::path(path).parent_path().string();
+    }
+    catch (...) {
+        return "";
+    }
+}
+
+// Get base name (filename with extension)
+std::string BaseName(const std::string& path) {
+    try {
+        return fs::path(path).filename().string();
+    }
+    catch (...) {
+        return "";
+    }
+}
+
+// Get file extension
+std::string Extension(const std::string& path) {
+    try {
+        return fs::path(path).extension().string();
+    }
+    catch (...) {
+        return "";
+    }
+}
+
+// Get stem (filename without extension)
+std::string Stem(const std::string& path) {
+    try {
+        return fs::path(path).stem().string();
+    }
+    catch (...) {
+        return "";
+    }
+}
+
 void SetupBindings(sol::state& lua) {
     auto fs_table = lua.create_table();
 
@@ -203,6 +302,12 @@ void SetupBindings(sol::state& lua) {
     fs_table["delete"] = Delete;
     fs_table["absolute_path"] = AbsolutePath;
     fs_table["get_cwd"] = GetCwd;
+    fs_table["walk"] = Walk;
+    fs_table["join"] = Join;
+    fs_table["dirname"] = DirName;
+    fs_table["basename"] = BaseName;
+    fs_table["extension"] = Extension;
+    fs_table["stem"] = Stem;
 
     // Convenience aliases
     fs_table["read"] = ReadFile;

@@ -8,6 +8,7 @@
 #include "JsonBindings.h"
 #include "SqliteBindings.h"
 #include "HttpBindings.h"
+#include "FileWatcherBindings.h"
 #include "DataStore.h"
 #include <httplib.h>
 #include <chrono>
@@ -380,6 +381,9 @@ void LuaThread::SetupLuaBindings() {
 
     // Setup HTTP bindings (pass this pointer for lock-free server registration)
     HttpBindings::SetupBindings(*lua_, this);
+
+    // Setup file watcher bindings (each thread owns its watcher)
+    FileWatcherBindings::SetupBindings(*lua_);
 
     // Bind event registration system
     auto event_table = lua_->create_table();

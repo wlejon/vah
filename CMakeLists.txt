@@ -23,6 +23,7 @@ find_package(sol2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
+find_package(efsw CONFIG REQUIRED)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
@@ -44,6 +45,7 @@ add_executable(vah
     src/DataStore.cpp
     src/InputEventListener.cpp
     src/InputTracker.cpp
+    src/FileWatcherBindings.cpp
 )
 
 target_include_directories(vah PRIVATE
@@ -66,6 +68,7 @@ target_link_libraries(vah PRIVATE
     nlohmann_json::nlohmann_json
     unofficial::sqlite3::sqlite3
     httplib::httplib
+    efsw::efsw
 )
 
 

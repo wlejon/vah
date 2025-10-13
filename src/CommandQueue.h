@@ -57,6 +57,10 @@ namespace Commands {
         std::string document_id;
     };
 
+    struct ReloadUIDocument {
+        std::string document_id;
+    };
+
     struct SetElementText {
         std::string element_id;
         std::string text;
@@ -100,6 +104,20 @@ namespace Commands {
         std::string model;
         std::string record_id;
     };
+
+    struct FileChanged {
+        std::string path;
+        std::string event_type;  // "created", "modified", "deleted"
+    };
+
+    struct AddFileWatch {
+        std::string path;
+        bool recursive;
+    };
+
+    struct RemoveFileWatch {
+        std::string path;
+    };
 }
 
 // Variant holding all possible command types
@@ -113,6 +131,7 @@ using Command = std::variant<
     Commands::LoadUIDocument,
     Commands::ShowUIDocument,
     Commands::HideUIDocument,
+    Commands::ReloadUIDocument,
     Commands::SetElementText,
     Commands::SetElementAttribute,
     Commands::SetElementStyle,
@@ -120,7 +139,10 @@ using Command = std::variant<
     Commands::RemoveElementClass,
     Commands::UpdateDataModel,
     Commands::GetInputEdits,
-    Commands::ClearInputEdits
+    Commands::ClearInputEdits,
+    Commands::FileChanged,
+    Commands::AddFileWatch,
+    Commands::RemoveFileWatch
 >;
 
 // Lock-free multi-producer (lua threads) single-consumer (main thread) queue

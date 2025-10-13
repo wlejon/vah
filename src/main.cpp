@@ -20,6 +20,43 @@
 #include "DataBindings.h"
 #include "InputEventListener.h"
 #include "InputTracker.h"
+#include <efsw/efsw.hpp>
+
+// File watcher listener for RML/RCSS hot reload
+class UIFileWatchListener : public efsw::FileWatchListener {
+public:
+    UIFileWatchListener(CommandQueue* command_queue) : command_queue_(command_queue) {}
+
+    void handleFileAction(efsw::WatchID watch_id,
+                         const std::string& dir,
+                         const std::string& filename,
+                         efsw::Action action,
+                         std::string old_filename) override {
+
+        // Only respond to modifications and additions
+        if (action != efsw::Actions::Modified && action != efsw::Actions::Add) {
+            return;
+        }
+
+        // Check if it's an RML or RCSS file
+        std::string lower_filename = filename;
+        std::transform(lower_filename.begin(), lower_filename.end(), lower_filename.begin(), ::tolower);
+
+        if (lower_filename.ends_with(".rml") || lower_filename.ends_with(".rcss")) {
+            std::string full_path = dir + filename;
+            LOG_INFO("UI file changed, reloading: {}", full_path);
+
+            // Push file changed command for both RML and RCSS
+            Commands::FileChanged cmd;
+            cmd.path = full_path;
+            cmd.event_type = "modified";
+            command_queue_->Push(std::move(cmd));
+        }
+    }
+
+private:
+    CommandQueue* command_queue_;
+};
 
 class VahEngine {
 public:
@@ -179,6 +216,19 @@ public:
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");
 
+        // Setup file watcher for RML/RCSS hot reload
+        ui_file_watcher_ = std::make_unique<efsw::FileWatcher>();
+        ui_file_watch_listener_ = std::make_unique<UIFileWatchListener>(command_queue_.get());
+
+        // Watch the ui directory recursively
+        efsw::WatchID watch_id = ui_file_watcher_->addWatch("ui", ui_file_watch_listener_.get(), true);
+        if (watch_id >= 0) {
+            ui_file_watcher_->watch();
+            LOG_INFO("Watching ui/ directory for RML/RCSS changes");
+        } else {
+            LOG_WARN("Failed to watch ui/ directory for hot reload");
+        }
+
         LOG_INFO("Vah Engine initialized successfully");
         return true;
     }
@@ -199,6 +249,10 @@ public:
 
     void Shutdown() {
         LOG_INFO("Shutting down Vah Engine...");
+
+        // Stop file watcher
+        ui_file_watch_listener_.reset();
+        ui_file_watcher_.reset();
 
         // Clean up data model definitions before context is destroyed
         data_model_defs_.clear();
@@ -556,6 +610,107 @@ private:
                               command.model, command.record_id);
                     input_tracker_->ClearEdits(command.model, command.record_id);
                 }
+                else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
+                    auto it = loaded_documents_.find(command.document_id);
+                    if (it != loaded_documents_.end() && rml_context_) {
+                        LOG_INFO("Reloading UI document: {}", command.document_id);
+                        auto doc = it->second;
+                        std::string src = doc->GetSourceURL();
+
+                        // Close the old document
+                        doc->Close();
+                        loaded_documents_.erase(it);
+
+                        // Reload it
+                        auto new_doc = rml_context_->LoadDocument(src.c_str());
+                        if (new_doc) {
+                            loaded_documents_[command.document_id] = new_doc;
+                            new_doc->Show();
+                            LOG_INFO("Reloaded UI document: {}", src);
+                        } else {
+                            LOG_ERROR("Failed to reload UI document: {}", src);
+                        }
+                    } else {
+                        LOG_WARN("Cannot reload document: {} not found", command.document_id);
+                    }
+                }
+                else if constexpr (std::is_same_v<T, Commands::FileChanged>) {
+                    // Handle RML file changes for hot reload
+                    if (command.event_type == "modified" && rml_context_) {
+                        std::string lower_path = command.path;
+                        std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
+
+                        // Normalize path separators to forward slashes
+                        std::string normalized_path = command.path;
+                        std::replace(normalized_path.begin(), normalized_path.end(), '\\', '/');
+
+                        if (lower_path.ends_with(".rml")) {
+                            // Iterate through ALL documents in context (not just tracked ones)
+                            int num_docs = rml_context_->GetNumDocuments();
+                            for (int i = 0; i < num_docs; i++) {
+                                auto doc = rml_context_->GetDocument(i);
+                                if (!doc) continue;
+
+                                std::string src = doc->GetSourceURL();
+
+                                // Check if the changed file matches this document
+                                // Compare with both absolute and relative paths
+                                if (src == normalized_path ||
+                                    normalized_path.ends_with(src) ||
+                                    src.ends_with(normalized_path)) {
+
+                                    LOG_INFO("Auto-reloading document: {}", src);
+                                    bool was_visible = doc->IsVisible();
+
+                                    doc->Close();
+                                    auto new_doc = rml_context_->LoadDocument(src.c_str());
+                                    if (new_doc && was_visible) {
+                                        new_doc->Show();
+                                    }
+
+                                    // Update tracked documents map if this doc has an ID
+                                    for (auto& [doc_id, tracked_doc] : loaded_documents_) {
+                                        if (tracked_doc == doc) {
+                                            loaded_documents_[doc_id] = new_doc;
+                                            break;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        } else if (lower_path.ends_with(".rcss")) {
+                            // For RCSS changes, clear stylesheet cache and reload all documents
+                            LOG_INFO("RCSS file changed: {}, clearing cache and reloading all documents", command.path);
+
+                            // Clear the stylesheet cache so RmlUi reloads the CSS
+                            Rml::Factory::ClearStyleSheetCache();
+
+                            int num_docs = rml_context_->GetNumDocuments();
+                            for (int i = 0; i < num_docs; i++) {
+                                auto doc = rml_context_->GetDocument(i);
+                                if (!doc) continue;
+
+                                std::string src = doc->GetSourceURL();
+                                bool was_visible = doc->IsVisible();
+
+                                doc->Close();
+                                auto new_doc = rml_context_->LoadDocument(src.c_str());
+
+                                // Update tracked documents
+                                for (auto& [doc_id, tracked_doc] : loaded_documents_) {
+                                    if (tracked_doc == doc) {
+                                        loaded_documents_[doc_id] = new_doc;
+                                        break;
+                                    }
+                                }
+
+                                if (new_doc && was_visible) {
+                                    new_doc->Show();
+                                }
+                            }
+                        }
+                    }
+                }
 
             }, cmd);
         });
@@ -608,6 +763,10 @@ private:
     // Track data models and their definitions
     std::unordered_map<std::string, std::unique_ptr<DynamicTableDef>> data_model_defs_;
     std::unordered_map<std::string, Rml::DataModelHandle> data_model_handles_;
+
+    // File watcher for RML/RCSS hot reload
+    std::unique_ptr<efsw::FileWatcher> ui_file_watcher_;
+    std::unique_ptr<UIFileWatchListener> ui_file_watch_listener_;
 };
 
 int main(int argc, char* argv[]) {

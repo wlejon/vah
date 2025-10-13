@@ -34,5 +34,8 @@ for assistance, please read the code directly or the documentation. they can be 
 
 ## current task
 
-after understanding the long term goals (idea and manufold-client) please review the c++ code so far. we're still building the foundation. i'm after a review of what is implemented and a short term roadmap for what's left in the foundation to fully support building manufold-client. 
+this task is small enough you don't need to use subagents. please complete the work yourself.
 
+after understanding the long term goals (idea and manufold-client) please review the c++ code so far. we're still building the foundation. 
+
+you're working on integrating efsw. we're going to watch the rml/rcss files and reload documents when they change. this is the starting point. we'll also want to expose efsw to lua threads. we can likely give each thread it's own watcher it can configure. so far, we have included efsw in the cmake.
