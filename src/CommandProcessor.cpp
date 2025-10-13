@@ -2,19 +2,16 @@
 #include "ThreadManager.h"
 #include "DocumentManager.h"
 #include "DataModelManager.h"
-#include "InputTracker.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
     ThreadManager* thread_manager,
     DocumentManager* document_manager,
-    DataModelManager* data_model_manager,
-    InputTracker* input_tracker
+    DataModelManager* data_model_manager
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
-    , input_tracker_(input_tracker)
 {
 }
 
@@ -75,26 +72,6 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
             data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));
-        }
-        else if constexpr (std::is_same_v<T, Commands::GetInputEdits>) {
-            LOG_DEBUG("Processing GetInputEdits command: model={}, record_id={}", command.model, command.record_id);
-
-            // Query InputTracker for edits
-            PayloadMap edits = input_tracker_->GetEdits(command.model, command.record_id);
-
-            // Send response with PayloadMap - Lua thread will convert to table
-            auto response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-            if (response_queue) {
-                Response response{command.request_id, std::move(edits), ""};
-                response_queue->enqueue(std::move(response));
-                LOG_DEBUG("Sent GetInputEdits response with PayloadMap to thread {}", command.requesting_thread_id);
-            } else {
-                LOG_WARN("Cannot send GetInputEdits response: thread {} not found", command.requesting_thread_id);
-            }
-        }
-        else if constexpr (std::is_same_v<T, Commands::ClearInputEdits>) {
-            LOG_DEBUG("Processing ClearInputEdits command: model={}, record_id={}", command.model, command.record_id);
-            input_tracker_->ClearEdits(command.model, command.record_id);
         }
         else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
             document_manager_->ReloadDocument(command.document_id);

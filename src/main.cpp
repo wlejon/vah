@@ -17,8 +17,6 @@
 #include "RmlUiBridge.h"
 #include "DataStore.h"
 #include "DataBindings.h"
-#include "InputEventListener.h"
-#include "InputTracker.h"
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "CommandProcessor.h"
@@ -175,48 +173,12 @@ public:
         document_manager_ = std::make_unique<DocumentManager>(rml_context_);
         data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), ui_event_queue_.get());
 
-        // Initialize input tracker
-        input_tracker_ = std::make_unique<InputTracker>();
-        input_tracker_->Initialize("data/input_tracking.db");
-
-        // Initialize command processor (needs all managers and input tracker)
+        // Initialize command processor (needs all managers)
         command_processor_ = std::make_unique<CommandProcessor>(
             thread_manager_.get(),
             document_manager_.get(),
-            data_model_manager_.get(),
-            input_tracker_.get()
+            data_model_manager_.get()
         );
-
-        // Initialize input event listener for automatic tracking
-        input_event_listener_ = std::make_unique<InputEventListener>();
-
-        // Setup callbacks - wire InputEventListener to InputTracker
-        input_event_listener_->SetOnFocus([this](const std::string& model, const std::string& record_id,
-                                                  const std::string& field, const std::string& value) {
-            if (input_tracker_) {
-                input_tracker_->OnFocus(model, record_id, field, value);
-            }
-        });
-
-        input_event_listener_->SetOnBlur([this](const std::string& model, const std::string& record_id,
-                                                 const std::string& field, const std::string& value) {
-            if (input_tracker_) {
-                input_tracker_->OnBlur(model, record_id, field, value);
-            }
-        });
-
-        input_event_listener_->SetOnChange([this](const std::string& model, const std::string& record_id,
-                                                   const std::string& field, const std::string& value) {
-            if (input_tracker_) {
-                input_tracker_->OnChange(model, record_id, field, value);
-            }
-        });
-
-        // Register the listener with the RmlUi context for all three event types
-        // Use capture phase (true) to catch events before they bubble
-        rml_context_->AddEventListener("focus", input_event_listener_.get(), true);
-        rml_context_->AddEventListener("blur", input_event_listener_.get(), true);
-        rml_context_->AddEventListener("change", input_event_listener_.get(), true);
 
         // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
@@ -270,18 +232,8 @@ public:
 
         // Shutdown managers (in reverse order of initialization)
         command_processor_.reset();
-
-        // Unregister input event listener before destroying context
-        if (rml_context_ && input_event_listener_) {
-            rml_context_->RemoveEventListener("focus", input_event_listener_.get(), true);
-            rml_context_->RemoveEventListener("blur", input_event_listener_.get(), true);
-            rml_context_->RemoveEventListener("change", input_event_listener_.get(), true);
-        }
-
         thread_manager_.reset();
         rmlui_bridge_.reset();
-        input_event_listener_.reset();
-        input_tracker_.reset();
 
         // Clean up managers before destroying context
         data_model_manager_.reset();
@@ -474,8 +426,6 @@ private:
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
-    std::unique_ptr<InputEventListener> input_event_listener_;
-    std::unique_ptr<InputTracker> input_tracker_;
 
     // Managers
     std::unique_ptr<DocumentManager> document_manager_;

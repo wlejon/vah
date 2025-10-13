@@ -1,6 +1,7 @@
 #include "DataModelManager.h"
 #include "Logger.h"
 #include <RmlUi/Lua/Interpreter.h>
+#include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <lua.hpp>
 
 DataModelManager::DataModelManager(Rml::Context* context, DataStore* data_store, moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
@@ -100,6 +101,7 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                 }
 
                 // If we found a data context, inject the full row into payload
+                Rml::Element* row_element = nullptr;  // Track the row element for input extraction
                 if (!context_model.empty() && context_row != -1) {
                     auto model_data = data_store_->GetModel(context_model);
                     if (model_data && context_row >= 0 && context_row < static_cast<int>(model_data->size())) {
@@ -112,10 +114,33 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
 
                         LOG_DEBUG("trigger('{}') injected row {} from model '{}' ({} fields)",
                                  event_name, context_row, context_model, row.size());
+
+                        // Store the row element for input extraction
+                        // Walk back up from current element to find the element with data-row-index
+                        Rml::Element* el = event.GetTargetElement();
+                        while (el) {
+                            const Rml::Variant* row_attr = el->GetAttribute("data-row-index");
+                            if (row_attr) {
+                                row_element = el;
+                                break;
+                            }
+                            el = el->GetParentNode();
+                        }
                     }
                 }
 
-                // Add explicit arguments on top (may override row fields)
+                // Extract current values from tracked inputs in the row (overrides row data)
+                if (row_element) {
+                    PayloadMap tracked_values = ExtractTrackedInputValues(row_element);
+                    for (const auto& [key, value] : tracked_values) {
+                        payload[key] = value;  // Override with current input values
+                    }
+                    if (!tracked_values.empty()) {
+                        LOG_DEBUG("trigger('{}') merged {} tracked input values", event_name, tracked_values.size());
+                    }
+                }
+
+                // Add explicit arguments on top (may override row fields and tracked values)
                 // Use smart key assignment:
                 // - Second argument (index 1) → "id"
                 // - Third+ arguments → numbered keys "1", "2", etc.
@@ -180,4 +205,51 @@ void DataModelManager::ClearAllModels() {
     // Clean up data model definitions before context is destroyed
     data_model_defs_.clear();
     data_model_handles_.clear();
+}
+
+PayloadMap DataModelManager::ExtractTrackedInputValues(Rml::Element* root) {
+    PayloadMap result;
+
+    if (!root) {
+        return result;
+    }
+
+    // Recursively walk the DOM tree starting from root
+    std::function<void(Rml::Element*)> walk = [&](Rml::Element* element) {
+        if (!element) {
+            return;
+        }
+
+        // Check if this element has the track attribute (not data-track, just track)
+        // because data-attr-track creates an attribute called "track"
+        const Rml::Variant* track_attr = element->GetAttribute("track");
+        if (track_attr) {
+            // This is a tracked input - try to extract its value
+            Rml::ElementFormControl* form_control = dynamic_cast<Rml::ElementFormControl*>(element);
+            if (form_control) {
+                // Get current value from the form control
+                Rml::String value_rml = form_control->GetValue();
+                std::string value(value_rml.data(), value_rml.size());
+
+                // Get the field name from the explicit field attribute
+                Rml::String field_rml = element->GetAttribute("field", Rml::String());
+                std::string field_name(field_rml.data(), field_rml.size());
+
+                if (!field_name.empty()) {
+                    result[field_name] = value;
+                    LOG_DEBUG("ExtractTrackedInputValues: {} = '{}'", field_name, value);
+                }
+            }
+        }
+
+        // Recurse to children
+        for (int i = 0; i < element->GetNumChildren(); ++i) {
+            walk(element->GetChild(i));
+        }
+    };
+
+    walk(root);
+
+    LOG_DEBUG("ExtractTrackedInputValues: extracted {} fields", result.size());
+    return result;
 }

@@ -28,4 +28,7 @@ private:
     // Track data models and their definitions
     std::unordered_map<std::string, std::unique_ptr<DynamicTableDef>> data_model_defs_;
     std::unordered_map<std::string, Rml::DataModelHandle> data_model_handles_;
+
+    // Helper function for extracting tracked input values from DOM
+    PayloadMap ExtractTrackedInputValues(Rml::Element* root);
 };

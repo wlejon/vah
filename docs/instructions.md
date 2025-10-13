@@ -34,3 +34,399 @@ for assistance, please read the code directly or the documentation. they can be 
 
 ## current task
 
+this task fits within your context, there's no need to use subagents.
+
+after understanding the long term goals (manufold-client), please review the c++ code. 
+
+you are trying to update the way we track information to improve the rml code requirements for being able to save data.
+
+currently clicking save is reverting the changes made to the data. i think it's actually passing the original row data back through and isn't merging with the tracked information. i would also like you to think about a different approach where we wouldn't need the tracker at all. we've gone over this before and i think we need the tracker because otherwise we need dom traversal but i think now we're doing dom traversal for finding the node so we might be able to just also grab the edited data. i'm not sure if that's right, please investigate.
+
+# current effort
+PS D:\projects\vah> git diff
+diff --git a/src/InputEventListener.cpp b/src/InputEventListener.cpp
+index 0cc900f..4094d28 100644
+--- a/src/InputEventListener.cpp
++++ b/src/InputEventListener.cpp
+@@ -1,7 +1,13 @@
+ #include "InputEventListener.h"
+ #include "Logger.h"
++#include "DataStore.h"
+ #include <RmlUi/Core/Elements/ElementFormControl.h>
+
++InputEventListener::InputEventListener(DataStore* data_store)
++    : data_store_(data_store)
++{
++}
++
+ void InputEventListener::ProcessEvent(Rml::Event& event) {
+     // Route to appropriate callback based on event type
+     if (event == "focus" || event == Rml::EventId::Focus) {
+@@ -27,41 +33,112 @@ void InputEventListener::HandleEvent(Rml::Event& event, EventCallback& callback)
+         return;
+     }
+
+-    // Only process elements with all three required tracking attributes
+-    if (!HasTrackingAttributes(target)) {
++    // Only process elements with data-track attribute
++    if (!HasTrackingAttribute(target)) {
+         return;
+     }
+
+-    // Extract tracking attributes
+-    Rml::String model_attr = target->GetAttribute("data-model", Rml::String());
+-    Rml::String record_id_attr = target->GetAttribute("data-record-id", Rml::String());
+-    Rml::String field_attr = target->GetAttribute("data-field", Rml::String());
++    // Walk up DOM to find data-model and data-row-index
++    Rml::Element* element = target;
++    std::string context_model;
++    int context_row = -1;
++
++    while (element) {
++        if (context_model.empty()) {
++            const Rml::Variant* model_attr = element->GetAttribute("data-model");
++            if (model_attr && model_attr->GetType() == Rml::Variant::STRING) {
++                context_model = std::string(model_attr->Get<Rml::String>());
++            }
++        }
++
++        if (context_row == -1) {
++            const Rml::Variant* row_attr = element->GetAttribute("data-row-index");
++            if (row_attr) {
++                if (row_attr->GetType() == Rml::Variant::INT) {
++                    context_row = row_attr->Get<int>();
++                } else if (row_attr->GetType() == Rml::Variant::INT64) {
++                    context_row = static_cast<int>(row_attr->Get<int64_t>());
++                } else if (row_attr->GetType() == Rml::Variant::STRING) {
++                    std::string row_str = std::string(row_attr->Get<Rml::String>());
++                    try {
++                        context_row = std::stoi(row_str);
++                    } catch (...) {
++                        LOG_WARN("InputEventListener: couldn't parse data-row-index: '{}'", row_str);
++                    }
++                }
++            }
++        }
+
+-    // Convert to std::string
+-    std::string model_name(model_attr.data(), model_attr.size());
+-    std::string record_id(record_id_attr.data(), record_id_attr.size());
+-    std::string field_name(field_attr.data(), field_attr.size());
++        if (!context_model.empty() && context_row != -1) {
++            break;
++        }
++
++        element = element->GetParentNode();
++    }
++
++    // Must find both model and row index
++    if (context_model.empty() || context_row == -1 || !data_store_) {
++        return;
++    }
++
++    // Look up the row from DataStore
++    auto model_data = data_store_->GetModel(context_model);
++    if (!model_data || context_row < 0 || context_row >= static_cast<int>(model_data->size())) {
++        return;
++    }
++
++    const auto& row = (*model_data)[context_row];
++
++    // Extract record ID from row's 'id' field
++    auto id_it = row.find("id");
++    if (id_it == row.end()) {
++        LOG_WARN("InputEventListener: row missing 'id' field in model '{}'", context_model);
++        return;
++    }
++
++    // Convert id DynamicValue to string
++    std::string record_id;
++    std::visit([&](auto&& val) {
++        using T = std::decay_t<decltype(val)>;
++        if constexpr (std::is_same_v<T, std::string>) {
++            record_id = val;
++        } else if constexpr (std::is_same_v<T, int64_t>) {
++            record_id = std::to_string(val);
++        } else if constexpr (std::is_same_v<T, double>) {
++            record_id = std::to_string(val);
++        } else if constexpr (std::is_same_v<T, bool>) {
++            record_id = val ? "true" : "false";
++        }
++    }, id_it->second);
++
++    // Parse field name from value binding expression
++    Rml::String value_binding = target->GetAttribute("value", Rml::String());
++    std::string binding_expr(value_binding.data(), value_binding.size());
++    std::string field_name = ParseFieldName(binding_expr);
++
++    if (field_name.empty()) {
++        LOG_WARN("InputEventListener: couldn't parse field name from binding: '{}'", binding_expr);
++        return;
++    }
+
+     // Extract current value from form control
+     std::string value = ExtractValue(target);
+
+     // Log for debugging
+     LOG_DEBUG("InputEventListener: {} event on {}.{}.{} = '{}'",
+-              event.GetType(), model_name, record_id, field_name, value);
++              event.GetType(), context_model, record_id, field_name, value);
+
+     // Call the callback
+-    callback(model_name, record_id, field_name, value);
++    callback(context_model, record_id, field_name, value);
+ }
+
+-bool InputEventListener::HasTrackingAttributes(Rml::Element* element) const {
++bool InputEventListener::HasTrackingAttribute(Rml::Element* element) const {
+     if (!element) {
+         return false;
+     }
+
+-    // Element must have all three data attributes
+-    return element->HasAttribute("data-model") &&
+-           element->HasAttribute("data-record-id") &&
+-           element->HasAttribute("data-field");
++    // Element must have data-track attribute
++    return element->HasAttribute("data-track");
+ }
+
+ std::string InputEventListener::ExtractValue(Rml::Element* element) const {
+@@ -80,3 +157,22 @@ std::string InputEventListener::ExtractValue(Rml::Element* element) const {
+     Rml::String value_attr = element->GetAttribute("value", Rml::String());
+     return std::string(value_attr.data(), value_attr.size());
+ }
++
++std::string InputEventListener::ParseFieldName(const std::string& binding_expr) const {
++    // Parse expressions like "contact.company" to extract "company"
++    // Also handles "contact.nested.field" -> "field" (last component)
++
++    if (binding_expr.empty()) {
++        return "";
++    }
++
++    // Find the last dot
++    size_t last_dot = binding_expr.rfind('.');
++    if (last_dot == std::string::npos) {
++        // No dot found - entire expression is the field name
++        return binding_expr;
++    }
++
++    // Return everything after the last dot
++    return binding_expr.substr(last_dot + 1);
++}
+diff --git a/src/InputEventListener.h b/src/InputEventListener.h
+index 7d11bed..464eaed 100644
+--- a/src/InputEventListener.h
++++ b/src/InputEventListener.h
+@@ -4,26 +4,28 @@
+ #include <functional>
+ #include <string>
+
++// Forward declaration
++class DataStore;
++
+ /**
+  * InputEventListener - Automatic input tracking event hooks for RmlUi
+  *
+  * This class implements RmlUi's EventListener interface to detect focus, blur,
+- * and change events on input elements. It only tracks elements that have ALL
+- * THREE required data attributes: data-model, data-record-id, and data-field.
++ * and change events on input elements. It tracks elements that have data-track attribute.
+  *
+- * When events fire on qualifying elements, it extracts the current value and
+- * calls the appropriate callback function. This class does NOT store any state
+- * or tracking information - all event data is passed to callbacks for external
+- * handling.
++ * It automatically extracts model, record ID, and field name by:
++ * - Walking up DOM to find data-model and data-row-index
++ * - Looking up the row from DataStore to get the id field
++ * - Parsing the value binding expression to extract field name
+  *
+  * Usage:
+- *   1. Create an instance: auto listener = std::make_unique<InputEventListener>();
++ *   1. Create an instance: auto listener = std::make_unique<InputEventListener>(data_store);
+  *   2. Set callbacks: listener->SetOnFocus([](model, id, field, value) { ... });
+  *   3. Register with context: context->AddEventListener("focus", listener.get(), true);
+  */
+ class InputEventListener : public Rml::EventListener {
+ public:
+-    InputEventListener() = default;
++    explicit InputEventListener(DataStore* data_store);
+     ~InputEventListener() override = default;
+
+     // Callback type: (model_name, record_id, field_name, value)
+@@ -42,12 +44,18 @@ private:
+     // Extract tracking attributes from element and call appropriate callback
+     void HandleEvent(Rml::Event& event, EventCallback& callback);
+
+-    // Check if element has all required data attributes
+-    bool HasTrackingAttributes(Rml::Element* element) const;
++    // Check if element has data-track attribute
++    bool HasTrackingAttribute(Rml::Element* element) const;
+
+     // Extract value from form control element
+     std::string ExtractValue(Rml::Element* element) const;
+
++    // Parse binding expression like "contact.company" to extract field name "company"
++    std::string ParseFieldName(const std::string& binding_expr) const;
++
++    // DataStore for looking up row data
++    DataStore* data_store_;
++
+     // Callbacks for each event type
+     EventCallback on_focus_;
+     EventCallback on_change_;
+diff --git a/src/main.cpp b/src/main.cpp
+index 6d21ddb..76eac55 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -188,7 +188,7 @@ public:
+         );
+
+         // Initialize input event listener for automatic tracking
+-        input_event_listener_ = std::make_unique<InputEventListener>();
++        input_event_listener_ = std::make_unique<InputEventListener>(data_store_.get());
+
+         // Setup callbacks - wire InputEventListener to InputTracker
+         input_event_listener_->SetOnFocus([this](const std::string& model, const std::string& record_id,
+diff --git a/ui/sqlite_demo.rml b/ui/sqlite_demo.rml
+index 9d1dcb9..1cfaf90 100644
+--- a/ui/sqlite_demo.rml
++++ b/ui/sqlite_demo.rml
+@@ -40,30 +40,22 @@
+                         <div class="col-name">
+                             <input type="text"
+                                    data-attr-value="contact.name"
+-                                   data-attr-data-model="'contacts'"
+-                                   data-attr-data-record-id="contact.id"
+-                                   data-attr-data-field="'name'" />
++                                   data-attr-track="true" />
+                         </div>
+                         <div class="col-email">
+                             <input type="text"
+                                    data-attr-value="contact.email"
+-                                   data-attr-data-model="'contacts'"
+-                                   data-attr-data-record-id="contact.id"
+-                                   data-attr-data-field="'email'" />
++                                   data-attr-track="true" />
+                         </div>
+                         <div class="col-phone">
+                             <input type="text"
+                                    data-attr-value="contact.phone"
+-                                   data-attr-data-model="'contacts'"
+-                                   data-attr-data-record-id="contact.id"
+-                                   data-attr-data-field="'phone'" />
++                                   data-attr-track="true" />
+                         </div>
+                         <div class="col-company">
+                             <input type="text"
+                                    data-attr-value="contact.company"
+-                                   data-attr-data-model="'contacts'"
+-                                   data-attr-data-record-id="contact.id"
+-                                   data-attr-data-field="'company'" />
++                                   data-attr-track="true" />
+                         </div>
+                         <div class="col-actions">
+                             <button class="btn-save" data-event-click="trigger('save_contact')">Save</button>
+
+
+# current log
+
+[2025-10-13 17:31:43.874] [info] Initializing Vah Engine...
+[2025-10-13 17:31:44.072] [info] RmlGL3: 
+[2025-10-13 17:31:44.078] [info] [RmlUi] Loaded font face 'Roboto' [regular] from 'ui/fonts/roboto-static/Roboto-Regular.ttf'.
+[2025-10-13 17:31:44.078] [info] [RmlUi] Loaded font face 'Roboto' [bold] from 'ui/fonts/roboto-static/Roboto-Bold.ttf'.
+[2025-10-13 17:31:44.079] [info] [RmlUi] Loaded font face 'Roboto' [italic] from 'ui/fonts/roboto-static/Roboto-Italic.ttf'.
+[2025-10-13 17:31:44.079] [info] [RmlUi] Loaded font face 'Roboto' [weight=300] from 'ui/fonts/roboto-static/Roboto-Light.ttf'.
+[2025-10-13 17:31:44.079] [info] [RmlUi] Loaded font face 'Roboto' [weight=500] from 'ui/fonts/roboto-static/Roboto-Medium.ttf'.
+[2025-10-13 17:31:44.079] [info] [RmlUi] Loading Lua plugin using a new Lua state.
+[2025-10-13 17:31:44.080] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [regular] from 'memory'.
+[2025-10-13 17:31:44.080] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [italic] from 'memory'.
+[2025-10-13 17:31:44.085] [info] Opened InputTracker database: data/input_tracking.db
+[2025-10-13 17:31:44.086] [debug] InputTracker tables created/verified
+[2025-10-13 17:31:44.086] [info] InputTracker initialized successfully
+[2025-10-13 17:31:44.086] [info] RmlUiBridge: Registered trigger() function in RmlUI lua state
+[2025-10-13 17:31:44.086] [info] ThreadManager: Spawned thread 0 for script 'scripts/main.lua'
+[2025-10-13 17:31:44.086] [info] Watching ui/ directory for RML/RCSS changes
+[2025-10-13 17:31:44.086] [info] Vah Engine initialized successfully
+[2025-10-13 17:31:44.086] [info] FileSystem bindings initialized
+[2025-10-13 17:31:44.086] [info] JSON bindings initialized
+[2025-10-13 17:31:44.087] [info] SQLite bindings initialized
+[2025-10-13 17:31:44.087] [info] HTTP bindings initialized
+[2025-10-13 17:31:44.087] [info] FileWatcher bindings initialized
+[2025-10-13 17:31:44.088] [info] Lua thread 0 running
+[2025-10-13 17:31:44.092] [info] [Lua Thread 0] Main Lua thread started
+[2025-10-13 17:31:44.092] [info] Processing SpawnThread command: scripts/sqlite_demo.lua (parent: 0)
+[2025-10-13 17:31:44.093] [info] ThreadManager: Spawned thread 1 for script 'scripts/sqlite_demo.lua'
+[2025-10-13 17:31:44.093] [info] [Lua Thread 0] Demo initialized
+[2025-10-13 17:31:44.093] [info] FileSystem bindings initialized
+[2025-10-13 17:31:44.093] [info] JSON bindings initialized
+[2025-10-13 17:31:44.093] [info] SQLite bindings initialized
+[2025-10-13 17:31:44.094] [info] HTTP bindings initialized
+[2025-10-13 17:31:44.094] [info] FileWatcher bindings initialized
+[2025-10-13 17:31:44.095] [debug] Lua thread 1 registered handler for event 'add_contact'
+[2025-10-13 17:31:44.095] [debug] Lua thread 1 registered handler for event 'save_contact'
+[2025-10-13 17:31:44.095] [debug] Lua thread 1 registered handler for event 'delete_contact'
+[2025-10-13 17:31:44.095] [debug] Lua thread 1 queued LoadUIDocument: ui/sqlite_demo.rml
+[2025-10-13 17:31:44.095] [info] Lua thread 1 running
+[2025-10-13 17:31:44.111] [info] [Lua Thread 1] SQLite demo started (thread_id: 1)
+[2025-10-13 17:31:44.111] [info] [Lua Thread 1] Database opened successfully
+[2025-10-13 17:31:44.111] [info] [Lua Thread 1] Loaded 4 contacts
+[2025-10-13 17:31:44.111] [debug] Processing UpdateDataModel command: contacts (4 rows)
+[2025-10-13 17:31:44.111] [debug] DataStore: Set model 'contacts' with 4 rows
+[2025-10-13 17:31:44.111] [info] Created data model 'contacts' (marked dirty for initial render)
+[2025-10-13 17:31:44.111] [info] Processing LoadUIDocument command: ui/sqlite_demo.rml
+[2025-10-13 17:31:44.121] [warning] [RmlUi] Could not get value from data variable 'contacts.size'.
+[2025-10-13 17:31:44.121] [warning] [RmlUi] Could not get value from data variable 'contacts.size'.
+[2025-10-13 17:31:44.135] [info] Loaded UI document: ui/sqlite_demo.rml
+[2025-10-13 17:31:46.841] [debug] trigger('save_contact') injected row 0 from model 'contacts' (6 fields)
+[2025-10-13 17:31:46.841] [debug] DataModelManager: Triggered event 'save_contact' with 6 payload items
+[2025-10-13 17:31:46.867] [debug] Lua thread 1 requested input edits for contacts.390
+[2025-10-13 17:31:46.868] [debug] Processing GetInputEdits command: model=contacts, record_id=390
+[2025-10-13 17:31:46.869] [debug] GetEdits(contacts, 390) returned 0 fields
+[2025-10-13 17:31:46.869] [debug] Sent GetInputEdits response with PayloadMap to thread 1
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1] Saving contact ID: 390
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1]   name: Chris Garcia
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1]   email: chris.garcia@example.com
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1]   phone: 555-76042134
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1]   company: Digital Inc123
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1] Updated contact with id: 390
+[2025-10-13 17:31:46.902] [info] [Lua Thread 1] Loaded 4 contacts
+[2025-10-13 17:31:46.902] [debug] Lua thread 1 cleared input edits for contacts.390
+[2025-10-13 17:31:46.904] [debug] Processing UpdateDataModel command: contacts (4 rows)
+[2025-10-13 17:31:46.905] [debug] DataStore: Set model 'contacts' with 4 rows
+[2025-10-13 17:31:46.905] [debug] Marked data model 'contacts' as dirty
+[2025-10-13 17:31:46.905] [debug] Processing ClearInputEdits command: model=contacts, record_id=390
+[2025-10-13 17:31:46.905] [debug] ClearEdits(contacts, 390) deleted 0 records
+[2025-10-13 17:31:46.905] [info] [Lua Thread 1] Cleared edit tracking for contact 390
+[2025-10-13 17:31:48.786] [debug] RmlUiBridge: Triggered event 'add_contact' with 0 payload items
+[2025-10-13 17:31:48.824] [info] [Lua Thread 1] Added contact: John Garcia
+[2025-10-13 17:31:48.824] [info] [Lua Thread 1] Loaded 5 contacts
+[2025-10-13 17:31:48.824] [debug] Processing UpdateDataModel command: contacts (5 rows)
+[2025-10-13 17:31:48.824] [debug] DataStore: Set model 'contacts' with 5 rows
+[2025-10-13 17:31:48.824] [debug] Marked data model 'contacts' as dirty
+[2025-10-13 17:31:51.225] [debug] trigger('save_contact') injected row 2 from model 'contacts' (6 fields)
+[2025-10-13 17:31:51.225] [debug] DataModelManager: Triggered event 'save_contact' with 6 payload items
+[2025-10-13 17:31:51.257] [debug] Lua thread 1 requested input edits for contacts.399
+[2025-10-13 17:31:51.260] [debug] Processing GetInputEdits command: model=contacts, record_id=399
+[2025-10-13 17:31:51.260] [debug] GetEdits(contacts, 399) returned 0 fields
+[2025-10-13 17:31:51.260] [debug] Sent GetInputEdits response with PayloadMap to thread 1
+[2025-10-13 17:31:51.290] [debug] Lua thread 1 cleared input edits for contacts.399
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1] Saving contact ID: 399
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1]   name: John Garcia
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1]   email: john.garcia@example.com
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1]   phone: 555-2286
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1]   company: Data Solutions
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1] Updated contact with id: 399
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1] Loaded 5 contacts
+[2025-10-13 17:31:51.291] [debug] Processing UpdateDataModel command: contacts (5 rows)
+[2025-10-13 17:31:51.291] [debug] DataStore: Set model 'contacts' with 5 rows
+[2025-10-13 17:31:51.291] [debug] Marked data model 'contacts' as dirty
+[2025-10-13 17:31:51.291] [debug] Processing ClearInputEdits command: model=contacts, record_id=399
+[2025-10-13 17:31:51.291] [debug] ClearEdits(contacts, 399) deleted 0 records
+[2025-10-13 17:31:51.291] [info] [Lua Thread 1] Cleared edit tracking for contact 399
+[2025-10-13 17:31:54.018] [info] Shutting down Vah Engine...
+[2025-10-13 17:31:54.018] [info] ThreadManager: Stopping all 2 threads
+[2025-10-13 17:31:54.022] [info] Lua thread 0 finished normally
+[2025-10-13 17:31:54.030] [info] Lua thread 1 finished normally

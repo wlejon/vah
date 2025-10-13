@@ -41,8 +41,6 @@ add_executable(vah
     src/HttpBindings.cpp
     src/DataBindings.cpp
     src/DataStore.cpp
-    src/InputEventListener.cpp
-    src/InputTracker.cpp
     src/FileWatcherBindings.cpp
     src/DocumentManager.cpp
     src/DataModelManager.cpp

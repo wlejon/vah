@@ -517,42 +517,6 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["data"] = data_table;
-    auto tracker_table = lua_->create_table();
-
-    tracker_table["get_edits"] = [this](const std::string& model, const std::string& record_id, sol::function callback) {
-        // Generate request ID
-        int request_id = next_request_id_++;
-
-        // Store callback
-        pending_requests_[request_id] = PendingRequest{
-            request_id,
-            callback,
-            "get_input_edits"
-        };
-
-        // Send command
-        Commands::GetInputEdits cmd;
-        cmd.model = model;
-        cmd.record_id = record_id;
-        cmd.requesting_thread_id = id_;
-        cmd.request_id = request_id;
-
-        command_queue_->enqueue(std::move(cmd));
-
-        LOG_DEBUG("Lua thread {} requested input edits for {}.{}", id_, model, record_id);
-    };
-
-    tracker_table["clear"] = [this](const std::string& model, const std::string& record_id) {
-        Commands::ClearInputEdits cmd;
-        cmd.model = model;
-        cmd.record_id = record_id;
-
-        command_queue_->enqueue(std::move(cmd));
-
-        LOG_DEBUG("Lua thread {} cleared input edits for {}.{}", id_, model, record_id);
-    };
-
-    (*lua_)["tracker"] = tracker_table;
 
     // Bind thread info
     (*lua_)["thread_id"] = id_;

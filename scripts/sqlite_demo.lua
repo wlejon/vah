@@ -180,46 +180,23 @@ function startup()
         if payload.id then
             local contact_id = payload.id
 
-            -- Find the current contact data
-            local contact = nil
-            for _, c in ipairs(contacts) do
-                if c.id == contact_id then
-                    contact = c
-                    break
-                end
-            end
+            -- Payload already contains merged data:
+            -- - Original row data from model
+            -- - Current input values from tracked inputs (override originals)
+            -- So we can just use payload directly!
+            local name = payload.name or ""
+            local email = payload.email or ""
+            local phone = payload.phone or ""
+            local company = payload.company or ""
 
-            if not contact then
-                print("ERROR: Contact ID " .. tostring(contact_id) .. " not found in contacts array")
-                return
-            end
+            print("Saving contact ID: " .. tostring(contact_id))
+            print("  name: " .. name)
+            print("  email: " .. email)
+            print("  phone: " .. phone)
+            print("  company: " .. company)
 
-            -- Get edited fields from input tracker
-            tracker.get_edits("contacts", tostring(contact_id), function(edits, err)
-                if err then
-                    print("ERROR getting edits: " .. err)
-                    return
-                end
-
-                -- Merge edited fields with current contact data (edited fields override)
-                local name = edits.name or contact.name or ""
-                local email = edits.email or contact.email or ""
-                local phone = edits.phone or contact.phone or ""
-                local company = edits.company or contact.company or ""
-
-                print("Saving contact ID: " .. tostring(contact_id))
-                print("  name: " .. name .. (edits.name and " (edited)" or ""))
-                print("  email: " .. email .. (edits.email and " (edited)" or ""))
-                print("  phone: " .. phone .. (edits.phone and " (edited)" or ""))
-                print("  company: " .. company .. (edits.company and " (edited)" or ""))
-
-                -- Save to database
-                if save_contact(contact_id, name, email, phone, company) then
-                    -- Clear tracking after successful save
-                    tracker.clear("contacts", tostring(contact_id))
-                    print("Cleared edit tracking for contact " .. tostring(contact_id))
-                end
-            end)
+            -- Save to database
+            save_contact(contact_id, name, email, phone, company)
         else
             print("ERROR: Missing id in save_contact payload")
         end

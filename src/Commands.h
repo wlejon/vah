@@ -90,18 +90,6 @@ namespace Commands {
         DynamicTable data;
     };
 
-    struct GetInputEdits {
-        std::string model;
-        std::string record_id;
-        int requesting_thread_id;
-        int request_id;
-    };
-
-    struct ClearInputEdits {
-        std::string model;
-        std::string record_id;
-    };
-
     struct FileChanged {
         std::string path;
         std::string event_type;  // "created", "modified", "deleted"
@@ -135,8 +123,6 @@ using Command = std::variant<
     Commands::AddElementClass,
     Commands::RemoveElementClass,
     Commands::UpdateDataModel,
-    Commands::GetInputEdits,
-    Commands::ClearInputEdits,
     Commands::FileChanged,
     Commands::AddFileWatch,
     Commands::RemoveFileWatch

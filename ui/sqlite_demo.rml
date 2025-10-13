@@ -40,30 +40,26 @@
                         <div class="col-name">
                             <input type="text"
                                    data-attr-value="contact.name"
-                                   data-attr-data-model="'contacts'"
-                                   data-attr-data-record-id="contact.id"
-                                   data-attr-data-field="'name'" />
+                                   data-attr-track="true"
+                                   data-attr-field="'name'" />
                         </div>
                         <div class="col-email">
                             <input type="text"
                                    data-attr-value="contact.email"
-                                   data-attr-data-model="'contacts'"
-                                   data-attr-data-record-id="contact.id"
-                                   data-attr-data-field="'email'" />
+                                   data-attr-track="true"
+                                   data-attr-field="'email'" />
                         </div>
                         <div class="col-phone">
                             <input type="text"
                                    data-attr-value="contact.phone"
-                                   data-attr-data-model="'contacts'"
-                                   data-attr-data-record-id="contact.id"
-                                   data-attr-data-field="'phone'" />
+                                   data-attr-track="true"
+                                   data-attr-field="'phone'" />
                         </div>
                         <div class="col-company">
                             <input type="text"
                                    data-attr-value="contact.company"
-                                   data-attr-data-model="'contacts'"
-                                   data-attr-data-record-id="contact.id"
-                                   data-attr-data-field="'company'" />
+                                   data-attr-track="true"
+                                   data-attr-field="'company'" />
                         </div>
                         <div class="col-actions">
                             <button class="btn-save" data-event-click="trigger('save_contact')">Save</button>
