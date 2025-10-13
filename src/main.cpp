@@ -257,6 +257,36 @@ private:
                     if (event.key.keysym.sym == SDLK_ESCAPE) {
                         running_ = false;
                     }
+                    // Handle Ctrl+V for clipboard paste
+                    else if (event.key.keysym.sym == SDLK_v && (event.key.keysym.mod & KMOD_CTRL)) {
+                        if (SDL_HasClipboardText()) {
+                            char* clipboard_text = SDL_GetClipboardText();
+                            if (clipboard_text) {
+                                std::string text(clipboard_text);
+                                SDL_free(clipboard_text);
+
+                                LOG_INFO("Clipboard paste detected ({} bytes)", text.size());
+                                // Trigger UI event with clipboard text
+                                PayloadMap payload;
+                                payload["text"] = text;
+                                ui_event_queue_->Push(UIEvent{"clipboard_paste", payload});
+                            }
+                        }
+                    }
+                    break;
+
+                case SDL_DROPFILE:
+                    // Handle file drag and drop
+                    if (event.drop.file) {
+                        std::string dropped_file(event.drop.file);
+                        SDL_free(event.drop.file);
+
+                        LOG_INFO("File drop detected: {}", dropped_file);
+                        // Trigger UI event with file path
+                        PayloadMap payload;
+                        payload["path"] = dropped_file;
+                        ui_event_queue_->Push(UIEvent{"file_drop", payload});
+                    }
                     break;
 
                 case SDL_WINDOWEVENT:

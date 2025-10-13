@@ -65,22 +65,29 @@ namespace {
     DynamicTable TableToDynamicTable(const sol::table& table) {
         DynamicTable result;
 
-        // Iterate through array elements (1-indexed in Lua)
-        for (size_t i = 1; i <= table.size(); ++i) {
-            sol::object elem = table[i];
-            if (elem.is<sol::table>()) {
-                sol::table row_table = elem.as<sol::table>();
-                DynamicRow row;
+        // Debug: Check table type
+        size_t count = 0;
 
-                // Convert each field in the row
-                for (const auto& [key, value] : row_table) {
-                    if (key.is<std::string>()) {
-                        std::string key_str = key.as<std::string>();
-                        row[key_str] = ObjectToDynamicValue(value);
+        // Iterate through all pairs to see what we have
+        for (const auto& [key, value] : table) {
+            if (key.is<int>() || key.is<size_t>()) {
+                count++;
+                int index = key.as<int>();
+
+                if (value.is<sol::table>()) {
+                    sol::table row_table = value.as<sol::table>();
+                    DynamicRow row;
+
+                    // Convert each field in the row
+                    for (const auto& [row_key, row_value] : row_table) {
+                        if (row_key.is<std::string>()) {
+                            std::string key_str = row_key.as<std::string>();
+                            row[key_str] = ObjectToDynamicValue(row_value);
+                        }
                     }
-                }
 
-                result.push_back(std::move(row));
+                    result.push_back(std::move(row));
+                }
             }
         }
 
@@ -481,9 +488,6 @@ void LuaThread::SetupLuaBindings() {
         cmd.model_name = model_name;
         cmd.data = std::move(dynamic_data);
         command_queue_->Push(std::move(cmd));
-
-        LOG_DEBUG("LuaThread {}: Queued data model '{}' update with {} rows",
-                  id_, model_name, cmd.data.size());
     };
 
     (*lua_)["data"] = data_table;

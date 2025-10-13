@@ -176,6 +176,21 @@ std::string GetCwd() {
     }
 }
 
+// Delete file or directory
+std::tuple<bool, std::string> Delete(const std::string& path) {
+    try {
+        if (!fs::exists(path)) {
+            return {false, "Path does not exist: " + path};
+        }
+
+        fs::remove(path);
+        return {true, ""};
+    }
+    catch (const std::exception& e) {
+        return {false, std::string("Error deleting path: ") + e.what()};
+    }
+}
+
 void SetupBindings(sol::state& lua) {
     auto fs_table = lua.create_table();
 
@@ -185,8 +200,23 @@ void SetupBindings(sol::state& lua) {
     fs_table["stat"] = Stat;
     fs_table["exists"] = Exists;
     fs_table["create_dir"] = CreateDir;
+    fs_table["delete"] = Delete;
     fs_table["absolute_path"] = AbsolutePath;
     fs_table["get_cwd"] = GetCwd;
+
+    // Convenience aliases
+    fs_table["read"] = ReadFile;
+    fs_table["write"] = WriteFile;
+    fs_table["mkdir"] = CreateDir;
+    fs_table["size"] = [](sol::this_state s, const std::string& path) -> std::tuple<sol::object, std::string> {
+        auto [stat_result, err] = Stat(s, path);
+        sol::state_view lua(s);
+        if (!stat_result.valid() || err != "") {
+            return {sol::make_object(lua, sol::nil), err};
+        }
+        sol::table stat_table = stat_result.as<sol::table>();
+        return {stat_table["size"], ""};
+    };
 
     lua["fs"] = fs_table;
 
