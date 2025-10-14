@@ -117,13 +117,21 @@
     </div>
 
     <div class="browser-container">
-        <div class="path-bar">
-            <span id="current_path">Loading...</span>
+        <div data-model="browser_info">
+            <div data-for="info : browser_info">
+                <div class="path-bar">
+                    <span>{{info.current_path}}</span>
+                </div>
+            </div>
         </div>
 
-        <div id="file_list" class="file-list">
-            <div class="file-item">
-                <span class="file-name">Loading files...</span>
+        <div class="file-list" data-model="files">
+            <div data-for="file, i : files">
+                <div class="file-item" data-event-click="trigger('navigate')" data-attr-data-row-index="i">
+                    <span class="file-icon">{{file.icon}}</span>
+                    <span class="file-name">{{file.name}}</span>
+                    <span class="file-size">{{file.size}}</span>
+                </div>
             </div>
         </div>
     </div>

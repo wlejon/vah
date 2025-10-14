@@ -1,42 +1,45 @@
 {
+  "statistics": {
+    "total_projects": 5,
+    "active_projects": 3,
+    "total_members": 42,
+    "last_updated": "2025-10-13"
+  },
   "projects": [
     {
-      "id": 1,
-      "name": "Manufold",
-      "description": "Data organization ecosystem for communities",
+      "name": "Vah Engine",
       "status": "active",
-      "members": 3,
-      "tags": ["data", "visualization", "desktop"]
+      "description": "Foundation for building Manufold - a data organization ecosystem with RmlUi and Lua.",
+      "members": 12,
+      "tags": ["c++", "lua", "rmlui", "ui-framework"]
     },
     {
-      "id": 2,
-      "name": "Vah Foundation",
-      "description": "C++ and Lua foundation for building desktop applications",
-      "status": "active",
-      "members": 1,
-      "tags": ["c++", "lua", "rmlui", "threading"]
-    },
-    {
-      "id": 3,
-      "name": "Data Leaf - Birding",
-      "description": "Track bird sightings with maps and species data",
+      "name": "Manufold Client",
       "status": "planned",
-      "members": 5,
-      "tags": ["birds", "mapping", "community"]
-    },
-    {
-      "id": 4,
-      "name": "Data Leaf - Climbing",
-      "description": "Rock climbing route database and tracking",
-      "status": "planned",
+      "description": "Desktop application for transforming unstructured data into structured, queryable knowledge environments.",
       "members": 8,
-      "tags": ["climbing", "outdoor", "tracking"]
+      "tags": ["desktop", "data-processing", "agent-assisted"]
+    },
+    {
+      "name": "Data Model System",
+      "status": "active",
+      "description": "Dynamic data binding system connecting C++ backend to Lua scripts and RmlUi views.",
+      "members": 5,
+      "tags": ["data-binding", "reactive", "threading"]
+    },
+    {
+      "name": "HTTP Server Framework",
+      "status": "active",
+      "description": "Built-in HTTP server with SSE support for real-time data streaming and API endpoints.",
+      "members": 7,
+      "tags": ["http", "sse", "server", "networking"]
+    },
+    {
+      "name": "Plugin System",
+      "status": "planned",
+      "description": "Extensible plugin architecture allowing custom data sources and visualization components.",
+      "members": 10,
+      "tags": ["plugins", "extensibility", "modules"]
     }
-  ],
-  "statistics": {
-    "total_projects": 4,
-    "active_projects": 2,
-    "total_members": 17,
-    "last_updated": "2025-01-15"
-  }
+  ]
 }

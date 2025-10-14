@@ -110,10 +110,10 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
         child_path.path.push_back(std::string(address.name.data(), address.name.size()));
     }
     // If address has an index, it's array access (array[index])
+    // Lua arrays use 1-based indexing, but RmlUi uses 0-based indexing
+    // Convert to string key matching Lua's 1-based index
     else if (address.index >= 0) {
-        // For now, we don't support nested arrays, only named fields
-        LOG_WARN("DataBindings: Nested array access not yet supported");
-        return Rml::DataVariable();
+        child_path.path.push_back(std::to_string(address.index + 1));
     }
 
     // Verify the child path exists and return it

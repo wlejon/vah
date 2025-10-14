@@ -16,8 +16,6 @@ DataModelManager::~DataModelManager() {
 }
 
 void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&& data) {
-    LOG_DEBUG("Processing UpdateDataModel command: {} ({} rows)", model_name, data.size());
-
     if (!context_ || !data_store_) {
         LOG_WARN("Cannot update model: context or data_store is null");
         return;
@@ -197,7 +195,6 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
     } else {
         // Model already exists - just mark it dirty to trigger re-render
         it->second.DirtyVariable(model_name);
-        LOG_DEBUG("Marked data model '{}' as dirty", model_name);
     }
 }
 

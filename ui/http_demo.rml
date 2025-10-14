@@ -7,29 +7,33 @@
 <body>
     <div class="container">
         <!-- Server Panel -->
-        <div class="panel">
-            <h1>HTTP Server</h1>
-            <div class="description">
-                Server sends counter events every second via Server-Sent Events (SSE).
-                Endpoint: GET /events
-            </div>
-            <div class="status-box">
-                <p id="server-status" class="value">Status: Initializing...</p>
-                <p id="server-messages" class="label">Messages sent: 0</p>
+        <div class="panel" data-model="http_server">
+            <div data-for="s : http_server">
+                <h1>HTTP Server</h1>
+                <div class="description">
+                    Server sends counter events every second via Server-Sent Events (SSE).
+                    Endpoint: GET /events
+                </div>
+                <div class="status-box">
+                    <p class="value">{{s.status}}</p>
+                    <p class="label">Messages sent: {{s.messages}}</p>
+                </div>
             </div>
         </div>
 
         <!-- Client Panel -->
-        <div class="panel">
-            <h1>HTTP Client</h1>
-            <div class="description">
-                Client connects to the server and receives SSE events in real-time.
-                Connection: http://127.0.0.1:8080/events
-            </div>
-            <div class="status-box">
-                <p id="client-status" class="value">Status: Waiting for connection...</p>
-                <p id="client-messages" class="label">Messages received: 0</p>
-                <p id="client-last-event" class="description">Last event: None</p>
+        <div class="panel" data-model="http_client">
+            <div data-for="c : http_client">
+                <h1>HTTP Client</h1>
+                <div class="description">
+                    Client connects to the server and receives SSE events in real-time.
+                    Connection: http://127.0.0.1:8080/events
+                </div>
+                <div class="status-box">
+                    <p class="value">{{c.status}}</p>
+                    <p class="label">Messages received: {{c.messages}}</p>
+                    <p class="description">Last event: {{c.last_event}}</p>
+                </div>
             </div>
         </div>
     </div>

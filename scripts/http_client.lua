@@ -1,17 +1,31 @@
 -- HTTP SSE Client Example
 -- Demonstrates receiving streaming events
 
+local client_data = {
+    status = "Status: Waiting for connection...",
+    messages = 0,
+    last_event = "None"
+}
+
 local message_count = 0
-local last_event_data = ""
+
+function update_model()
+    data.bind("http_client", {client_data})
+end
 
 function startup()
     print("Starting HTTP client...")
+
+    -- Bind initial model immediately (before server loads UI)
+    -- This ensures the client panel renders correctly from the start
+    update_model()
 
     -- Wait for server to start accepting connections
     print("Waiting 3 seconds for server to start...")
     sleep(3)
 
-    ui.set_element_text("client-status", "Status: Connecting...")
+    client_data.status = "Status: Connecting..."
+    update_model()
     print("Client attempting connection...")
 
     -- Connect to SSE stream
@@ -20,21 +34,19 @@ function startup()
     http.get("http://127.0.0.1:8080/events", {
         on_event = function(event_type, data)
             message_count = message_count + 1
-
-            -- Update UI with event information
-            ui.set_element_text("client-messages", "Messages received: " .. message_count)
+            client_data.messages = message_count
 
             if event_type == "counter" then
-                -- data is a table (parsed from JSON)
                 local msg = string.format("Count: %d, Message: %s", data.count, data.message)
-                last_event_data = msg
-                ui.set_element_text("client-last-event", "Last event: " .. msg)
+                client_data.last_event = msg
+                update_model()
                 print("Received counter event: " .. msg)
 
             elseif event_type == "done" then
                 print("Stream completed: " .. data.message)
-                ui.set_element_text("client-status", "Status: Stream completed")
-                ui.set_element_text("client-last-event", "Stream completed!")
+                client_data.status = "Status: Stream completed"
+                client_data.last_event = "Stream completed!"
+                update_model()
 
             else
                 print("Received unknown event type: " .. event_type)
@@ -42,13 +54,15 @@ function startup()
         end,
         on_error = function(err)
             print("Stream error: " .. err)
-            ui.set_element_text("client-status", "Status: Error - " .. err)
+            client_data.status = "Status: Error - " .. err
+            update_model()
         end
     })
 
     -- This is reached after the stream completes
     print("SSE connection closed")
-    ui.set_element_text("client-status", "Status: Disconnected")
+    client_data.status = "Status: Disconnected"
+    update_model()
 end
 
 function update(dt)

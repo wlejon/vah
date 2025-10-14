@@ -10,7 +10,21 @@ local start_time = os.time()
 local cpu_load = 45.0
 local mem_usage = 60.0
 local active_threads = 3
-local events = {}
+
+-- Data model
+local stream_data = {
+    metrics = {
+        threads = 3,
+        rate = 0,
+        total = 0
+    },
+    resources = {
+        cpu = 45.0,
+        memory = 60.0
+    },
+    data_stream = {},
+    events = {}
+}
 
 -- Random data generators
 local event_types = {"INFO", "WARN", "ERROR", "SUCCESS"}
@@ -78,9 +92,9 @@ function update_metrics()
     if elapsed == 0 then elapsed = 1 end
     local rate = math.floor(message_count / elapsed)
 
-    ui.set_element_text("metric_threads", tostring(active_threads))
-    ui.set_element_text("metric_rate", tostring(rate))
-    ui.set_element_text("metric_total", tostring(message_count))
+    stream_data.metrics.threads = active_threads
+    stream_data.metrics.rate = rate
+    stream_data.metrics.total = message_count
 end
 
 -- Update resource usage with smooth variation
@@ -93,27 +107,22 @@ function update_resources()
     mem_usage = mem_usage + random_float(-3, 3)
     mem_usage = math.max(20, math.min(90, mem_usage))
 
-    -- Update UI
-    ui.set_element_text("cpu_value", string.format("%.1f%%", cpu_load))
-    ui.set_element_text("cpu_bar", string.format('<div class="bar-fill" style="width: %.1f%%;"></div>', cpu_load))
-
-    ui.set_element_text("mem_value", string.format("%.1f%%", mem_usage))
-    ui.set_element_text("mem_bar", string.format('<div class="bar-fill" style="width: %.1f%%;"></div>', mem_usage))
+    stream_data.resources.cpu = string.format("%.1f", cpu_load)
+    stream_data.resources.memory = string.format("%.1f", mem_usage)
 end
 
 -- Update live data stream
 function update_data_stream()
-    local rows = ""
+    stream_data.data_stream = {}
 
     -- Generate 5 data rows with varied content
     for i = 1, 5 do
-        local source = random_choice(data_sources)
-        local value = random_float(0, 100)
-        local timestamp = format_time(os.time() - start_time)
-        rows = rows .. string.format('<div class="data-row">[%s] %s: %.2f</div>', timestamp, source, value)
+        table.insert(stream_data.data_stream, {
+            timestamp = format_time(os.time() - start_time),
+            source = random_choice(data_sources),
+            value = string.format("%.2f", random_float(0, 100))
+        })
     end
-
-    ui.set_element_text("data_stream", rows)
 end
 
 -- Update event log (keep last 10 events)
@@ -121,35 +130,23 @@ function update_event_log()
     -- Add new event occasionally (30% chance per frame)
     if math.random() < 0.3 then
         local event = generate_event()
-        table.insert(events, 1, event)
 
-        -- Keep only last 10 events
-        if #events > 10 then
-            table.remove(events)
-        end
-    end
-
-    -- Build event log HTML
-    local log_html = ""
-    for _, event in ipairs(events) do
+        -- Add status class for styling
         local status_class = "status-good"
         if event.type == "WARN" then
             status_class = "status-warn"
         elseif event.type == "ERROR" then
             status_class = "status-error"
         end
+        event.status_class = status_class
 
-        log_html = log_html .. string.format(
-            '<div class="event-entry"><span class="event-timestamp">[%s]</span> <span class="event-type %s">%s</span> <span>%s from %s</span></div>',
-            event.timestamp,
-            status_class,
-            event.type,
-            event.message,
-            event.source
-        )
+        table.insert(stream_data.events, 1, event)
+
+        -- Keep only last 10 events
+        if #stream_data.events > 10 then
+            table.remove(stream_data.events)
+        end
     end
-
-    ui.set_element_text("event_log", log_html)
 end
 
 -- Occasionally change thread count to simulate activity
@@ -165,21 +162,43 @@ function startup()
     math.randomseed(os.time() + thread_id)
 
     -- Initialize with first event
-    table.insert(events, {
+    table.insert(stream_data.events, {
         timestamp = "00:00:00",
         type = "INFO",
         message = "Data stream started",
-        source = "system"
+        source = "system",
+        status_class = "status-good"
     })
+
+    -- Initialize data stream with some data
+    for i = 1, 5 do
+        table.insert(stream_data.data_stream, {
+            timestamp = "00:00:00",
+            source = random_choice(data_sources),
+            value = string.format("%.2f", random_float(0, 100))
+        })
+    end
+
+    -- Bind initial data model BEFORE loading UI
+    data.bind("stream", {stream_data})
+
+    -- Load UI (data model must exist first)
+    ui.load_document("ui/streaming.rml")
+
+    print("Stream data initialized - events: " .. #stream_data.events .. ", data_stream: " .. #stream_data.data_stream)
 end
 
 -- Update function (called at 30hz)
 function update(dt)
     frame_count = frame_count + 1
 
+    -- Track if we need to update the model
+    local needs_update = false
+
     -- Update different components at different rates
     update_metrics()
     update_resources()
+    needs_update = true
 
     -- Update data stream every 5 frames (~6 times per second)
     if frame_count % 5 == 0 then
@@ -193,6 +212,11 @@ function update(dt)
 
     -- Update thread count occasionally
     update_thread_count()
+
+    -- Only update data model when we have changes (reduces log spam)
+    if needs_update then
+        data.bind("stream", {stream_data})
+    end
 end
 
 -- Shutdown function

@@ -64,13 +64,21 @@ namespace {
             return obj.as<std::string>();
         } else if (obj.is<sol::table>()) {
             // Nested table - convert to DynamicMap
+            // Support both string keys and numeric array indices (converted to strings)
             auto nested_map = std::make_shared<DynamicMap>();
             sol::table nested_table = obj.as<sol::table>();
             for (const auto& [key, value] : nested_table) {
+                std::string key_str;
                 if (key.is<std::string>()) {
-                    std::string key_str = key.as<std::string>();
-                    nested_map->fields[key_str] = ObjectToDynamicValue(value);
+                    key_str = key.as<std::string>();
+                } else if (key.is<int>()) {
+                    // Convert numeric index to string for arrays
+                    key_str = std::to_string(key.as<int>());
+                } else {
+                    // Skip other key types
+                    continue;
                 }
+                nested_map->fields[key_str] = ObjectToDynamicValue(value);
             }
             return nested_map;
         } else {

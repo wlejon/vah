@@ -8,8 +8,6 @@ void DataStore::SetModel(const std::string& name, const DynamicTable& data) {
 
     // Store or replace the shared_ptr
     models_[name] = new_data;
-
-    LOG_DEBUG("DataStore: Set model '{}' with {} rows", name, data.size());
 }
 
 std::shared_ptr<const DynamicTable> DataStore::GetModel(const std::string& name) const {

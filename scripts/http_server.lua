@@ -5,14 +5,31 @@ local server = nil
 local message_count = 0
 local server_running = false
 
+local server_data = {
+    status = "Status: Initializing...",
+    messages = 0
+}
+
+function update_model()
+    data.bind("http_server", {server_data})
+end
+
 function startup()
     print("Starting HTTP server...")
+
+    -- Initial bind
+    update_model()
+
+    -- Wait briefly for client thread to bind its initial model
+    -- (prevents race condition where UI loads before client model exists)
+    sleep(0.1)
 
     -- Load UI
     ui.load_document("ui/http_demo.rml", true, "http_demo")
 
     -- Update status before blocking
-    ui.set_element_text("server-status", "Status: Starting server...")
+    server_data.status = "Status: Starting server..."
+    update_model()
 
     -- Create server
     server = HttpServer.new()
@@ -44,7 +61,8 @@ function startup()
                     end
 
                     message_count = message_count + 1
-                    ui.set_element_text("server-messages", "Messages sent: " .. message_count)
+                    server_data.messages = message_count
+                    update_model()
 
                     -- Sleep for 1 second
                     sleep(1)
@@ -58,7 +76,8 @@ function startup()
     end)
 
     -- Update UI before blocking
-    ui.set_element_text("server-status", "Status: Listening on http://127.0.0.1:8080")
+    server_data.status = "Status: Listening on http://127.0.0.1:8080"
+    update_model()
 
     -- Start server (this blocks until server is stopped)
     print("Calling server:listen() - this will block...")

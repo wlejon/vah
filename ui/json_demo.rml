@@ -200,17 +200,48 @@
             <p class="subtitle">Parsing and visualizing JSON data from files</p>
         </div>
 
-        <div id="stats_container" class="stats-grid">
-            <!-- Statistics will be populated here -->
+        <div class="stats-grid" data-model="jsondata">
+            <div data-for="j : jsondata">
+                <div class="stat-item">
+                    <div class="stat-value">{{j.stats.total_projects}}</div>
+                    <div class="stat-label">Total Projects</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{j.stats.active_projects}}</div>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{j.stats.total_members}}</div>
+                    <div class="stat-label">Total Members</div>
+                </div>
+            </div>
         </div>
 
         <div class="section-title">Projects</div>
-        <div id="projects_container" class="projects-grid">
-            <!-- Projects will be populated here -->
+        <div class="projects-grid" data-model="jsondata">
+            <div data-for="j : jsondata">
+                <div data-for="project : j.projects">
+                    <div class="project-card">
+                        <div class="project-header">
+                            <h3>{{project.name}}</h3>
+                            <span class="project-status" data-attr-class="'project-status status-' + project.status">{{project.status}}</span>
+                        </div>
+                        <p class="project-desc">{{project.description}}</p>
+                        <div class="project-meta">
+                            <span class="meta-item">👥 {{project.members}} members</span>
+                            <div class="tags">
+                                <span data-for="tag : project.tags" class="tag">{{tag}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div id="last_updated" class="footer">
-            <!-- Last updated info -->
+        <div class="footer" data-model="jsondata">
+            <div data-for="j : jsondata">
+                Last updated: {{j.last_updated}}
+            </div>
         </div>
     </div>
 </body>
