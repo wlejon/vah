@@ -6,11 +6,14 @@ function startup()
 
     -- Choose which demo to run (comment/uncomment):
 
+    -- NanoVG Canvas Test (custom RmlUi element with NanoVG rendering)
+    ui.load_document("ui/canvas_test.rml")
+
     -- File browser demo
     -- command.spawn_thread("scripts/file_browser.lua")
 
     -- JSON data viewer demo
-    command.spawn_thread("scripts/json_demo.lua")
+    -- command.spawn_thread("scripts/json_demo.lua")
 
     -- SQLite database demo
     -- command.spawn_thread("scripts/sqlite_demo.lua")

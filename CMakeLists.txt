@@ -25,6 +25,7 @@ find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(efsw CONFIG REQUIRED)
 find_package(concurrentqueue CONFIG REQUIRED)
+find_package(nanovg CONFIG REQUIRED)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
@@ -45,6 +46,7 @@ add_executable(vah
     src/DocumentManager.cpp
     src/DataModelManager.cpp
     src/CommandProcessor.cpp
+    src/ElementCanvas.cpp
 )
 
 target_include_directories(vah PRIVATE
@@ -69,6 +71,7 @@ target_link_libraries(vah PRIVATE
     httplib::httplib
     efsw::efsw
     concurrentqueue::concurrentqueue
+    nanovg::nanovg
 )
 
 

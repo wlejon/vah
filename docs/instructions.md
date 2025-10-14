@@ -36,6 +36,27 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-after understanding the long term goals (manufold-client), please review your most recent document: [canvas scene architecture](canvas-scene-architecture.md)
+we're trying to get nanovg rendering in a custom element of rmlui.
 
-we want to build this into our foundation.
+please complete your effort.
+
+PS D:\projects\vah> git status
+On branch main
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   CMakeLists.txt
+        modified:   scripts/main.lua
+        modified:   src/main.cpp
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        src/ElementCanvas.cpp
+        src/ElementCanvas.h
+        ui/canvas_test.rcss
+        ui/canvas_test.rml
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+
+currently, it's not rendering correctly. what "not correctly means" is somewhat hard to describe. the circle has points on it, around the outside, which make it look like a sided shape. the rectangle has missing sides or something. there is no grid. i'm not sure what is wrong. perhaps we need to flip the rendering to face the other direction. i feel like i'm seeing the back side of an embroidery instead of the front where the design is. 

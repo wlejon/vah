@@ -20,6 +20,7 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "CommandProcessor.h"
+#include "ElementCanvas.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -161,6 +162,11 @@ public:
 
         // Initialize debugger
         Rml::Debugger::Initialise(rml_context_);
+
+        // Register custom elements
+        canvas_instancer_ = std::make_unique<Rml::ElementInstancerGeneric<ElementCanvas>>();
+        Rml::Factory::RegisterElementInstancer("canvas", canvas_instancer_.get());
+        LOG_INFO("Registered custom element: canvas");
 
         // Initialize our systems
         command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
@@ -420,6 +426,9 @@ private:
     std::unique_ptr<RenderInterface_GL3> rml_renderer_;
     std::unique_ptr<RmlUiSystemInterface> rml_system_interface_;
     Rml::Context* rml_context_ = nullptr;
+
+    // Custom element instancers (must outlive RmlUi context)
+    std::unique_ptr<Rml::ElementInstancerGeneric<ElementCanvas>> canvas_instancer_;
 
     std::unique_ptr<moodycamel::ConcurrentQueue<Command>> command_queue_;
     std::unique_ptr<moodycamel::ConcurrentQueue<UIEvent>> ui_event_queue_;
