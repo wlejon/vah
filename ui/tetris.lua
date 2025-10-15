@@ -498,13 +498,13 @@ function render_tetris(nvg_ctx, x, y, w, h, time)
     info_y = info_y + 20
     nvg.fontSize(nvg_ctx, 12.0)
     nvg.fillColor(nvg_ctx, nvg.rgba(120, 120, 120, 255))
-    nvg.text(nvg_ctx, sidebar_x, info_y, "← → Move")
+    nvg.text(nvg_ctx, sidebar_x, info_y, "A D Move")
     info_y = info_y + 16
-    nvg.text(nvg_ctx, sidebar_x, info_y, "↓ Soft Drop")
+    nvg.text(nvg_ctx, sidebar_x, info_y, "S Soft Drop")
     info_y = info_y + 16
-    nvg.text(nvg_ctx, sidebar_x, info_y, "↑ or Z Rotate")
+    nvg.text(nvg_ctx, sidebar_x, info_y, "Left Click Rotate")
     info_y = info_y + 16
-    nvg.text(nvg_ctx, sidebar_x, info_y, "SPACE Hard Drop")
+    nvg.text(nvg_ctx, sidebar_x, info_y, "W or SPACE Hard Drop")
     info_y = info_y + 16
     nvg.text(nvg_ctx, sidebar_x, info_y, "P Pause")
     info_y = info_y + 16
@@ -541,9 +541,31 @@ function render_tetris(nvg_ctx, x, y, w, h, time)
     end
 end
 
+-- Mouse handler for rotation
+function handle_tetris_mouse(mouse_down)
+    -- Only process mouse down events
+    if not mouse_down then
+        return
+    end
+
+    -- Don't process if game over or paused
+    if game.game_over or game.paused then
+        return
+    end
+
+    -- Rotate piece on left click
+    local rotated = rotate_piece(game.current_piece)
+    if is_valid_position(rotated, game.current_x, game.current_y) then
+        game.current_piece = rotated
+    end
+end
+
 -- Key handler for game controls
 function handle_tetris_key(key, key_down)
-    -- Only process key down events (ignore key up for simplicity)
+    -- Track key state for simultaneous input
+    game.keys_pressed[key] = key_down
+
+    -- Only process key down events for single-press actions
     if not key_down then
         return
     end
@@ -565,24 +587,18 @@ function handle_tetris_key(key, key_down)
         return
     end
 
-    -- Movement
-    if key == "left" then
+    -- Movement (WASD)
+    if key == "a" then
         if is_valid_position(game.current_piece, game.current_x - 1, game.current_y) then
             game.current_x = game.current_x - 1
         end
-    elseif key == "right" then
+    elseif key == "d" then
         if is_valid_position(game.current_piece, game.current_x + 1, game.current_y) then
             game.current_x = game.current_x + 1
         end
-    elseif key == "down" then
+    elseif key == "s" then
         move_down()
-    elseif key == "up" or key == "z" then
-        -- Rotate piece
-        local rotated = rotate_piece(game.current_piece)
-        if is_valid_position(rotated, game.current_x, game.current_y) then
-            game.current_piece = rotated
-        end
-    elseif key == "space" then
+    elseif key == "w" or key == "space" then
         -- Hard drop
         hard_drop()
     end

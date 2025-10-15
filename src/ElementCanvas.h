@@ -57,8 +57,14 @@ private:
     // Call Lua render function if renderfunction attribute is set
     void CallLuaRenderFunction(float x, float y, float w, float h, float t);
 
+    // Map RmlUI key identifier to Lua string name
+    Rml::String MapKeyToString(Rml::Input::KeyIdentifier key);
+
     // Call Lua keyboard handler if keyhandler attribute is set
     void CallLuaKeyHandler(const Rml::String& key_name, bool key_down);
+
+    // Call Lua mouse handler if mousehandler attribute is set
+    void CallLuaMouseHandler(bool mouse_down);
 
     NVGcontext* nvg_context_;
     float time_; // Animation time

@@ -12,7 +12,8 @@
     <div class="container">
         <canvas id="tetris-canvas"
                 renderfunction="render_tetris"
-                keyhandler="handle_tetris_key"/>
+                keyhandler="handle_tetris_key"
+                mousehandler="handle_tetris_mouse"/>
     </div>
 </body>
 </rml>

@@ -109,32 +109,18 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
     else if (event == Rml::EventId::Mousedown) {
         mouse_down_ = true;
         LOG_INFO("Canvas mouse down at ({}, {})", mouse_pos_.x, mouse_pos_.y);
+        CallLuaMouseHandler(true);
     }
     else if (event == Rml::EventId::Mouseup) {
         mouse_down_ = false;
         LOG_INFO("Canvas mouse up at ({}, {})", mouse_pos_.x, mouse_pos_.y);
+        CallLuaMouseHandler(false);
     }
     else if (event == Rml::EventId::Keydown) {
         Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
             event.GetParameter<int>("key_identifier", 0));
 
-        // Map RmlUI key identifiers to string names for Lua
-        Rml::String key_name;
-        switch (key) {
-            case Rml::Input::KI_LEFT:   key_name = "left"; break;
-            case Rml::Input::KI_RIGHT:  key_name = "right"; break;
-            case Rml::Input::KI_UP:     key_name = "up"; break;
-            case Rml::Input::KI_DOWN:   key_name = "down"; break;
-            case Rml::Input::KI_SPACE:  key_name = "space"; break;
-            case Rml::Input::KI_RETURN: key_name = "return"; break;
-            case Rml::Input::KI_ESCAPE: key_name = "escape"; break;
-            case Rml::Input::KI_Z:      key_name = "z"; break;
-            case Rml::Input::KI_X:      key_name = "x"; break;
-            case Rml::Input::KI_C:      key_name = "c"; break;
-            case Rml::Input::KI_P:      key_name = "p"; break;
-            default: break;
-        }
-
+        Rml::String key_name = MapKeyToString(key);
         if (!key_name.empty()) {
             CallLuaKeyHandler(key_name, true);
         }
@@ -143,22 +129,7 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
         Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
             event.GetParameter<int>("key_identifier", 0));
 
-        Rml::String key_name;
-        switch (key) {
-            case Rml::Input::KI_LEFT:   key_name = "left"; break;
-            case Rml::Input::KI_RIGHT:  key_name = "right"; break;
-            case Rml::Input::KI_UP:     key_name = "up"; break;
-            case Rml::Input::KI_DOWN:   key_name = "down"; break;
-            case Rml::Input::KI_SPACE:  key_name = "space"; break;
-            case Rml::Input::KI_RETURN: key_name = "return"; break;
-            case Rml::Input::KI_ESCAPE: key_name = "escape"; break;
-            case Rml::Input::KI_Z:      key_name = "z"; break;
-            case Rml::Input::KI_X:      key_name = "x"; break;
-            case Rml::Input::KI_C:      key_name = "c"; break;
-            case Rml::Input::KI_P:      key_name = "p"; break;
-            default: break;
-        }
-
+        Rml::String key_name = MapKeyToString(key);
         if (!key_name.empty()) {
             CallLuaKeyHandler(key_name, false);
         }
@@ -311,6 +282,118 @@ void ElementCanvas::CallLuaRenderFunction(float x, float y, float w, float h, fl
     }
 }
 
+Rml::String ElementCanvas::MapKeyToString(Rml::Input::KeyIdentifier key)
+{
+    // Map RmlUI key identifiers to string names for Lua
+    switch (key) {
+        // Arrow keys
+        case Rml::Input::KI_LEFT:   return "left";
+        case Rml::Input::KI_RIGHT:  return "right";
+        case Rml::Input::KI_UP:     return "up";
+        case Rml::Input::KI_DOWN:   return "down";
+
+        // Special keys
+        case Rml::Input::KI_SPACE:  return "space";
+        case Rml::Input::KI_RETURN: return "return";
+        case Rml::Input::KI_ESCAPE: return "escape";
+        case Rml::Input::KI_BACK:   return "backspace";
+        case Rml::Input::KI_TAB:    return "tab";
+        case Rml::Input::KI_DELETE: return "delete";
+        case Rml::Input::KI_INSERT: return "insert";
+        case Rml::Input::KI_HOME:   return "home";
+        case Rml::Input::KI_END:    return "end";
+        case Rml::Input::KI_PRIOR:  return "pageup";
+        case Rml::Input::KI_NEXT:   return "pagedown";
+
+        // Letters A-Z
+        case Rml::Input::KI_A: return "a";
+        case Rml::Input::KI_B: return "b";
+        case Rml::Input::KI_C: return "c";
+        case Rml::Input::KI_D: return "d";
+        case Rml::Input::KI_E: return "e";
+        case Rml::Input::KI_F: return "f";
+        case Rml::Input::KI_G: return "g";
+        case Rml::Input::KI_H: return "h";
+        case Rml::Input::KI_I: return "i";
+        case Rml::Input::KI_J: return "j";
+        case Rml::Input::KI_K: return "k";
+        case Rml::Input::KI_L: return "l";
+        case Rml::Input::KI_M: return "m";
+        case Rml::Input::KI_N: return "n";
+        case Rml::Input::KI_O: return "o";
+        case Rml::Input::KI_P: return "p";
+        case Rml::Input::KI_Q: return "q";
+        case Rml::Input::KI_R: return "r";
+        case Rml::Input::KI_S: return "s";
+        case Rml::Input::KI_T: return "t";
+        case Rml::Input::KI_U: return "u";
+        case Rml::Input::KI_V: return "v";
+        case Rml::Input::KI_W: return "w";
+        case Rml::Input::KI_X: return "x";
+        case Rml::Input::KI_Y: return "y";
+        case Rml::Input::KI_Z: return "z";
+
+        // Numbers 0-9
+        case Rml::Input::KI_0: return "0";
+        case Rml::Input::KI_1: return "1";
+        case Rml::Input::KI_2: return "2";
+        case Rml::Input::KI_3: return "3";
+        case Rml::Input::KI_4: return "4";
+        case Rml::Input::KI_5: return "5";
+        case Rml::Input::KI_6: return "6";
+        case Rml::Input::KI_7: return "7";
+        case Rml::Input::KI_8: return "8";
+        case Rml::Input::KI_9: return "9";
+
+        // Numpad
+        case Rml::Input::KI_NUMPAD0: return "numpad0";
+        case Rml::Input::KI_NUMPAD1: return "numpad1";
+        case Rml::Input::KI_NUMPAD2: return "numpad2";
+        case Rml::Input::KI_NUMPAD3: return "numpad3";
+        case Rml::Input::KI_NUMPAD4: return "numpad4";
+        case Rml::Input::KI_NUMPAD5: return "numpad5";
+        case Rml::Input::KI_NUMPAD6: return "numpad6";
+        case Rml::Input::KI_NUMPAD7: return "numpad7";
+        case Rml::Input::KI_NUMPAD8: return "numpad8";
+        case Rml::Input::KI_NUMPAD9: return "numpad9";
+        case Rml::Input::KI_NUMPADENTER: return "numpadenter";
+        case Rml::Input::KI_MULTIPLY: return "multiply";
+        case Rml::Input::KI_ADD: return "add";
+        case Rml::Input::KI_SUBTRACT: return "subtract";
+        case Rml::Input::KI_DECIMAL: return "decimal";
+        case Rml::Input::KI_DIVIDE: return "divide";
+
+        // Function keys
+        case Rml::Input::KI_F1:  return "f1";
+        case Rml::Input::KI_F2:  return "f2";
+        case Rml::Input::KI_F3:  return "f3";
+        case Rml::Input::KI_F4:  return "f4";
+        case Rml::Input::KI_F5:  return "f5";
+        case Rml::Input::KI_F6:  return "f6";
+        case Rml::Input::KI_F7:  return "f7";
+        case Rml::Input::KI_F8:  return "f8";
+        case Rml::Input::KI_F9:  return "f9";
+        case Rml::Input::KI_F10: return "f10";
+        case Rml::Input::KI_F11: return "f11";
+        case Rml::Input::KI_F12: return "f12";
+
+        // Punctuation
+        case Rml::Input::KI_OEM_1:      return "semicolon";
+        case Rml::Input::KI_OEM_PLUS:   return "equals";
+        case Rml::Input::KI_OEM_COMMA:  return "comma";
+        case Rml::Input::KI_OEM_MINUS:  return "minus";
+        case Rml::Input::KI_OEM_PERIOD: return "period";
+        case Rml::Input::KI_OEM_2:      return "slash";
+        case Rml::Input::KI_OEM_3:      return "backquote";
+        case Rml::Input::KI_OEM_4:      return "leftbracket";
+        case Rml::Input::KI_OEM_5:      return "backslash";
+        case Rml::Input::KI_OEM_6:      return "rightbracket";
+        case Rml::Input::KI_OEM_7:      return "quote";
+
+        default: return "";
+    }
+}
+
 void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down)
 {
     // Get the RmlUI Lua state
@@ -349,6 +432,47 @@ void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down
     if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling Lua key handler '{}': {}", handler_func, error);
+        lua_pop(L, 1);
+    }
+}
+
+void ElementCanvas::CallLuaMouseHandler(bool mouse_down)
+{
+    // Get the RmlUI Lua state
+    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+    if (!L) {
+        LOG_ERROR("ElementCanvas: RmlUI Lua state not available");
+        return;
+    }
+
+    // Get the mousehandler attribute
+    const Rml::Variant* handler_attr = GetAttribute("mousehandler");
+    if (!handler_attr) {
+        return;
+    }
+
+    Rml::String handler_func = handler_attr->Get<Rml::String>();
+    if (handler_func.empty()) {
+        return;
+    }
+
+    // Get the Lua function from global scope
+    lua_getglobal(L, handler_func.c_str());
+
+    // Check if it's a function
+    if (!lua_isfunction(L, -1)) {
+        LOG_WARN("ElementCanvas: mousehandler attribute '{}' is not a valid Lua function", handler_func);
+        lua_pop(L, 1);
+        return;
+    }
+
+    // Push arguments: mouse_down (boolean)
+    lua_pushboolean(L, mouse_down);
+
+    // Call the function with 1 argument, 0 return values
+    if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+        const char* error = lua_tostring(L, -1);
+        LOG_ERROR("ElementCanvas: Error calling Lua mouse handler '{}': {}", handler_func, error);
         lua_pop(L, 1);
     }
 }
