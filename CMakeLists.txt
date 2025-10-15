@@ -48,6 +48,10 @@ add_executable(vah
     src/CommandProcessor.cpp
     src/ElementCanvas.cpp
     src/NanoVGBindings.cpp
+    src/NanoVGPaint.cpp
+    src/NanoVGText.cpp
+    src/NanoVGImage.cpp
+    src/NanoVGUtils.cpp
 )
 
 target_include_directories(vah PRIVATE

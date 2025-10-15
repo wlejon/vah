@@ -1,4 +1,8 @@
 #include "NanoVGBindings.h"
+#include "NanoVGPaint.h"
+#include "NanoVGText.h"
+#include "NanoVGImage.h"
+#include "NanoVGUtils.h"
 #include "Logger.h"
 #include <nanovg.h>
 
@@ -29,7 +33,6 @@ namespace {
 
         NVGcolor color = nvgRGBA(r, g, b, a);
 
-        // Return as a table {r, g, b, a}
         lua_createtable(L, 4, 0);
         lua_pushnumber(L, color.r);
         lua_rawseti(L, -2, 1);
@@ -51,7 +54,6 @@ namespace {
 
         NVGcolor color = nvgRGBAf(r, g, b, a);
 
-        // Return as a table {r, g, b, a}
         lua_createtable(L, 4, 0);
         lua_pushnumber(L, color.r);
         lua_rawseti(L, -2, 1);
@@ -72,7 +74,6 @@ namespace {
 
         NVGcolor color = nvgRGB(r, g, b);
 
-        // Return as a table {r, g, b, a}
         lua_createtable(L, 4, 0);
         lua_pushnumber(L, color.r);
         lua_rawseti(L, -2, 1);
@@ -84,29 +85,6 @@ namespace {
         lua_rawseti(L, -2, 4);
 
         return 1;
-    }
-
-    // Helper to convert Lua color table to NVGcolor
-    NVGcolor TableToColor(lua_State* L, int idx) {
-        NVGcolor color;
-
-        lua_rawgeti(L, idx, 1);
-        color.r = static_cast<float>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-
-        lua_rawgeti(L, idx, 2);
-        color.g = static_cast<float>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-
-        lua_rawgeti(L, idx, 3);
-        color.b = static_cast<float>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-
-        lua_rawgeti(L, idx, 4);
-        color.a = static_cast<float>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-
-        return color;
     }
 
     // ============================================================================
@@ -214,6 +192,20 @@ namespace {
         return 0;
     }
 
+    int lua_nvgRoundedRectVarying(lua_State* L) {
+        NVGcontext* ctx = GetContext(L, 1);
+        float x = static_cast<float>(luaL_checknumber(L, 2));
+        float y = static_cast<float>(luaL_checknumber(L, 3));
+        float w = static_cast<float>(luaL_checknumber(L, 4));
+        float h = static_cast<float>(luaL_checknumber(L, 5));
+        float radTopLeft = static_cast<float>(luaL_checknumber(L, 6));
+        float radTopRight = static_cast<float>(luaL_checknumber(L, 7));
+        float radBottomRight = static_cast<float>(luaL_checknumber(L, 8));
+        float radBottomLeft = static_cast<float>(luaL_checknumber(L, 9));
+        nvgRoundedRectVarying(ctx, x, y, w, h, radTopLeft, radTopRight, radBottomRight, radBottomLeft);
+        return 0;
+    }
+
     int lua_nvgEllipse(lua_State* L) {
         NVGcontext* ctx = GetContext(L, 1);
         float cx = static_cast<float>(luaL_checknumber(L, 2));
@@ -252,7 +244,7 @@ namespace {
     int lua_nvgFillColor(lua_State* L) {
         NVGcontext* ctx = GetContext(L, 1);
         luaL_checktype(L, 2, LUA_TTABLE);
-        NVGcolor color = TableToColor(L, 2);
+        NVGcolor color = NanoVGUtils::TableToColor(L, 2);
         nvgFillColor(ctx, color);
         return 0;
     }
@@ -260,7 +252,7 @@ namespace {
     int lua_nvgStrokeColor(lua_State* L) {
         NVGcontext* ctx = GetContext(L, 1);
         luaL_checktype(L, 2, LUA_TTABLE);
-        NVGcolor color = TableToColor(L, 2);
+        NVGcolor color = NanoVGUtils::TableToColor(L, 2);
         nvgStrokeColor(ctx, color);
         return 0;
     }
@@ -354,71 +346,7 @@ namespace {
     }
 
     // ============================================================================
-    // Text Functions
-    // ============================================================================
-
-    int lua_nvgFontSize(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float size = static_cast<float>(luaL_checknumber(L, 2));
-        nvgFontSize(ctx, size);
-        return 0;
-    }
-
-    int lua_nvgFontFace(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        const char* font = luaL_checkstring(L, 2);
-        nvgFontFace(ctx, font);
-        return 0;
-    }
-
-    int lua_nvgTextAlign(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        int align = static_cast<int>(luaL_checkinteger(L, 2));
-        nvgTextAlign(ctx, align);
-        return 0;
-    }
-
-    int lua_nvgText(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float x = static_cast<float>(luaL_checknumber(L, 2));
-        float y = static_cast<float>(luaL_checknumber(L, 3));
-        const char* text = luaL_checkstring(L, 4);
-        nvgText(ctx, x, y, text, nullptr);
-        return 0;
-    }
-
-    int lua_nvgCreateFont(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        const char* name = luaL_checkstring(L, 2);
-        const char* filename = luaL_checkstring(L, 3);
-        int handle = nvgCreateFont(ctx, name, filename);
-        lua_pushinteger(L, handle);
-        return 1;
-    }
-
-    int lua_nvgFontBlur(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float blur = static_cast<float>(luaL_checknumber(L, 2));
-        nvgFontBlur(ctx, blur);
-        return 0;
-    }
-
-    int lua_nvgTextLetterSpacing(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float spacing = static_cast<float>(luaL_checknumber(L, 2));
-        nvgTextLetterSpacing(ctx, spacing);
-        return 0;
-    }
-
-    int lua_nvgTextLineHeight(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float lineHeight = static_cast<float>(luaL_checknumber(L, 2));
-        nvgTextLineHeight(ctx, lineHeight);
-        return 0;
-    }
-
-    // ============================================================================
-    // Additional Style Functions
+    // Style Functions
     // ============================================================================
 
     int lua_nvgGlobalAlpha(lua_State* L) {
@@ -449,50 +377,9 @@ namespace {
         return 0;
     }
 
-    // ============================================================================
-    // Gradient Functions
-    // ============================================================================
-
-    int lua_nvgLinearGradient(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float sx = static_cast<float>(luaL_checknumber(L, 2));
-        float sy = static_cast<float>(luaL_checknumber(L, 3));
-        float ex = static_cast<float>(luaL_checknumber(L, 4));
-        float ey = static_cast<float>(luaL_checknumber(L, 5));
-        luaL_checktype(L, 6, LUA_TTABLE);
-        NVGcolor icol = TableToColor(L, 6);
-        luaL_checktype(L, 7, LUA_TTABLE);
-        NVGcolor ocol = TableToColor(L, 7);
-
-        NVGpaint paint = nvgLinearGradient(ctx, sx, sy, ex, ey, icol, ocol);
-
-        // Return paint as light userdata (Note: this is a simplified approach)
-        // For production, you'd want to properly manage paint lifetime
-        lua_pushlightuserdata(L, &paint);
-        return 1;
-    }
-
-    int lua_nvgRadialGradient(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
-        float cx = static_cast<float>(luaL_checknumber(L, 2));
-        float cy = static_cast<float>(luaL_checknumber(L, 3));
-        float inr = static_cast<float>(luaL_checknumber(L, 4));
-        float outr = static_cast<float>(luaL_checknumber(L, 5));
-        luaL_checktype(L, 6, LUA_TTABLE);
-        NVGcolor icol = TableToColor(L, 6);
-        luaL_checktype(L, 7, LUA_TTABLE);
-        NVGcolor ocol = TableToColor(L, 7);
-
-        NVGpaint paint = nvgRadialGradient(ctx, cx, cy, inr, outr, icol, ocol);
-
-        lua_pushlightuserdata(L, &paint);
-        return 1;
-    }
-
 } // anonymous namespace
 
 void NanoVGBindings::SetupBindings(lua_State* L) {
-    // Create nvg table
     lua_newtable(L);
 
     // Color functions
@@ -538,6 +425,9 @@ void NanoVGBindings::SetupBindings(lua_State* L) {
 
     lua_pushcfunction(L, lua_nvgRoundedRect);
     lua_setfield(L, -2, "roundedRect");
+
+    lua_pushcfunction(L, lua_nvgRoundedRectVarying);
+    lua_setfield(L, -2, "roundedRectVarying");
 
     lua_pushcfunction(L, lua_nvgEllipse);
     lua_setfield(L, -2, "ellipse");
@@ -593,32 +483,7 @@ void NanoVGBindings::SetupBindings(lua_State* L) {
     lua_pushcfunction(L, lua_nvgScale);
     lua_setfield(L, -2, "scale");
 
-    // Text functions
-    lua_pushcfunction(L, lua_nvgFontSize);
-    lua_setfield(L, -2, "fontSize");
-
-    lua_pushcfunction(L, lua_nvgFontFace);
-    lua_setfield(L, -2, "fontFace");
-
-    lua_pushcfunction(L, lua_nvgTextAlign);
-    lua_setfield(L, -2, "textAlign");
-
-    lua_pushcfunction(L, lua_nvgText);
-    lua_setfield(L, -2, "text");
-
-    lua_pushcfunction(L, lua_nvgCreateFont);
-    lua_setfield(L, -2, "createFont");
-
-    lua_pushcfunction(L, lua_nvgFontBlur);
-    lua_setfield(L, -2, "fontBlur");
-
-    lua_pushcfunction(L, lua_nvgTextLetterSpacing);
-    lua_setfield(L, -2, "textLetterSpacing");
-
-    lua_pushcfunction(L, lua_nvgTextLineHeight);
-    lua_setfield(L, -2, "textLineHeight");
-
-    // Additional style functions
+    // Style functions
     lua_pushcfunction(L, lua_nvgGlobalAlpha);
     lua_setfield(L, -2, "globalAlpha");
 
@@ -631,19 +496,18 @@ void NanoVGBindings::SetupBindings(lua_State* L) {
     lua_pushcfunction(L, lua_nvgMiterLimit);
     lua_setfield(L, -2, "miterLimit");
 
-    // Gradient functions
-    lua_pushcfunction(L, lua_nvgLinearGradient);
-    lua_setfield(L, -2, "linearGradient");
-
-    lua_pushcfunction(L, lua_nvgRadialGradient);
-    lua_setfield(L, -2, "radialGradient");
-
     // Constants
     lua_pushinteger(L, NVG_CCW);
     lua_setfield(L, -2, "CCW");
 
     lua_pushinteger(L, NVG_CW);
     lua_setfield(L, -2, "CW");
+
+    lua_pushinteger(L, NVG_SOLID);
+    lua_setfield(L, -2, "SOLID");
+
+    lua_pushinteger(L, NVG_HOLE);
+    lua_setfield(L, -2, "HOLE");
 
     lua_pushinteger(L, NVG_BUTT);
     lua_setfield(L, -2, "BUTT");
@@ -660,26 +524,11 @@ void NanoVGBindings::SetupBindings(lua_State* L) {
     lua_pushinteger(L, NVG_MITER);
     lua_setfield(L, -2, "MITER");
 
-    lua_pushinteger(L, NVG_ALIGN_LEFT);
-    lua_setfield(L, -2, "ALIGN_LEFT");
-
-    lua_pushinteger(L, NVG_ALIGN_CENTER);
-    lua_setfield(L, -2, "ALIGN_CENTER");
-
-    lua_pushinteger(L, NVG_ALIGN_RIGHT);
-    lua_setfield(L, -2, "ALIGN_RIGHT");
-
-    lua_pushinteger(L, NVG_ALIGN_TOP);
-    lua_setfield(L, -2, "ALIGN_TOP");
-
-    lua_pushinteger(L, NVG_ALIGN_MIDDLE);
-    lua_setfield(L, -2, "ALIGN_MIDDLE");
-
-    lua_pushinteger(L, NVG_ALIGN_BOTTOM);
-    lua_setfield(L, -2, "ALIGN_BOTTOM");
-
-    lua_pushinteger(L, NVG_ALIGN_BASELINE);
-    lua_setfield(L, -2, "ALIGN_BASELINE");
+    // Setup bindings from other modules
+    NanoVGPaint::SetupBindings(L);
+    NanoVGText::SetupBindings(L);
+    NanoVGImage::SetupBindings(L);
+    NanoVGUtils::SetupBindings(L);
 
     // Set as global 'nvg' table
     lua_setglobal(L, "nvg");

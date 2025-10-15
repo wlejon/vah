@@ -36,7 +36,25 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-now that we have nanovg rendering in the ElementCanvas (canvas_test shows this) i would like a tetris clone in lua. make sure you understand the project before you build it so you know how and where it goes. 
+we've added the nanovg canvas using a ElementCanvas and nanovg lua bindings. please code review the nanovg bindings.
 
-we will use this to determine what is missing from the implementation, be thorough and don't simplify if we're missing features: implement the missing features.
+PS D:\projects\vah> git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   CMakeLists.txt
+        modified:   docs/instructions.md
+        modified:   src/NanoVGBindings.cpp
+        modified:   src/NanoVGBindings.h
 
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        src/NanoVGImage.cpp
+        src/NanoVGImage.h
+        src/NanoVGPaint.cpp
+        src/NanoVGPaint.h
+        src/NanoVGText.cpp
+        src/NanoVGText.h
+        src/NanoVGUtils.cpp
+        src/NanoVGUtils.h
