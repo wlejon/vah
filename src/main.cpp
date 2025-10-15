@@ -190,6 +190,16 @@ public:
         // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
 
+        // Add ui/ folder to Lua package path for require() in RML scripts
+        lua_getglobal(rml_lua, "package");
+        lua_getfield(rml_lua, -1, "path");
+        std::string current_path = lua_tostring(rml_lua, -1);
+        std::string new_path = current_path + ";ui/?.lua";
+        lua_pop(rml_lua, 1);
+        lua_pushstring(rml_lua, new_path.c_str());
+        lua_setfield(rml_lua, -2, "path");
+        lua_pop(rml_lua, 1);
+
         // Store context in Lua registry for data model creation
         lua_pushlightuserdata(rml_lua, rml_context_);
         lua_setfield(rml_lua, LUA_REGISTRYINDEX, "rmlui_context");
