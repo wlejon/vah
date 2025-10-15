@@ -606,6 +606,3 @@ end
 
 -- Initialize game on load
 init_game()
-
--- Return the render function
-return render_tetris

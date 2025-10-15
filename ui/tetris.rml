@@ -4,7 +4,7 @@
     <link type="text/rcss" href="reset.rcss"/>
     <link type="text/rcss" href="tetris.rcss"/>
     <script>
-    tetris_render = require "tetris"
+    require "tetris"
     </script>
 </head>
 <body>
