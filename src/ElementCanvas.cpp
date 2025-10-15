@@ -45,6 +45,12 @@ void ElementCanvas::InitializeNanoVG()
         return;
     }
 
+    // Load default font (Roboto) for text rendering
+    int font_handle = nvgCreateFont(nvg_context_, "roboto", "ui/fonts/roboto-static/Roboto-Regular.ttf");
+    if (font_handle == -1) {
+        LOG_WARN("Failed to load font 'roboto' from ui/fonts/roboto-static/Roboto-Regular.ttf");
+    }
+
     LOG_INFO("NanoVG context created successfully");
 }
 
@@ -169,11 +175,11 @@ void ElementCanvas::OnRender()
     nvgBeginFrame(nvg_context_, static_cast<float>(viewport[2]), static_cast<float>(viewport[3]), 1.0f);
 
     // Check if there's a Lua render function specified
-    const Rml::Variant* onrender_attr = GetAttribute("onrender");
+    const Rml::Variant* render_attr = GetAttribute("renderfunction");
 
-    if (onrender_attr) {
-        Rml::String onrender_func = onrender_attr->Get<Rml::String>();
-        if (!onrender_func.empty()) {
+    if (render_attr) {
+        Rml::String render_func = render_attr->Get<Rml::String>();
+        if (!render_func.empty()) {
             // Call Lua render function
             CallLuaRenderFunction(x, y, w, h, time_);
         }
@@ -213,23 +219,23 @@ void ElementCanvas::CallLuaRenderFunction(float x, float y, float w, float h, fl
         return;
     }
 
-    // Get the onrender attribute
-    const Rml::Variant* onrender_attr = GetAttribute("onrender");
-    if (!onrender_attr) {
+    // Get the renderfunction attribute
+    const Rml::Variant* render_attr = GetAttribute("renderfunction");
+    if (!render_attr) {
         return;
     }
 
-    Rml::String onrender_func = onrender_attr->Get<Rml::String>();
-    if (onrender_func.empty()) {
+    Rml::String render_func = render_attr->Get<Rml::String>();
+    if (render_func.empty()) {
         return;
     }
 
     // Get the Lua function from global scope
-    lua_getglobal(L, onrender_func.c_str());
+    lua_getglobal(L, render_func.c_str());
 
     // Check if it's a function
     if (!lua_isfunction(L, -1)) {
-        LOG_WARN("ElementCanvas: onrender attribute '{}' is not a valid Lua function", onrender_func);
+        LOG_WARN("ElementCanvas: renderfunction attribute '{}' is not a valid Lua function", render_func);
         lua_pop(L, 1);
         return;
     }
@@ -245,7 +251,7 @@ void ElementCanvas::CallLuaRenderFunction(float x, float y, float w, float h, fl
     // Call the function with 6 arguments, 0 return values
     if (lua_pcall(L, 6, 0, 0) != LUA_OK) {
         const char* error = lua_tostring(L, -1);
-        LOG_ERROR("ElementCanvas: Error calling Lua render function '{}': {}", onrender_func, error);
+        LOG_ERROR("ElementCanvas: Error calling Lua render function '{}': {}", render_func, error);
         lua_pop(L, 1);
     }
 }

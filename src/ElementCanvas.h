@@ -12,11 +12,11 @@ extern "C" {
  * ElementCanvas - A custom RmlUi element that provides a NanoVG drawing surface.
  *
  * This element exposes NanoVG 2D drawing primitives to Lua scripts in RML files.
- * When an 'onrender' attribute is specified, the element will call that Lua function
+ * When a 'renderfunction' attribute is specified, the element will call that Lua function
  * each frame to perform custom rendering.
  *
  * Usage in RML:
- *   <canvas id="my-canvas" onrender="myRenderFunction" style="width: 800px; height: 600px;" />
+ *   <canvas id="my-canvas" renderfunction="myRenderFunction" style="width: 800px; height: 600px;" />
  *
  * The Lua render function receives:
  *   function myRenderFunction(nvg, x, y, w, h, time)

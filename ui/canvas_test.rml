@@ -36,6 +36,17 @@
                 gy = gy + grid_size
             end
 
+            -- Draw text
+            nvg.fontSize(nvg_ctx, 18.0)
+            nvg.fontFace(nvg_ctx, "roboto")
+            nvg.textAlign(nvg_ctx, nvg.ALIGN_LEFT + nvg.ALIGN_TOP)
+            nvg.fillColor(nvg_ctx, nvg.rgba(220, 220, 220, 255))
+            nvg.text(nvg_ctx, x + 10, y + 10, "Lua-Rendered Workflow Canvas")
+
+            nvg.fontSize(nvg_ctx, 14.0)
+            nvg.fillColor(nvg_ctx, nvg.rgba(180, 180, 180, 255))
+            nvg.text(nvg_ctx, x + 10, y + 35, "Rendered from Lua script in RML!")
+
             -- Draw animated node
             local cx = x + w * 0.3 + math.sin(time) * 50.0
             local cy = y + h * 0.3 + math.cos(time * 0.7) * 30.0
@@ -82,17 +93,6 @@
             nvg.strokeWidth(nvg_ctx, 3.0)
             nvg.strokeColor(nvg_ctx, nvg.rgba(100, 200, 100, 255))
             nvg.stroke(nvg_ctx)
-
-            -- Draw text
-            nvg.fontSize(nvg_ctx, 18.0)
-            nvg.fontFace(nvg_ctx, "sans")
-            nvg.textAlign(nvg_ctx, nvg.ALIGN_LEFT + nvg.ALIGN_TOP)
-            nvg.fillColor(nvg_ctx, nvg.rgba(220, 220, 220, 255))
-            nvg.text(nvg_ctx, x + 10, y + 10, "Lua-Rendered Workflow Canvas")
-
-            nvg.fontSize(nvg_ctx, 14.0)
-            nvg.fillColor(nvg_ctx, nvg.rgba(180, 180, 180, 255))
-            nvg.text(nvg_ctx, x + 10, y + 35, "Rendered from Lua script in RML!")
         end
     </script>
 </head>
@@ -103,7 +103,7 @@
         <p>All drawing logic is in Lua, with C++ providing the 2D primitives.</p>
 
         <div class="canvas-container">
-            <canvas id="test-canvas" onrender="render_workflow"/>
+            <canvas id="test-canvas" renderfunction="render_workflow"/>
         </div>
 
         <div class="info">

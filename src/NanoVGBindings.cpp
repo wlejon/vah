@@ -387,6 +387,36 @@ namespace {
         return 0;
     }
 
+    int lua_nvgCreateFont(lua_State* L) {
+        NVGcontext* ctx = GetContext(L, 1);
+        const char* name = luaL_checkstring(L, 2);
+        const char* filename = luaL_checkstring(L, 3);
+        int handle = nvgCreateFont(ctx, name, filename);
+        lua_pushinteger(L, handle);
+        return 1;
+    }
+
+    int lua_nvgFontBlur(lua_State* L) {
+        NVGcontext* ctx = GetContext(L, 1);
+        float blur = static_cast<float>(luaL_checknumber(L, 2));
+        nvgFontBlur(ctx, blur);
+        return 0;
+    }
+
+    int lua_nvgTextLetterSpacing(lua_State* L) {
+        NVGcontext* ctx = GetContext(L, 1);
+        float spacing = static_cast<float>(luaL_checknumber(L, 2));
+        nvgTextLetterSpacing(ctx, spacing);
+        return 0;
+    }
+
+    int lua_nvgTextLineHeight(lua_State* L) {
+        NVGcontext* ctx = GetContext(L, 1);
+        float lineHeight = static_cast<float>(luaL_checknumber(L, 2));
+        nvgTextLineHeight(ctx, lineHeight);
+        return 0;
+    }
+
     // ============================================================================
     // Additional Style Functions
     // ============================================================================
@@ -575,6 +605,18 @@ void NanoVGBindings::SetupBindings(lua_State* L) {
 
     lua_pushcfunction(L, lua_nvgText);
     lua_setfield(L, -2, "text");
+
+    lua_pushcfunction(L, lua_nvgCreateFont);
+    lua_setfield(L, -2, "createFont");
+
+    lua_pushcfunction(L, lua_nvgFontBlur);
+    lua_setfield(L, -2, "fontBlur");
+
+    lua_pushcfunction(L, lua_nvgTextLetterSpacing);
+    lua_setfield(L, -2, "textLetterSpacing");
+
+    lua_pushcfunction(L, lua_nvgTextLineHeight);
+    lua_setfield(L, -2, "textLineHeight");
 
     // Additional style functions
     lua_pushcfunction(L, lua_nvgGlobalAlpha);
