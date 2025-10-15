@@ -1,6 +1,12 @@
 #include "DocumentManager.h"
 #include "Logger.h"
 #include <algorithm>
+#include <RmlUi/Lua/Interpreter.h>
+
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+}
 
 DocumentManager::DocumentManager(Rml::Context* context)
     : context_(context)
@@ -156,6 +162,64 @@ void DocumentManager::HandleRcssFileChanged() {
     // Clear the stylesheet cache so RmlUi reloads the CSS
     Rml::Factory::ClearStyleSheetCache();
 
+    int num_docs = context_->GetNumDocuments();
+    for (int i = 0; i < num_docs; i++) {
+        auto doc = context_->GetDocument(i);
+        if (!doc) continue;
+
+        std::string src = doc->GetSourceURL();
+        bool was_visible = doc->IsVisible();
+
+        doc->Close();
+        auto new_doc = context_->LoadDocument(src.c_str());
+
+        // Update tracked documents
+        for (auto& [doc_id, tracked_doc] : loaded_documents_) {
+            if (tracked_doc == doc) {
+                loaded_documents_[doc_id] = new_doc;
+                break;
+            }
+        }
+
+        if (new_doc && was_visible) {
+            new_doc->Show();
+        }
+    }
+}
+
+void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
+    if (!context_) return;
+
+    // Clear the Lua module cache so require() will reload the file
+    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+    if (!L) {
+        LOG_WARN("Cannot clear Lua cache: Lua state is null");
+        return;
+    }
+
+    // Extract module name from path (e.g., "ui/canvas_test.lua" -> "canvas_test")
+    std::string module_name;
+    size_t last_slash = normalized_path.find_last_of("/\\");
+    size_t last_dot = normalized_path.find_last_of(".");
+
+    if (last_slash != std::string::npos && last_dot != std::string::npos && last_dot > last_slash) {
+        module_name = normalized_path.substr(last_slash + 1, last_dot - last_slash - 1);
+    } else if (last_dot != std::string::npos) {
+        module_name = normalized_path.substr(0, last_dot);
+    } else {
+        module_name = normalized_path;
+    }
+
+    LOG_INFO("Clearing Lua cache for module: {}", module_name);
+
+    // Clear package.loaded[module_name]
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "loaded");
+    lua_pushnil(L);
+    lua_setfield(L, -2, module_name.c_str());
+    lua_pop(L, 2); // pop loaded and package tables
+
+    // Reload all documents to re-execute their <script> tags
     int num_docs = context_->GetNumDocuments();
     for (int i = 0; i < num_docs; i++) {
         auto doc = context_->GetDocument(i);

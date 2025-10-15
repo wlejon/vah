@@ -40,15 +40,15 @@ public:
             return;
         }
 
-        // Check if it's an RML or RCSS file
+        // Check if it's an RML, RCSS, or LUA file
         std::string lower_filename = filename;
         std::transform(lower_filename.begin(), lower_filename.end(), lower_filename.begin(), ::tolower);
 
-        if (lower_filename.ends_with(".rml") || lower_filename.ends_with(".rcss")) {
+        if (lower_filename.ends_with(".rml") || lower_filename.ends_with(".rcss") || lower_filename.ends_with(".lua")) {
             std::string full_path = dir + filename;
             LOG_INFO("UI file changed, reloading: {}", full_path);
 
-            // Push file changed command for both RML and RCSS
+            // Push file changed command for RML, RCSS, and Lua
             Commands::FileChanged cmd;
             cmd.path = full_path;
             cmd.event_type = "modified";
@@ -320,6 +320,10 @@ private:
                     }
                     break;
 
+                case SDL_KEYUP:
+                    // Keyboard events are handled below with RmlUI processing
+                    break;
+
                 case SDL_DROPFILE:
                     // Handle file drag and drop
                     if (event.drop.file) {
@@ -367,6 +371,45 @@ private:
                             }
                         }
                         break;
+                    case SDL_KEYDOWN:
+                    case SDL_KEYUP: {
+                        // Convert SDL key to RmlUI KeyIdentifier
+                        Rml::Input::KeyIdentifier key_id = Rml::Input::KI_UNKNOWN;
+                        int key_modifier = 0;
+
+                        // Map common keys
+                        switch (event.key.keysym.sym) {
+                            case SDLK_LEFT:     key_id = Rml::Input::KI_LEFT; break;
+                            case SDLK_RIGHT:    key_id = Rml::Input::KI_RIGHT; break;
+                            case SDLK_UP:       key_id = Rml::Input::KI_UP; break;
+                            case SDLK_DOWN:     key_id = Rml::Input::KI_DOWN; break;
+                            case SDLK_SPACE:    key_id = Rml::Input::KI_SPACE; break;
+                            case SDLK_RETURN:   key_id = Rml::Input::KI_RETURN; break;
+                            case SDLK_ESCAPE:   key_id = Rml::Input::KI_ESCAPE; break;
+                            case SDLK_z:        key_id = Rml::Input::KI_Z; break;
+                            case SDLK_x:        key_id = Rml::Input::KI_X; break;
+                            case SDLK_c:        key_id = Rml::Input::KI_C; break;
+                            case SDLK_p:        key_id = Rml::Input::KI_P; break;
+                            default: break;
+                        }
+
+                        // Map modifiers
+                        if (event.key.keysym.mod & KMOD_SHIFT)
+                            key_modifier |= Rml::Input::KM_SHIFT;
+                        if (event.key.keysym.mod & KMOD_CTRL)
+                            key_modifier |= Rml::Input::KM_CTRL;
+                        if (event.key.keysym.mod & KMOD_ALT)
+                            key_modifier |= Rml::Input::KM_ALT;
+
+                        if (key_id != Rml::Input::KI_UNKNOWN) {
+                            if (event.type == SDL_KEYDOWN) {
+                                rml_context_->ProcessKeyDown(key_id, key_modifier);
+                            } else {
+                                rml_context_->ProcessKeyUp(key_id, key_modifier);
+                            }
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -399,6 +442,9 @@ private:
                     } else if (lower_path.ends_with(".rcss")) {
                         LOG_INFO("RCSS file changed: {}, clearing cache and reloading all documents", command.path);
                         document_manager_->HandleRcssFileChanged();
+                    } else if (lower_path.ends_with(".lua")) {
+                        LOG_INFO("Lua file changed: {}, clearing Lua cache and reloading all documents", command.path);
+                        document_manager_->HandleLuaFileChanged(normalized_path);
                     }
                 }
             } else {

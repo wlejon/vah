@@ -76,6 +76,10 @@ void ElementCanvas::OnChildAdd(Rml::Element* element)
         AddEventListener(Rml::EventId::Mousedown, this);
         AddEventListener(Rml::EventId::Mouseup, this);
 
+        // Register for keyboard events
+        AddEventListener(Rml::EventId::Keydown, this);
+        AddEventListener(Rml::EventId::Keyup, this);
+
         LOG_INFO("ElementCanvas added to document tree");
     }
 }
@@ -89,6 +93,8 @@ void ElementCanvas::OnChildRemove(Rml::Element* element)
         RemoveEventListener(Rml::EventId::Mousemove, this);
         RemoveEventListener(Rml::EventId::Mousedown, this);
         RemoveEventListener(Rml::EventId::Mouseup, this);
+        RemoveEventListener(Rml::EventId::Keydown, this);
+        RemoveEventListener(Rml::EventId::Keyup, this);
 
         LOG_INFO("ElementCanvas removed from document tree");
     }
@@ -107,6 +113,55 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
     else if (event == Rml::EventId::Mouseup) {
         mouse_down_ = false;
         LOG_INFO("Canvas mouse up at ({}, {})", mouse_pos_.x, mouse_pos_.y);
+    }
+    else if (event == Rml::EventId::Keydown) {
+        Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
+            event.GetParameter<int>("key_identifier", 0));
+
+        // Map RmlUI key identifiers to string names for Lua
+        Rml::String key_name;
+        switch (key) {
+            case Rml::Input::KI_LEFT:   key_name = "left"; break;
+            case Rml::Input::KI_RIGHT:  key_name = "right"; break;
+            case Rml::Input::KI_UP:     key_name = "up"; break;
+            case Rml::Input::KI_DOWN:   key_name = "down"; break;
+            case Rml::Input::KI_SPACE:  key_name = "space"; break;
+            case Rml::Input::KI_RETURN: key_name = "return"; break;
+            case Rml::Input::KI_ESCAPE: key_name = "escape"; break;
+            case Rml::Input::KI_Z:      key_name = "z"; break;
+            case Rml::Input::KI_X:      key_name = "x"; break;
+            case Rml::Input::KI_C:      key_name = "c"; break;
+            case Rml::Input::KI_P:      key_name = "p"; break;
+            default: break;
+        }
+
+        if (!key_name.empty()) {
+            CallLuaKeyHandler(key_name, true);
+        }
+    }
+    else if (event == Rml::EventId::Keyup) {
+        Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
+            event.GetParameter<int>("key_identifier", 0));
+
+        Rml::String key_name;
+        switch (key) {
+            case Rml::Input::KI_LEFT:   key_name = "left"; break;
+            case Rml::Input::KI_RIGHT:  key_name = "right"; break;
+            case Rml::Input::KI_UP:     key_name = "up"; break;
+            case Rml::Input::KI_DOWN:   key_name = "down"; break;
+            case Rml::Input::KI_SPACE:  key_name = "space"; break;
+            case Rml::Input::KI_RETURN: key_name = "return"; break;
+            case Rml::Input::KI_ESCAPE: key_name = "escape"; break;
+            case Rml::Input::KI_Z:      key_name = "z"; break;
+            case Rml::Input::KI_X:      key_name = "x"; break;
+            case Rml::Input::KI_C:      key_name = "c"; break;
+            case Rml::Input::KI_P:      key_name = "p"; break;
+            default: break;
+        }
+
+        if (!key_name.empty()) {
+            CallLuaKeyHandler(key_name, false);
+        }
     }
 }
 
@@ -252,6 +307,48 @@ void ElementCanvas::CallLuaRenderFunction(float x, float y, float w, float h, fl
     if (lua_pcall(L, 6, 0, 0) != LUA_OK) {
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling Lua render function '{}': {}", render_func, error);
+        lua_pop(L, 1);
+    }
+}
+
+void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down)
+{
+    // Get the RmlUI Lua state
+    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+    if (!L) {
+        LOG_ERROR("ElementCanvas: RmlUI Lua state not available");
+        return;
+    }
+
+    // Get the keyhandler attribute
+    const Rml::Variant* handler_attr = GetAttribute("keyhandler");
+    if (!handler_attr) {
+        return;
+    }
+
+    Rml::String handler_func = handler_attr->Get<Rml::String>();
+    if (handler_func.empty()) {
+        return;
+    }
+
+    // Get the Lua function from global scope
+    lua_getglobal(L, handler_func.c_str());
+
+    // Check if it's a function
+    if (!lua_isfunction(L, -1)) {
+        LOG_WARN("ElementCanvas: keyhandler attribute '{}' is not a valid Lua function", handler_func);
+        lua_pop(L, 1);
+        return;
+    }
+
+    // Push arguments: key_name (string), key_down (boolean)
+    lua_pushstring(L, key_name.c_str());
+    lua_pushboolean(L, key_down);
+
+    // Call the function with 2 arguments, 0 return values
+    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+        const char* error = lua_tostring(L, -1);
+        LOG_ERROR("ElementCanvas: Error calling Lua key handler '{}': {}", handler_func, error);
         lua_pop(L, 1);
     }
 }

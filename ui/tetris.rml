@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Tetris Game</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="tetris.rcss"/>
+    <script>
+    tetris_render = require "tetris"
+    </script>
+</head>
+<body>
+    <h1>A tetris example :)</h1>
+    <div class="container">
+        <canvas id="tetris-canvas"
+                renderfunction="render_tetris"
+                keyhandler="handle_tetris_key"/>
+    </div>
+</body>
+</rml>

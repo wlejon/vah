@@ -36,5 +36,7 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
+now that we have nanovg rendering in the ElementCanvas (canvas_test shows this) i would like a tetris clone in lua. make sure you understand the project before you build it so you know how and where it goes. 
 
+we will use this to determine what is missing from the implementation, be thorough and don't simplify if we're missing features: implement the missing features.
 

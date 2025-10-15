@@ -6,8 +6,11 @@ function startup()
 
     -- Choose which demo to run (comment/uncomment):
 
+    -- Tetris Game
+    ui.load_document("ui/tetris.rml")
+
     -- NanoVG Canvas Test (custom RmlUi element with NanoVG rendering)
-    ui.load_document("ui/canvas_test.rml")
+    -- ui.load_document("ui/canvas_test.rml")
 
     -- File browser demo
     -- command.spawn_thread("scripts/file_browser.lua")

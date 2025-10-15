@@ -16,23 +16,6 @@
         <div class="canvas-container">
             <canvas id="test-canvas" renderfunction="render_workflow"/>
         </div>
-
-        <div class="info">
-            <h2>What you're seeing:</h2>
-            <ul>
-                <li>Grid background drawn from Lua</li>
-                <li>Animated circle node (Lua-controlled)</li>
-                <li>Static rounded rectangle node</li>
-                <li>Bezier curve connection</li>
-                <li>All rendering logic in Lua script</li>
-            </ul>
-
-            <p><strong>Architecture:</strong> C++ exposes NanoVG primitives to Lua, RML scripts handle rendering logic.</p>
-
-            <p class="success">✓ NanoVG API exposed to Lua!</p>
-            <p class="success">✓ Rendering logic in Lua scripts</p>
-            <p class="success">✓ Clean foundation for workflow editor</p>
-        </div>
     </div>
 </body>
 </rml>

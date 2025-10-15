@@ -37,7 +37,7 @@ public:
     // Called when element is removed from the document tree
     void OnChildRemove(Rml::Element* element) override;
 
-    // Handle mouse events for interaction testing
+    // Handle mouse and keyboard events for interaction
     void ProcessEvent(Rml::Event& event) override;
 
 protected:
@@ -54,8 +54,11 @@ private:
     void InitializeNanoVG();
     void ShutdownNanoVG();
 
-    // Call Lua render function if onrender attribute is set
+    // Call Lua render function if renderfunction attribute is set
     void CallLuaRenderFunction(float x, float y, float w, float h, float t);
+
+    // Call Lua keyboard handler if keyhandler attribute is set
+    void CallLuaKeyHandler(const Rml::String& key_name, bool key_down);
 
     NVGcontext* nvg_context_;
     float time_; // Animation time

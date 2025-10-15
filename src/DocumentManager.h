@@ -25,6 +25,7 @@ public:
     // File change handling (for hot reload)
     void HandleRmlFileChanged(const std::string& normalized_path);
     void HandleRcssFileChanged();
+    void HandleLuaFileChanged(const std::string& normalized_path);
 
     // Cleanup
     void UnloadAllDocuments();
