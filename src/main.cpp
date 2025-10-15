@@ -21,6 +21,7 @@
 #include "DataModelManager.h"
 #include "CommandProcessor.h"
 #include "ElementCanvas.h"
+#include "NanoVGBindings.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -192,6 +193,9 @@ public:
         // Store context in Lua registry for data model creation
         lua_pushlightuserdata(rml_lua, rml_context_);
         lua_setfield(rml_lua, LUA_REGISTRYINDEX, "rmlui_context");
+
+        // Setup NanoVG bindings for canvas elements
+        NanoVGBindings::SetupBindings(rml_lua);
 
         rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_);
 

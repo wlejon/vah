@@ -1,34 +1,126 @@
 <rml>
 <head>
-    <title>Canvas Test</title>
+    <title>Canvas Test - Lua Rendering</title>
     <link type="text/rcss" href="reset.rcss"/>
     <link type="text/rcss" href="canvas_test.rcss"/>
+    <script>
+        -- Lua rendering function for workflow editor
+        function render_workflow(nvg_ctx, x, y, w, h, time)
+            -- Draw background
+            nvg.beginPath(nvg_ctx)
+            nvg.rect(nvg_ctx, x, y, w, h)
+            nvg.fillColor(nvg_ctx, nvg.rgba(28, 30, 34, 255))
+            nvg.fill(nvg_ctx)
+
+            -- Draw grid
+            local grid_size = 20.0
+            local gx = x
+            while gx < x + w do
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, gx, y)
+                nvg.lineTo(nvg_ctx, gx, y + h)
+                nvg.strokeColor(nvg_ctx, nvg.rgba(60, 60, 60, 100))
+                nvg.strokeWidth(nvg_ctx, 1.0)
+                nvg.stroke(nvg_ctx)
+                gx = gx + grid_size
+            end
+
+            local gy = y
+            while gy < y + h do
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, x, gy)
+                nvg.lineTo(nvg_ctx, x + w, gy)
+                nvg.strokeColor(nvg_ctx, nvg.rgba(60, 60, 60, 100))
+                nvg.strokeWidth(nvg_ctx, 1.0)
+                nvg.stroke(nvg_ctx)
+                gy = gy + grid_size
+            end
+
+            -- Draw animated node
+            local cx = x + w * 0.3 + math.sin(time) * 50.0
+            local cy = y + h * 0.3 + math.cos(time * 0.7) * 30.0
+            local radius = 40.0
+
+            -- Node shadow
+            nvg.beginPath(nvg_ctx)
+            nvg.circle(nvg_ctx, cx, cy + 2, radius + 5)
+            nvg.fillColor(nvg_ctx, nvg.rgba(0, 0, 0, 64))
+            nvg.fill(nvg_ctx)
+
+            -- Node body
+            nvg.beginPath(nvg_ctx)
+            nvg.circle(nvg_ctx, cx, cy, radius)
+            nvg.fillColor(nvg_ctx, nvg.rgba(40, 120, 255, 255))
+            nvg.fill(nvg_ctx)
+
+            -- Node border
+            nvg.beginPath(nvg_ctx)
+            nvg.circle(nvg_ctx, cx, cy, radius)
+            nvg.strokeWidth(nvg_ctx, 2.0)
+            nvg.strokeColor(nvg_ctx, nvg.rgba(255, 140, 255, 255))
+            nvg.stroke(nvg_ctx)
+
+            -- Draw static node
+            local cx2 = x + w * 0.7
+            local cy2 = y + h * 0.5
+
+            nvg.beginPath(nvg_ctx)
+            nvg.roundedRect(nvg_ctx, cx2 - 60, cy2 - 40, 120, 80, 8)
+            nvg.fillColor(nvg_ctx, nvg.rgba(40, 40, 45, 255))
+            nvg.fill(nvg_ctx)
+
+            nvg.beginPath(nvg_ctx)
+            nvg.roundedRect(nvg_ctx, cx2 - 60, cy2 - 40, 120, 80, 8)
+            nvg.strokeWidth(nvg_ctx, 2.0)
+            nvg.strokeColor(nvg_ctx, nvg.rgba(255, 176, 50, 255))
+            nvg.stroke(nvg_ctx)
+
+            -- Draw bezier curve connection
+            nvg.beginPath(nvg_ctx)
+            nvg.moveTo(nvg_ctx, cx + radius, cy)
+            nvg.bezierTo(nvg_ctx, cx + radius + 100, cy, cx2 - 60 - 100, cy2, cx2 - 60, cy2)
+            nvg.strokeWidth(nvg_ctx, 3.0)
+            nvg.strokeColor(nvg_ctx, nvg.rgba(100, 200, 100, 255))
+            nvg.stroke(nvg_ctx)
+
+            -- Draw text
+            nvg.fontSize(nvg_ctx, 18.0)
+            nvg.fontFace(nvg_ctx, "sans")
+            nvg.textAlign(nvg_ctx, nvg.ALIGN_LEFT + nvg.ALIGN_TOP)
+            nvg.fillColor(nvg_ctx, nvg.rgba(220, 220, 220, 255))
+            nvg.text(nvg_ctx, x + 10, y + 10, "Lua-Rendered Workflow Canvas")
+
+            nvg.fontSize(nvg_ctx, 14.0)
+            nvg.fillColor(nvg_ctx, nvg.rgba(180, 180, 180, 255))
+            nvg.text(nvg_ctx, x + 10, y + 35, "Rendered from Lua script in RML!")
+        end
+    </script>
 </head>
 <body>
     <div class="container">
-        <h1>NanoVG Canvas Element Test</h1>
-        <p>This demonstrates a custom RmlUi element rendering with NanoVG.</p>
-        <p>Foundation for porting imgui-node-editor.</p>
+        <h1>NanoVG Canvas - Lua Rendering</h1>
+        <p>This canvas is rendered by a Lua script defined in the RML file.</p>
+        <p>All drawing logic is in Lua, with C++ providing the 2D primitives.</p>
 
         <div class="canvas-container">
-            <canvas id="test-canvas"/>
+            <canvas id="test-canvas" onrender="render_workflow"/>
         </div>
 
         <div class="info">
             <h2>What you're seeing:</h2>
             <ul>
-                <li>Grid background (like a node editor canvas)</li>
-                <li>Animated circle node (simulating movement)</li>
+                <li>Grid background drawn from Lua</li>
+                <li>Animated circle node (Lua-controlled)</li>
                 <li>Static rounded rectangle node</li>
-                <li>Bezier curve link between nodes</li>
-                <li>Mouse cursor indicator (moves with your mouse)</li>
+                <li>Bezier curve connection</li>
+                <li>All rendering logic in Lua script</li>
             </ul>
 
-            <p><strong>Interaction:</strong> Move your mouse over the canvas and click to test mouse events.</p>
+            <p><strong>Architecture:</strong> C++ exposes NanoVG primitives to Lua, RML scripts handle rendering logic.</p>
 
-            <p class="success">✓ NanoVG integration working!</p>
-            <p class="success">✓ Custom RmlUi element rendering</p>
-            <p class="success">✓ Ready for node editor port</p>
+            <p class="success">✓ NanoVG API exposed to Lua!</p>
+            <p class="success">✓ Rendering logic in Lua scripts</p>
+            <p class="success">✓ Clean foundation for workflow editor</p>
         </div>
     </div>
 </body>

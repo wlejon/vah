@@ -36,27 +36,6 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-we're trying to get nanovg rendering in a custom element of rmlui.
+we've gone a few iterations on trying to build a workflow editor. i tried bringing over an existing node editor in c++. i tried porting litegraph.js. i think our architecture is making building this difficult. i think we need to expose drawing 2d primitives (like html canvas context) to the rmlui lua state and load lua scripts from the rml files to render the workflows from lua. like beginFrame() draw() endFrame() level of draw functions, i think. this foundation gives us a cleaner path to building the rendering side of the equation.
 
-please complete your effort.
-
-PS D:\projects\vah> git status
-On branch main
-Changes not staged for commit:
-  (use "git add/rm <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        modified:   CMakeLists.txt
-        modified:   scripts/main.lua
-        modified:   src/main.cpp
-
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-        src/ElementCanvas.cpp
-        src/ElementCanvas.h
-        ui/canvas_test.rcss
-        ui/canvas_test.rml
-
-no changes added to commit (use "git add" and/or "git commit -a")
-
-
-currently, it's not rendering correctly. what "not correctly means" is somewhat hard to describe. the circle has points on it, around the outside, which make it look like a sided shape. the rectangle has missing sides or something. there is no grid. i'm not sure what is wrong. perhaps we need to flip the rendering to face the other direction. i feel like i'm seeing the back side of an embroidery instead of the front where the design is. 
+please investigate the codebase to see how my idea could be implemented. 

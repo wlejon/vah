@@ -47,6 +47,7 @@ add_executable(vah
     src/DataModelManager.cpp
     src/CommandProcessor.cpp
     src/ElementCanvas.cpp
+    src/NanoVGBindings.cpp
 )
 
 target_include_directories(vah PRIVATE
