@@ -2,6 +2,7 @@
 
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/EventListener.h>
+#include <RmlUi/Core/Input.h>
 #include <nanovg.h>
 
 extern "C" {

@@ -167,6 +167,11 @@ void DocumentManager::HandleRcssFileChanged() {
         auto doc = context_->GetDocument(i);
         if (!doc) continue;
 
+        // Skip debugger documents - they don't have file sources and shouldn't be reloaded
+        if (doc->GetId().find("rmlui-debug-") == 0) {
+            continue;
+        }
+
         std::string src = doc->GetSourceURL();
         bool was_visible = doc->IsVisible();
 
@@ -224,6 +229,11 @@ void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
     for (int i = 0; i < num_docs; i++) {
         auto doc = context_->GetDocument(i);
         if (!doc) continue;
+
+        // Skip debugger documents - they don't have file sources and shouldn't be reloaded
+        if (doc->GetId().find("rmlui-debug-") == 0) {
+            continue;
+        }
 
         std::string src = doc->GetSourceURL();
         bool was_visible = doc->IsVisible();
