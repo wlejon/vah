@@ -34,11 +34,18 @@ function startup()
     database_initialized = true
     print("Workflow database initialized successfully")
 
+    -- Register event handler for navigation
+    event.register("open_node_editor", function(payload)
+        print("Opening node type editor view")
+        ui.hide_document("workflow_editor")
+        ui.show_document("node_type_editor")
+    end)
+
     -- Bind data BEFORE loading UI (so data model exists when document loads)
     load_node_types()
 
     -- Load UI AFTER data is bound
-    ui.load_document("ui/workflow_editor.rml")
+    ui.load_document("ui/workflow_editor.rml", true, "workflow_editor")
 end
 
 function update(dt)

@@ -11,6 +11,9 @@ local editor = {
     selected_node = nil
 }
 
+-- Forward declaration
+local load_node_type_colors
+
 -- Load all node types from database
 local function load_node_types()
     -- Query node types with color components separated
@@ -56,7 +59,7 @@ local function load_node_types()
 end
 
 -- Load color data for all node types
-local function load_node_type_colors()
+load_node_type_colors = function()
     for _, nt in ipairs(editor.node_types) do
         local db_handle = workflow_db.db_handle or db.open("data/workflow.db")
         if db_handle then
@@ -76,24 +79,33 @@ local function load_node_type_colors()
 end
 
 -- Select a node type for editing
-function select_node_type(event)
-    local index = tonumber(event.index)
-    if not index or index < 1 or index > #editor.node_types then
+local function select_node_type(payload)
+    -- payload contains the row data from the data model
+    -- We can identify the node by its id
+    local node_id = payload.id
+    if not node_id then
+        print("ERROR: No id in select_node_type payload")
         return
     end
 
-    editor.selected_index = index
-    editor.selected_node = editor.node_types[index]
+    -- Find the index of this node type
+    for i, nt in ipairs(editor.node_types) do
+        if nt.id == node_id then
+            editor.selected_index = i
+            editor.selected_node = editor.node_types[i]
+            print("Selected node type: " .. editor.selected_node.name)
 
-    print("Selected node type: " .. editor.selected_node.name)
+            -- Update data model - wrap selected_node in an array for data binding
+            data.bind("selected_node", {editor.selected_node})
+            return
+        end
+    end
 
-    -- Update data model
-    data.bind("selected_index", editor.selected_index)
-    data.bind("selected_node", editor.selected_node)
+    print("ERROR: Could not find node type with id " .. node_id)
 end
 
 -- Add a new node type
-function add_new_node_type()
+local function add_new_node_type(payload)
     local node_id = workflow_db.create_node_type("New Node", 128, 128, 128, 255)
 
     if node_id then
@@ -105,7 +117,7 @@ function add_new_node_type()
 end
 
 -- Add input port to selected node
-function add_input_port()
+local function add_input_port(payload)
     if not editor.selected_node then
         return
     end
@@ -116,7 +128,7 @@ function add_input_port()
 end
 
 -- Add output port to selected node
-function add_output_port()
+local function add_output_port(payload)
     if not editor.selected_node then
         return
     end
@@ -127,12 +139,12 @@ function add_output_port()
 end
 
 -- Delete input port
-function delete_input_port(event)
+local function delete_input_port(payload)
     if not editor.selected_node then
         return
     end
 
-    local index = tonumber(event.index)
+    local index = tonumber(payload.index)
     if index and index >= 1 and index <= #editor.selected_node.inputs then
         table.remove(editor.selected_node.inputs, index)
         data.bind("selected_node", editor.selected_node)
@@ -141,12 +153,12 @@ function delete_input_port(event)
 end
 
 -- Delete output port
-function delete_output_port(event)
+local function delete_output_port(payload)
     if not editor.selected_node then
         return
     end
 
-    local index = tonumber(event.index)
+    local index = tonumber(payload.index)
     if index and index >= 1 and index <= #editor.selected_node.outputs then
         table.remove(editor.selected_node.outputs, index)
         data.bind("selected_node", editor.selected_node)
@@ -155,7 +167,7 @@ function delete_output_port(event)
 end
 
 -- Save changes to the selected node type
-function save_node_type()
+local function save_node_type(payload)
     if not editor.selected_node then
         print("ERROR: No node type selected")
         return
@@ -240,7 +252,7 @@ function save_node_type()
 end
 
 -- Delete the selected node type
-function delete_node_type()
+local function delete_node_type(payload)
     if not editor.selected_node then
         print("ERROR: No node type selected")
         return
@@ -280,16 +292,31 @@ function startup()
         return
     end
 
+    -- Register event handlers
+    event.register("return_to_workflow", function(payload)
+        print("Returning to workflow editor view")
+        ui.hide_document("node_type_editor")
+        ui.show_document("workflow_editor")
+    end)
+
+    event.register("select_node_type", select_node_type)
+    event.register("add_new_node_type", add_new_node_type)
+    event.register("add_input_port", add_input_port)
+    event.register("add_output_port", add_output_port)
+    event.register("delete_input_port", delete_input_port)
+    event.register("delete_output_port", delete_output_port)
+    event.register("save_node_type", save_node_type)
+    event.register("delete_node_type", delete_node_type)
+
     -- Bind initial data
     data.bind("node_types", {})
-    data.bind("selected_index", nil)
-    data.bind("selected_node", nil)
+    data.bind("selected_node", {})  -- Initialize as empty array
 
     -- Load node types from database
     load_node_types()
 
-    -- Load UI
-    ui.load_document("ui/node_type_editor.rml")
+    -- Load UI (initially hidden, will be shown when user navigates to it)
+    ui.load_document("ui/node_type_editor.rml", false, "node_type_editor")
 end
 
 function update(dt)
