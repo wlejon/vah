@@ -6,8 +6,11 @@ function startup()
 
     -- Choose which demo to run (comment/uncomment):
 
+    -- Workflow Node Editor
+    ui.load_document("ui/workflow_editor.rml")
+
     -- Tetris Game
-    ui.load_document("ui/tetris.rml")
+    -- ui.load_document("ui/tetris.rml")
 
     -- NanoVG Canvas Test (custom RmlUi element with NanoVG rendering)
     -- ui.load_document("ui/canvas_test.rml")

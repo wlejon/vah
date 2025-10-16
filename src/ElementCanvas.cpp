@@ -19,7 +19,7 @@ ElementCanvas::ElementCanvas(const Rml::String& tag)
     , nvg_context_(nullptr)
     , time_(0.0f)
     , mouse_pos_(0.0f, 0.0f)
-    , mouse_down_(false)
+    , mouse_buttons_{false, false, false}
 {
     LOG_INFO("ElementCanvas created");
 }
@@ -75,6 +75,7 @@ void ElementCanvas::OnChildAdd(Rml::Element* element)
         AddEventListener(Rml::EventId::Mousemove, this);
         AddEventListener(Rml::EventId::Mousedown, this);
         AddEventListener(Rml::EventId::Mouseup, this);
+        AddEventListener(Rml::EventId::Mouseout, this);
 
         // Register for keyboard events
         AddEventListener(Rml::EventId::Keydown, this);
@@ -93,6 +94,7 @@ void ElementCanvas::OnChildRemove(Rml::Element* element)
         RemoveEventListener(Rml::EventId::Mousemove, this);
         RemoveEventListener(Rml::EventId::Mousedown, this);
         RemoveEventListener(Rml::EventId::Mouseup, this);
+        RemoveEventListener(Rml::EventId::Mouseout, this);
         RemoveEventListener(Rml::EventId::Keydown, this);
         RemoveEventListener(Rml::EventId::Keyup, this);
 
@@ -105,16 +107,39 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
     if (event == Rml::EventId::Mousemove) {
         mouse_pos_.x = event.GetParameter<float>("mouse_x", 0.0f);
         mouse_pos_.y = event.GetParameter<float>("mouse_y", 0.0f);
+        // Call mouse handler during move to enable dragging for any pressed button
+        for (int button = 0; button < 3; button++) {
+            if (mouse_buttons_[button]) {
+                CallLuaMouseHandler(button, true);
+            }
+        }
     }
     else if (event == Rml::EventId::Mousedown) {
-        mouse_down_ = true;
-        LOG_INFO("Canvas mouse down at ({}, {})", mouse_pos_.x, mouse_pos_.y);
-        CallLuaMouseHandler(true);
+        int button = event.GetParameter<int>("button", 0);
+        if (button >= 0 && button < 3) {
+            mouse_buttons_[button] = true;
+            LOG_INFO("Canvas mouse button {} down at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
+            CallLuaMouseHandler(button, true);
+        }
     }
     else if (event == Rml::EventId::Mouseup) {
-        mouse_down_ = false;
-        LOG_INFO("Canvas mouse up at ({}, {})", mouse_pos_.x, mouse_pos_.y);
-        CallLuaMouseHandler(false);
+        int button = event.GetParameter<int>("button", 0);
+        if (button >= 0 && button < 3) {
+            mouse_buttons_[button] = false;
+            LOG_INFO("Canvas mouse button {} up at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
+            CallLuaMouseHandler(button, false);
+        }
+    }
+    else if (event == Rml::EventId::Mouseout) {
+        // Mouse left the canvas - release all pressed buttons to prevent stuck drag states
+        for (int button = 0; button < 3; button++) {
+            if (mouse_buttons_[button]) {
+                LOG_INFO("Canvas mouse out while button {} down - releasing at ({}, {})",
+                        button, mouse_pos_.x, mouse_pos_.y);
+                mouse_buttons_[button] = false;
+                CallLuaMouseHandler(button, false);
+            }
+        }
     }
     else if (event == Rml::EventId::Keydown) {
         Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
@@ -436,7 +461,7 @@ void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down
     }
 }
 
-void ElementCanvas::CallLuaMouseHandler(bool mouse_down)
+void ElementCanvas::CallLuaMouseHandler(int button, bool button_down)
 {
     // Get the RmlUI Lua state
     lua_State* L = Rml::Lua::Interpreter::GetLuaState();
@@ -466,11 +491,20 @@ void ElementCanvas::CallLuaMouseHandler(bool mouse_down)
         return;
     }
 
-    // Push arguments: mouse_down (boolean)
-    lua_pushboolean(L, mouse_down);
+    // Get canvas absolute position for coordinate conversion
+    Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
 
-    // Call the function with 1 argument, 0 return values
-    if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+    // Push arguments: button (int: 0=left, 1=right, 2=middle), button_down (boolean),
+    //                 mouse_x, mouse_y, canvas_x, canvas_y
+    lua_pushinteger(L, button);
+    lua_pushboolean(L, button_down);
+    lua_pushnumber(L, mouse_pos_.x);
+    lua_pushnumber(L, mouse_pos_.y);
+    lua_pushnumber(L, absolute_offset.x);
+    lua_pushnumber(L, absolute_offset.y);
+
+    // Call the function with 6 arguments, 0 return values
+    if (lua_pcall(L, 6, 0, 0) != LUA_OK) {
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling Lua mouse handler '{}': {}", handler_func, error);
         lua_pop(L, 1);

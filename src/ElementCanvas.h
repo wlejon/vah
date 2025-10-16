@@ -65,13 +65,13 @@ private:
     void CallLuaKeyHandler(const Rml::String& key_name, bool key_down);
 
     // Call Lua mouse handler if mousehandler attribute is set
-    void CallLuaMouseHandler(bool mouse_down);
+    void CallLuaMouseHandler(int button, bool button_down);
 
     NVGcontext* nvg_context_;
     float time_; // Animation time
 
     // Mouse interaction state
     Rml::Vector2f mouse_pos_;
-    bool mouse_down_;
+    bool mouse_buttons_[3]; // Track left (0), right (1), middle (2) mouse buttons
 };
 
