@@ -65,6 +65,9 @@ end
 local function switch_to_workflow(payload)
     print("Switching to workflow editor view")
 
+    -- Reload node types from database (in case they were modified)
+    load_node_types()
+
     -- Hide node editor view
     ui.remove_element_class("node-editor-view", "active")
     -- Show workflow view
@@ -172,20 +175,21 @@ end
 
 -- Save changes to the selected node type
 local function save_node_type(payload)
-    if not editor.selected_node then
-        print("ERROR: No node type selected")
+    if not payload.id then
+        print("ERROR: No id in save_node_type payload")
         return
     end
 
-    -- Get current input values
-    local inputs = input.get_tracked_inputs()
-
-    -- Update from tracked inputs
-    local name = inputs.node_name or editor.selected_node.name
-    local color_r = tonumber(inputs.color_r) or editor.selected_node.color_r
-    local color_g = tonumber(inputs.color_g) or editor.selected_node.color_g
-    local color_b = tonumber(inputs.color_b) or editor.selected_node.color_b
-    local color_a = tonumber(inputs.color_a) or editor.selected_node.color_a
+    -- Payload already contains merged data:
+    -- - Original row data from model (including id, inputs, outputs arrays)
+    -- - Current input values from tracked inputs (override originals)
+    -- So we can use payload directly!
+    local node_id = payload.id
+    local name = payload.name or "Unnamed"
+    local color_r = tonumber(payload.color_r) or 128
+    local color_g = tonumber(payload.color_g) or 128
+    local color_b = tonumber(payload.color_b) or 128
+    local color_a = tonumber(payload.color_a) or 255
 
     -- Clamp color values
     color_r = math.max(0, math.min(255, color_r))
@@ -193,29 +197,36 @@ local function save_node_type(payload)
     color_b = math.max(0, math.min(255, color_b))
     color_a = math.max(0, math.min(255, color_a))
 
-    -- Update port names from tracked inputs
-    for i, _ in ipairs(editor.selected_node.inputs) do
-        local input_name = inputs["input_port_" .. i]
-        if input_name then
-            editor.selected_node.inputs[i] = input_name
+    -- Extract port names from payload (tracked inputs override original values)
+    local inputs = {}
+    local outputs = {}
+
+    -- The payload will have input_port_1, input_port_2, etc. for tracked inputs
+    -- and the original inputs/outputs arrays
+    -- We need to check which ports exist and get their current values
+    if editor.selected_node then
+        -- Build inputs array from tracked values
+        for i = 1, #editor.selected_node.inputs do
+            local port_name = payload["input_port_" .. i] or editor.selected_node.inputs[i]
+            table.insert(inputs, port_name)
+        end
+
+        -- Build outputs array from tracked values
+        for i = 1, #editor.selected_node.outputs do
+            local port_name = payload["output_port_" .. i] or editor.selected_node.outputs[i]
+            table.insert(outputs, port_name)
         end
     end
 
-    for i, _ in ipairs(editor.selected_node.outputs) do
-        local output_name = inputs["output_port_" .. i]
-        if output_name then
-            editor.selected_node.outputs[i] = output_name
-        end
-    end
-
-    print("Saving node type: " .. name)
+    print("Saving node type ID: " .. node_id)
+    print("  Name: " .. name)
     print("  Color: " .. color_r .. ", " .. color_g .. ", " .. color_b .. ", " .. color_a)
-    print("  Inputs: " .. #editor.selected_node.inputs)
-    print("  Outputs: " .. #editor.selected_node.outputs)
+    print("  Inputs: " .. #inputs)
+    print("  Outputs: " .. #outputs)
 
     -- Update node type in database
     local success = workflow_db.update_node_type(
-        editor.selected_node.id,
+        node_id,
         name,
         color_r, color_g, color_b, color_a
     )
@@ -226,16 +237,16 @@ local function save_node_type(payload)
     end
 
     -- Delete all ports and re-add them
-    workflow_db.delete_ports(editor.selected_node.id)
+    workflow_db.delete_ports(node_id)
 
     -- Add input ports
-    for i, port_name in ipairs(editor.selected_node.inputs) do
-        workflow_db.add_port(editor.selected_node.id, port_name, "input", i)
+    for i, port_name in ipairs(inputs) do
+        workflow_db.add_port(node_id, port_name, "input", i)
     end
 
     -- Add output ports
-    for i, port_name in ipairs(editor.selected_node.outputs) do
-        workflow_db.add_port(editor.selected_node.id, port_name, "output", i)
+    for i, port_name in ipairs(outputs) do
+        workflow_db.add_port(node_id, port_name, "output", i)
     end
 
     print("Node type saved successfully")
@@ -245,7 +256,7 @@ local function save_node_type(payload)
 
     -- Re-select the same node
     for i, nt in ipairs(editor.node_types) do
-        if nt.id == editor.selected_node.id then
+        if nt.id == node_id then
             editor.selected_index = i
             editor.selected_node = editor.node_types[i]
             data.bind("selected_node", {editor.selected_node})
@@ -256,15 +267,15 @@ end
 
 -- Delete the selected node type
 local function delete_node_type(payload)
-    if not editor.selected_node then
-        print("ERROR: No node type selected")
+    if not payload.id then
+        print("ERROR: No id in delete_node_type payload")
         return
     end
 
-    local node_type_name = editor.selected_node.name
-    local node_type_id = editor.selected_node.id
+    local node_type_id = payload.id
+    local node_type_name = payload.name or "Unknown"
 
-    print("Deleting node type: " .. node_type_name)
+    print("Deleting node type: " .. node_type_name .. " (ID: " .. node_type_id .. ")")
 
     local success = workflow_db.delete_node_type(node_type_id)
 

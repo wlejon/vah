@@ -559,8 +559,18 @@ local function init_editor()
     end
 end
 
+-- Track when to check for updates
+local last_reload_check = 0
+local reload_check_interval = 0.5 -- Check twice per second
+
 -- Main render function
 function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
+    -- Periodically check if node types were updated
+    if time - last_reload_check > reload_check_interval then
+        reload_node_types()
+        last_reload_check = time
+    end
+
     -- Store canvas position for mouse coordinate conversion
     editor.canvas_x = canvas_x
     editor.canvas_y = canvas_y
@@ -871,6 +881,76 @@ function handle_workflow_key(key, key_down)
             editor.selected_node = new_node.id
         end
     end
+end
+
+-- Reload node types from data store and update existing nodes
+function reload_node_types()
+    if not data or not data.get then
+        print("[Rendering] data.get() not available")
+        return
+    end
+
+    local new_node_types = data.get("node_types") or {}
+    print("[Rendering] Reloading " .. #new_node_types .. " node types from data store")
+
+    -- Update existing nodes in the scene to match their new type definitions
+    for _, node in ipairs(editor.nodes) do
+        if node.type_index and node.type_index <= #new_node_types then
+            local node_type = new_node_types[node.type_index]
+
+            -- Update node name and color
+            node.name = node_type.name
+            node.color = nvg.rgba(
+                node_type.color_r or 128,
+                node_type.color_g or 128,
+                node_type.color_b or 128,
+                node_type.color_a or 255
+            )
+
+            -- Update ports - this is trickier because we need to preserve connections
+            -- For now, we'll update the port names but keep the same count structure
+            -- TODO: In the future, might want to handle port additions/removals more gracefully
+
+            -- Update inputs
+            local old_input_count = #node.inputs
+            node.inputs = {}
+            for i, port_name in ipairs(node_type.inputs or {}) do
+                table.insert(node.inputs, port_name)
+            end
+
+            -- If inputs were removed, remove affected connections
+            if #node.inputs < old_input_count then
+                for i = #editor.connections, 1, -1 do
+                    local conn = editor.connections[i]
+                    if conn.to_node == node.id and conn.to_port > #node.inputs then
+                        table.remove(editor.connections, i)
+                    end
+                end
+            end
+
+            -- Update outputs
+            local old_output_count = #node.outputs
+            node.outputs = {}
+            for i, port_name in ipairs(node_type.outputs or {}) do
+                table.insert(node.outputs, port_name)
+            end
+
+            -- If outputs were removed, remove affected connections
+            if #node.outputs < old_output_count then
+                for i = #editor.connections, 1, -1 do
+                    local conn = editor.connections[i]
+                    if conn.from_node == node.id and conn.from_port > #node.outputs then
+                        table.remove(editor.connections, i)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Update the node_types table
+    node_types = new_node_types
+
+    print("[Rendering] Node types reloaded, updated " .. #editor.nodes .. " existing nodes")
 end
 
 -- Load node types from data store using data.get()
