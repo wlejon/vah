@@ -52,6 +52,13 @@ body {
     z-index: 10;
 }
 
+.button-group-header {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+}
+
 h1 {
     margin: 0;
     padding: 0;

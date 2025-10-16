@@ -117,7 +117,6 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
         int button = event.GetParameter<int>("button", 0);
         if (button >= 0 && button < 3) {
             mouse_buttons_[button] = true;
-            LOG_INFO("Canvas mouse button {} down at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
             CallLuaMouseClickHandler(button, true);
         }
     }
@@ -125,7 +124,6 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
         int button = event.GetParameter<int>("button", 0);
         if (button >= 0 && button < 3) {
             mouse_buttons_[button] = false;
-            LOG_INFO("Canvas mouse button {} up at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
             CallLuaMouseClickHandler(button, false);
         }
     }

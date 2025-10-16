@@ -14,7 +14,11 @@
         <div id="workflow-view" class="view active">
             <div class="header">
                 <h1>Visual Workflow Editor</h1>
-                <button class="config-btn" onclick="trigger('switch_to_node_editor', {})">Configure Node Types</button>
+                <div class="button-group-header">
+                    <button onclick="trigger('save_workflow')">Save</button>
+                    <button onclick="trigger('new_workflow')">New</button>
+                    <button class="config-btn" onclick="trigger('switch_to_node_editor')">Configure Node Types</button>
+                </div>
             </div>
             <div class="container">
                 <canvas id="workflow-canvas"
