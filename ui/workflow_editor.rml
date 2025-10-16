@@ -13,7 +13,9 @@
         <canvas id="workflow-canvas"
                 renderfunction="render_workflow"
                 keyhandler="handle_workflow_key"
-                mousehandler="handle_workflow_mouse"/>
+                mouseclickhandler="handle_workflow_click"
+                mousemovehandler="handle_workflow_move"
+                mousescrollhandler="handle_workflow_scroll"/>
     </div>
 </body>
 </rml>

@@ -36,4 +36,4 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-we've created a comprehensive binding of nanovg through the ElementCanvas. we have the tetris example to show what's implemented so far. we're looking for a comprehensive workflow node editor. we'll be building it in lua. please think through a canvas system (the visual side) and build the working visual side only worflow node editor. 
+we've built an example in tetris and workflow editor how to use the canvas. i'm working through issues with them. in the tetris example, the piece often moves multiple times when i click once. i think we're handling the same click for multiple frames sometimes. 

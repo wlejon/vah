@@ -64,8 +64,14 @@ private:
     // Call Lua keyboard handler if keyhandler attribute is set
     void CallLuaKeyHandler(const Rml::String& key_name, bool key_down);
 
-    // Call Lua mouse handler if mousehandler attribute is set
-    void CallLuaMouseHandler(int button, bool button_down);
+    // Call Lua mouse click handler - called on button down/up events only
+    void CallLuaMouseClickHandler(int button, bool button_down);
+
+    // Call Lua mouse move handler - called on move events
+    void CallLuaMouseMoveHandler();
+
+    // Call Lua mouse scroll handler - called on mouse wheel events
+    void CallLuaMouseScrollHandler(float wheel_x, float wheel_y);
 
     NVGcontext* nvg_context_;
     float time_; // Animation time

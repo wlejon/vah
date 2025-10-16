@@ -541,7 +541,7 @@ function render_tetris(nvg_ctx, x, y, w, h, time)
     end
 end
 
--- Mouse handler for rotation
+-- Mouse click handler for rotation (called only on button down/up, not during drag)
 function handle_tetris_mouse(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
     -- Only process left mouse button (0) down events
     if button ~= 0 or not button_down then

@@ -622,9 +622,9 @@ function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
             "Left: Select/Drag  |  Middle: Pan  |  Right: Create menu  |  Delete: Remove  |  1-7: Quick create")
 end
 
--- Mouse handler
+-- Mouse click handler (called on button down/up events only)
 -- Button: 0=left, 1=right, 2=middle
-function handle_workflow_mouse(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
+function handle_workflow_click(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
     -- Update mouse position relative to canvas
     editor.mouse_x = mouse_x - canvas_x
     editor.mouse_y = mouse_y - canvas_y
@@ -720,13 +720,6 @@ function handle_workflow_mouse(button, button_down, mouse_x, mouse_y, canvas_x, 
             end
 
             editor.dragging_node = nil
-
-        elseif button_down then
-            -- Left button drag
-            if editor.dragging_node then
-                editor.dragging_node.x = world_x - editor.mouse_drag_start_x
-                editor.dragging_node.y = world_y - editor.mouse_drag_start_y
-            end
         end
 
     -- MIDDLE MOUSE BUTTON - Canvas panning
@@ -740,13 +733,6 @@ function handle_workflow_mouse(button, button_down, mouse_x, mouse_y, canvas_x, 
         elseif not button_down and was_down then
             -- Middle button release
             editor.panning_canvas = false
-
-        elseif button_down then
-            -- Middle button drag - pan canvas
-            editor.pan_x = editor.pan_x + (editor.mouse_x - editor.mouse_drag_start_x)
-            editor.pan_y = editor.pan_y + (editor.mouse_y - editor.mouse_drag_start_y)
-            editor.mouse_drag_start_x = editor.mouse_x
-            editor.mouse_drag_start_y = editor.mouse_y
         end
 
     -- RIGHT MOUSE BUTTON - Context menu
@@ -775,6 +761,67 @@ function handle_workflow_mouse(button, button_down, mouse_x, mouse_y, canvas_x, 
                 break
             end
         end
+    end
+end
+
+-- Mouse move handler (called on all mouse movement)
+function handle_workflow_move(mouse_x, mouse_y, canvas_x, canvas_y, button_left, button_middle, button_right)
+    -- Update mouse position relative to canvas
+    editor.mouse_x = mouse_x - canvas_x
+    editor.mouse_y = mouse_y - canvas_y
+
+    local world_x, world_y = screen_to_world(editor.mouse_x, editor.mouse_y)
+
+    -- Handle dragging if left button is pressed
+    if button_left then
+        if editor.dragging_node then
+            editor.dragging_node.x = world_x - editor.mouse_drag_start_x
+            editor.dragging_node.y = world_y - editor.mouse_drag_start_y
+        end
+    end
+
+    -- Handle canvas panning if middle button is pressed
+    if button_middle then
+        if editor.panning_canvas then
+            editor.pan_x = editor.pan_x + (editor.mouse_x - editor.mouse_drag_start_x)
+            editor.pan_y = editor.pan_y + (editor.mouse_y - editor.mouse_drag_start_y)
+            editor.mouse_drag_start_x = editor.mouse_x
+            editor.mouse_drag_start_y = editor.mouse_y
+        end
+    end
+
+    -- Update hover state when not dragging
+    if not editor.dragging_node and not editor.dragging_connection then
+        editor.hovered_node = nil
+        editor.hovered_port = nil
+
+        for i = #editor.nodes, 1, -1 do
+            local node = editor.nodes[i]
+            if is_point_in_node(node, world_x, world_y) then
+                editor.hovered_node = node.id
+                local port = get_port_at_position(node, world_x, world_y)
+                if port then
+                    editor.hovered_port = port
+                end
+                break
+            end
+        end
+    end
+end
+
+-- Mouse scroll handler (mouse wheel zoom)
+function handle_workflow_scroll(wheel_x, wheel_y)
+    -- Zoom in/out with mouse wheel
+    -- Negative wheel_y = scroll up = zoom in
+    -- Positive wheel_y = scroll down = zoom out
+    local zoom_factor = 1.1
+
+    if wheel_y < 0 then
+        -- Zoom in
+        editor.zoom = math.min(editor.zoom * zoom_factor, 3.0)
+    elseif wheel_y > 0 then
+        -- Zoom out
+        editor.zoom = math.max(editor.zoom / zoom_factor, 0.3)
     end
 end
 

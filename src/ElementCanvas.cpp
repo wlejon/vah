@@ -76,6 +76,7 @@ void ElementCanvas::OnChildAdd(Rml::Element* element)
         AddEventListener(Rml::EventId::Mousedown, this);
         AddEventListener(Rml::EventId::Mouseup, this);
         AddEventListener(Rml::EventId::Mouseout, this);
+        AddEventListener(Rml::EventId::Mousescroll, this);
 
         // Register for keyboard events
         AddEventListener(Rml::EventId::Keydown, this);
@@ -95,6 +96,7 @@ void ElementCanvas::OnChildRemove(Rml::Element* element)
         RemoveEventListener(Rml::EventId::Mousedown, this);
         RemoveEventListener(Rml::EventId::Mouseup, this);
         RemoveEventListener(Rml::EventId::Mouseout, this);
+        RemoveEventListener(Rml::EventId::Mousescroll, this);
         RemoveEventListener(Rml::EventId::Keydown, this);
         RemoveEventListener(Rml::EventId::Keyup, this);
 
@@ -107,19 +109,16 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
     if (event == Rml::EventId::Mousemove) {
         mouse_pos_.x = event.GetParameter<float>("mouse_x", 0.0f);
         mouse_pos_.y = event.GetParameter<float>("mouse_y", 0.0f);
-        // Call mouse handler during move to enable dragging for any pressed button
-        for (int button = 0; button < 3; button++) {
-            if (mouse_buttons_[button]) {
-                CallLuaMouseHandler(button, true);
-            }
-        }
+
+        // Call mousemove handler if defined
+        CallLuaMouseMoveHandler();
     }
     else if (event == Rml::EventId::Mousedown) {
         int button = event.GetParameter<int>("button", 0);
         if (button >= 0 && button < 3) {
             mouse_buttons_[button] = true;
             LOG_INFO("Canvas mouse button {} down at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
-            CallLuaMouseHandler(button, true);
+            CallLuaMouseClickHandler(button, true);
         }
     }
     else if (event == Rml::EventId::Mouseup) {
@@ -127,7 +126,7 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
         if (button >= 0 && button < 3) {
             mouse_buttons_[button] = false;
             LOG_INFO("Canvas mouse button {} up at ({}, {})", button, mouse_pos_.x, mouse_pos_.y);
-            CallLuaMouseHandler(button, false);
+            CallLuaMouseClickHandler(button, false);
         }
     }
     else if (event == Rml::EventId::Mouseout) {
@@ -137,7 +136,7 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
                 LOG_INFO("Canvas mouse out while button {} down - releasing at ({}, {})",
                         button, mouse_pos_.x, mouse_pos_.y);
                 mouse_buttons_[button] = false;
-                CallLuaMouseHandler(button, false);
+                CallLuaMouseClickHandler(button, false);
             }
         }
     }
@@ -158,6 +157,11 @@ void ElementCanvas::ProcessEvent(Rml::Event& event)
         if (!key_name.empty()) {
             CallLuaKeyHandler(key_name, false);
         }
+    }
+    else if (event == Rml::EventId::Mousescroll) {
+        float wheel_x = event.GetParameter<float>("wheel_delta_x", 0.0f);
+        float wheel_y = event.GetParameter<float>("wheel_delta_y", 0.0f);
+        CallLuaMouseScrollHandler(wheel_x, wheel_y);
     }
 }
 
@@ -461,7 +465,7 @@ void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down
     }
 }
 
-void ElementCanvas::CallLuaMouseHandler(int button, bool button_down)
+void ElementCanvas::CallLuaMouseClickHandler(int button, bool button_down)
 {
     // Get the RmlUI Lua state
     lua_State* L = Rml::Lua::Interpreter::GetLuaState();
@@ -470,8 +474,8 @@ void ElementCanvas::CallLuaMouseHandler(int button, bool button_down)
         return;
     }
 
-    // Get the mousehandler attribute
-    const Rml::Variant* handler_attr = GetAttribute("mousehandler");
+    // Get the mouseclickhandler attribute
+    const Rml::Variant* handler_attr = GetAttribute("mouseclickhandler");
     if (!handler_attr) {
         return;
     }
@@ -486,7 +490,7 @@ void ElementCanvas::CallLuaMouseHandler(int button, bool button_down)
 
     // Check if it's a function
     if (!lua_isfunction(L, -1)) {
-        LOG_WARN("ElementCanvas: mousehandler attribute '{}' is not a valid Lua function", handler_func);
+        LOG_WARN("ElementCanvas: mouseclickhandler '{}' is not a valid Lua function", handler_func);
         lua_pop(L, 1);
         return;
     }
@@ -506,7 +510,102 @@ void ElementCanvas::CallLuaMouseHandler(int button, bool button_down)
     // Call the function with 6 arguments, 0 return values
     if (lua_pcall(L, 6, 0, 0) != LUA_OK) {
         const char* error = lua_tostring(L, -1);
-        LOG_ERROR("ElementCanvas: Error calling Lua mouse handler '{}': {}", handler_func, error);
+        LOG_ERROR("ElementCanvas: Error calling mouseclickhandler '{}': {}", handler_func, error);
+        lua_pop(L, 1);
+    }
+}
+
+void ElementCanvas::CallLuaMouseMoveHandler()
+{
+    // Get the RmlUI Lua state
+    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+    if (!L) {
+        LOG_ERROR("ElementCanvas: RmlUI Lua state not available");
+        return;
+    }
+
+    // Get the mousemovehandler attribute
+    const Rml::Variant* handler_attr = GetAttribute("mousemovehandler");
+    if (!handler_attr) {
+        // No mousemove handler defined - that's okay, not all canvases need it
+        return;
+    }
+
+    Rml::String handler_func = handler_attr->Get<Rml::String>();
+    if (handler_func.empty()) {
+        return;
+    }
+
+    // Get the Lua function from global scope
+    lua_getglobal(L, handler_func.c_str());
+
+    // Check if it's a function
+    if (!lua_isfunction(L, -1)) {
+        LOG_WARN("ElementCanvas: mousemove handler '{}' is not a valid Lua function", handler_func);
+        lua_pop(L, 1);
+        return;
+    }
+
+    // Get canvas absolute position for coordinate conversion
+    Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
+
+    // Push arguments: mouse_x, mouse_y, canvas_x, canvas_y,
+    //                 button_left (0), button_middle (1), button_right (2)
+    lua_pushnumber(L, mouse_pos_.x);
+    lua_pushnumber(L, mouse_pos_.y);
+    lua_pushnumber(L, absolute_offset.x);
+    lua_pushnumber(L, absolute_offset.y);
+    lua_pushboolean(L, mouse_buttons_[0]);  // left
+    lua_pushboolean(L, mouse_buttons_[1]);  // middle
+    lua_pushboolean(L, mouse_buttons_[2]);  // right
+
+    // Call the function with 7 arguments, 0 return values
+    if (lua_pcall(L, 7, 0, 0) != LUA_OK) {
+        const char* error = lua_tostring(L, -1);
+        LOG_ERROR("ElementCanvas: Error calling Lua mousemove handler '{}': {}", handler_func, error);
+        lua_pop(L, 1);
+    }
+}
+
+void ElementCanvas::CallLuaMouseScrollHandler(float wheel_x, float wheel_y)
+{
+    // Get the RmlUI Lua state
+    lua_State* L = Rml::Lua::Interpreter::GetLuaState();
+    if (!L) {
+        LOG_ERROR("ElementCanvas: RmlUI Lua state not available");
+        return;
+    }
+
+    // Get the mousescrollhandler attribute
+    const Rml::Variant* handler_attr = GetAttribute("mousescrollhandler");
+    if (!handler_attr) {
+        // No scroll handler defined - that's okay, not all canvases need it
+        return;
+    }
+
+    Rml::String handler_func = handler_attr->Get<Rml::String>();
+    if (handler_func.empty()) {
+        return;
+    }
+
+    // Get the Lua function from global scope
+    lua_getglobal(L, handler_func.c_str());
+
+    // Check if it's a function
+    if (!lua_isfunction(L, -1)) {
+        LOG_WARN("ElementCanvas: mousescrollhandler '{}' is not a valid Lua function", handler_func);
+        lua_pop(L, 1);
+        return;
+    }
+
+    // Push arguments: wheel_x (horizontal scroll), wheel_y (vertical scroll)
+    lua_pushnumber(L, wheel_x);
+    lua_pushnumber(L, wheel_y);
+
+    // Call the function with 2 arguments, 0 return values
+    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+        const char* error = lua_tostring(L, -1);
+        LOG_ERROR("ElementCanvas: Error calling mousescrollhandler '{}': {}", handler_func, error);
         lua_pop(L, 1);
     }
 }
