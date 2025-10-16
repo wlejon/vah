@@ -52,6 +52,85 @@ namespace {
         return 0;  // No return values
     }
 
+    // Lua callback for data.update_row() function
+    // Updates an entire row in the DataStore immediately (main thread only)
+    int lua_data_update_row(lua_State* L) {
+        if (!g_data_store) {
+            return luaL_error(L, "data.update_row() called but data store not available");
+        }
+
+        // Arguments: model_name, row_index, updates_table
+        if (!lua_isstring(L, 1)) {
+            return luaL_error(L, "data.update_row() arg 1: model name (string) required");
+        }
+        if (!lua_isnumber(L, 2)) {
+            return luaL_error(L, "data.update_row() arg 2: row index (number) required");
+        }
+        if (!lua_istable(L, 3)) {
+            return luaL_error(L, "data.update_row() arg 3: updates table required");
+        }
+
+        std::string model_name = lua_tostring(L, 1);
+        int row_index = static_cast<int>(lua_tonumber(L, 2)) - 1;  // Lua is 1-indexed
+
+        // Get the current model data
+        auto model_data = g_data_store->GetModel(model_name);
+        if (!model_data) {
+            return luaL_error(L, "data.update_row(): model '%s' not found", model_name.c_str());
+        }
+
+        // Create a mutable copy
+        DynamicTable mutable_data = *model_data;
+
+        if (row_index < 0 || row_index >= static_cast<int>(mutable_data.size())) {
+            return luaL_error(L, "data.update_row(): row index %d out of bounds (size: %d)",
+                            row_index + 1, static_cast<int>(mutable_data.size()));
+        }
+
+        // Iterate through the updates table and apply to the row
+        lua_pushnil(L);  // First key
+        while (lua_next(L, 3) != 0) {
+            // Key at -2, value at -1
+            if (lua_isstring(L, -2)) {
+                std::string field_name = lua_tostring(L, -2);
+
+                // Convert Lua value to DynamicValue
+                DynamicValue new_value;
+                if (lua_isnil(L, -1)) {
+                    new_value = std::monostate{};
+                } else if (lua_isboolean(L, -1)) {
+                    new_value = static_cast<bool>(lua_toboolean(L, -1));
+                } else if (lua_isinteger(L, -1)) {
+                    new_value = static_cast<int64_t>(lua_tointeger(L, -1));
+                } else if (lua_isnumber(L, -1)) {
+                    new_value = lua_tonumber(L, -1);
+                } else if (lua_isstring(L, -1)) {
+                    new_value = std::string(lua_tostring(L, -1));
+                }
+
+                // Update the field
+                mutable_data[row_index][field_name] = new_value;
+            }
+            lua_pop(L, 1);  // Remove value, keep key for next iteration
+        }
+
+        // Write back to DataStore
+        g_data_store->SetModel(model_name, mutable_data);
+
+        // Dirty the model in RmlUi to trigger re-render
+        if (g_bridge && g_bridge->GetContext()) {
+            auto model_constructor = g_bridge->GetContext()->GetDataModel(model_name);
+            if (model_constructor) {
+                auto model_handle = model_constructor.GetModelHandle();
+                if (model_handle) {
+                    model_handle.DirtyVariable(model_name);
+                }
+            }
+        }
+
+        return 0;  // No return values
+    }
+
     // Lua callback for data.get() function
     int lua_data_get(lua_State* L) {
         if (!g_data_store) {
@@ -151,10 +230,12 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     lua_pushcfunction(L, lua_trigger);
     lua_setglobal(L, "trigger");
 
-    // Create data table with get() function
+    // Create data table with get() and update_row() functions
     lua_newtable(L);
     lua_pushcfunction(L, lua_data_get);
     lua_setfield(L, -2, "get");
+    lua_pushcfunction(L, lua_data_update_row);
+    lua_setfield(L, -2, "update_row");
     lua_setglobal(L, "data");
 
     // Expose the context as a global for RML inline scripts to use

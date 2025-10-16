@@ -15,20 +15,24 @@ local reload_check_interval = 0.5
 local last_workflow_sync = 0
 local workflow_sync_interval = 0.1
 
--- Sync workflow state from data bindings (called periodically)
-local function sync_workflow_from_bindings()
+-- Build renderable nodes from server data
+local function build_nodes_from_server()
     if not editor or not data or not data.get then
         return
     end
 
-    local workflow_nodes = data.get("workflow_nodes")
-    local workflow_connections = data.get("workflow_connections")
-
-    if not workflow_nodes or not workflow_connections then
+    -- Don't refresh if we're currently dragging
+    if editor.dragging_node then
         return
     end
 
-    -- Rebuild nodes from bound data
+    local workflow_nodes = data.get("workflow_nodes")
+    if not workflow_nodes then
+        editor.nodes = {}
+        return
+    end
+
+    -- Rebuild nodes from server data with full type information for rendering
     local new_nodes = {}
     local max_id = 0
 
@@ -59,7 +63,21 @@ local function sync_workflow_from_bindings()
 
     editor.nodes = new_nodes
     editor.next_node_id = max_id + 1
-    editor.connections = workflow_connections or {}
+end
+
+-- Get connections from server data
+local function get_connections_from_server()
+    if not data or not data.get then
+        return {}
+    end
+
+    -- Don't refresh if we're currently dragging
+    if editor.dragging_node then
+        return editor.connections or {}
+    end
+
+    local workflow_connections = data.get("workflow_connections")
+    return workflow_connections or {}
 end
 
 -- Reload node types from data store
@@ -105,11 +123,9 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
         last_reload_check = time
     end
 
-    -- Periodically sync workflow state from bindings
-    if time - last_workflow_sync > workflow_sync_interval then
-        sync_workflow_from_bindings()
-        last_workflow_sync = time
-    end
+    -- Refresh from server when not dragging
+    build_nodes_from_server()
+    editor.connections = get_connections_from_server()
 
     -- Store canvas position for mouse coordinate conversion
     editor.canvas_x = canvas_x
@@ -156,16 +172,21 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
             "Left: Select/Drag  |  Middle: Pan  |  Right: Create menu  |  Delete: Remove  |  1-7: Quick create")
 end
 
+-- Removed sync_to_bindings - client doesn't have data.bind()
+-- Server is source of truth, client just reads via data.get()
+
 -- Mouse click handler
 local function handle_workflow_click(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
     if not editor then return end
     input.handle_click(editor, node_types, button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
+    -- No sync needed - input handlers trigger events to server
 end
 
 -- Mouse move handler
 local function handle_workflow_move(mouse_x, mouse_y, canvas_x, canvas_y, button_left, button_middle, button_right)
     if not editor then return end
     input.handle_move(editor, mouse_x, mouse_y, canvas_x, canvas_y, button_left, button_middle, button_right)
+    -- No sync during drag - update is sent on mouse release
 end
 
 -- Mouse scroll handler
@@ -178,6 +199,7 @@ end
 local function handle_workflow_key(key, key_down)
     if not editor then return end
     input.handle_key(editor, node_types, key, key_down)
+    -- No sync needed - input handlers trigger events to server
 end
 
 -- Export public API

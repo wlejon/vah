@@ -13,10 +13,12 @@
         <!-- Workflow Editor View -->
         <div id="workflow-view" class="view active">
             <div class="header">
-                <h1>Visual Workflow Editor</h1>
+                <div class="workflow-info" data-model="active_workflow" data-if="active_workflow.size > 0" data-for="wf,i : active_workflow">
+                    <h1>{{ wf.name }}</h1>
+                </div>
                 <div class="button-group-header">
-                    <button onclick="trigger('save_workflow')">Save</button>
-                    <button onclick="trigger('new_workflow')">New</button>
+                    <button onclick="trigger('switch_to_workflow_list')">Workflows</button>
+                    <button onclick="trigger('new_workflow')">New Workflow</button>
                     <button class="config-btn" onclick="trigger('switch_to_node_editor')">Configure Node Types</button>
                 </div>
             </div>
@@ -27,6 +29,29 @@
                         mouseclickhandler="handle_workflow_click"
                         mousemovehandler="handle_workflow_move"
                         mousescrollhandler="handle_workflow_scroll"/>
+            </div>
+        </div>
+
+        <!-- Workflow List View -->
+        <div id="workflow-list-view" class="view">
+            <div class="header">
+                <button class="back-btn" onclick="trigger('switch_to_workflow', {})">← Back to Workflow</button>
+                <h1>My Workflows</h1>
+                <button onclick="trigger('new_workflow', {})">+ New Workflow</button>
+            </div>
+
+            <div class="main-container">
+                <div class="workflows-list">
+                    <div class="workflows-container" data-model="workflows" data-for="workflow,i : workflows">
+                        <div class="workflow-item" data-attr-data-row-index="i">
+                            <div class="workflow-item-content" data-event-click="trigger('select_workflow')">
+                                <h3>{{ workflow.name }}</h3>
+                                <p class="workflow-meta">Updated: {{ workflow.updated_at }}</p>
+                            </div>
+                            <button class="delete-btn" data-event-click="trigger('delete_workflow')">×</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

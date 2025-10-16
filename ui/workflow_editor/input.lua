@@ -88,8 +88,24 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
         elseif not button_down and was_down then
             -- Left button release
 
-            -- If we were dragging a node, trigger node moved event
+            -- If we were dragging a node, update DataStore immediately and trigger server event
             if editor.dragging_node then
+                -- Find the row in workflow_nodes that matches this node_id
+                local workflow_nodes = data.get("workflow_nodes")
+                if workflow_nodes then
+                    for i, node in ipairs(workflow_nodes) do
+                        if node.id == editor.dragging_node.id then
+                            -- Update this row in the DataStore immediately
+                            data.update_row("workflow_nodes", i, {
+                                x = editor.dragging_node.x,
+                                y = editor.dragging_node.y
+                            })
+                            break
+                        end
+                    end
+                end
+
+                -- Trigger server event to persist to database
                 trigger('workflow_node_moved', {
                     node_id = editor.dragging_node.id,
                     x = editor.dragging_node.x,

@@ -55,6 +55,58 @@ function M.init()
         return false
     end
 
+    -- Create workflows table
+    success, exec_error = db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS workflows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ]])
+
+    if not success then
+        print("Error creating workflows table: " .. exec_error)
+        return false
+    end
+
+    -- Create workflow_nodes table
+    success, exec_error = db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS workflow_nodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workflow_id INTEGER NOT NULL,
+            node_id INTEGER NOT NULL,
+            node_type_id INTEGER NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
+            FOREIGN KEY (node_type_id) REFERENCES node_types(id)
+        )
+    ]])
+
+    if not success then
+        print("Error creating workflow_nodes table: " .. exec_error)
+        return false
+    end
+
+    -- Create workflow_connections table
+    success, exec_error = db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS workflow_connections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workflow_id INTEGER NOT NULL,
+            from_node INTEGER NOT NULL,
+            from_port INTEGER NOT NULL,
+            to_node INTEGER NOT NULL,
+            to_port INTEGER NOT NULL,
+            FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating workflow_connections table: " .. exec_error)
+        return false
+    end
+
     -- Check if we need to add sample data
     local count_result, count_error = db_handle:query("SELECT COUNT(*) as count FROM node_types")
     if count_error ~= "" then
@@ -306,6 +358,315 @@ function M.close()
         db_handle = nil
         M.db_handle = nil
     end
+end
+
+-- ============================================
+-- Workflow Management Functions
+-- ============================================
+
+-- Create a new workflow
+function M.create_workflow(name)
+    if not db_handle then
+        print("Database not initialized")
+        return nil
+    end
+
+    local escaped_name = name:gsub("'", "''")
+
+    local sql = string.format([[
+        INSERT INTO workflows (name)
+        VALUES ('%s')
+    ]], escaped_name)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error creating workflow: " .. error)
+        return nil
+    end
+
+    return db_handle:last_insert_rowid()
+end
+
+-- Get all workflows
+function M.get_workflows()
+    if not db_handle then
+        print("Database not initialized")
+        return {}
+    end
+
+    local results, error = db_handle:query([[
+        SELECT id, name, created_at, updated_at
+        FROM workflows
+        ORDER BY updated_at DESC
+    ]])
+
+    if error ~= "" then
+        print("Error loading workflows: " .. error)
+        return {}
+    end
+
+    return results or {}
+end
+
+-- Update workflow name
+function M.update_workflow(id, name)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    local escaped_name = name:gsub("'", "''")
+
+    local sql = string.format([[
+        UPDATE workflows
+        SET name = '%s', updated_at = CURRENT_TIMESTAMP
+        WHERE id = %d
+    ]], escaped_name, id)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error updating workflow: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Delete a workflow
+function M.delete_workflow(id)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    local sql = string.format("DELETE FROM workflows WHERE id = %d", id)
+    local success, error = db_handle:execute(sql)
+
+    if not success then
+        print("Error deleting workflow: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Save workflow state (nodes and connections)
+function M.save_workflow(workflow_id, nodes, connections)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    -- Clear existing nodes and connections for this workflow
+    db_handle:execute(string.format("DELETE FROM workflow_nodes WHERE workflow_id = %d", workflow_id))
+    db_handle:execute(string.format("DELETE FROM workflow_connections WHERE workflow_id = %d", workflow_id))
+
+    -- Save nodes
+    for _, node in ipairs(nodes) do
+        local sql = string.format([[
+            INSERT INTO workflow_nodes (workflow_id, node_id, node_type_id, x, y)
+            VALUES (%d, %d, %d, %f, %f)
+        ]], workflow_id, node.id, node.type_index, node.x, node.y)
+
+        local success, error = db_handle:execute(sql)
+        if not success then
+            print("Error saving workflow node: " .. error)
+            return false
+        end
+    end
+
+    -- Save connections
+    for _, conn in ipairs(connections) do
+        local sql = string.format([[
+            INSERT INTO workflow_connections (workflow_id, from_node, from_port, to_node, to_port)
+            VALUES (%d, %d, %d, %d, %d)
+        ]], workflow_id, conn.from_node, conn.from_port, conn.to_node, conn.to_port)
+
+        local success, error = db_handle:execute(sql)
+        if not success then
+            print("Error saving workflow connection: " .. error)
+            return false
+        end
+    end
+
+    -- Update timestamp
+    db_handle:execute(string.format([[
+        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
+    ]], workflow_id))
+
+    return true
+end
+
+-- Add a single node to a workflow
+function M.add_node(workflow_id, node_id, node_type_id, x, y)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    local sql = string.format([[
+        INSERT INTO workflow_nodes (workflow_id, node_id, node_type_id, x, y)
+        VALUES (%d, %d, %d, %f, %f)
+    ]], workflow_id, node_id, node_type_id, x, y)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error adding workflow node: " .. error)
+        return false
+    end
+
+    -- Update workflow timestamp
+    db_handle:execute(string.format([[
+        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
+    ]], workflow_id))
+
+    return true
+end
+
+-- Update a node's position
+function M.update_node_position(workflow_id, node_id, x, y)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    local sql = string.format([[
+        UPDATE workflow_nodes
+        SET x = %f, y = %f
+        WHERE workflow_id = %d AND node_id = %d
+    ]], x, y, workflow_id, node_id)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error updating node position: " .. error)
+        return false
+    end
+
+    -- Update workflow timestamp
+    db_handle:execute(string.format([[
+        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
+    ]], workflow_id))
+
+    return true
+end
+
+-- Delete a node from a workflow
+function M.delete_node(workflow_id, node_id)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    -- Delete the node
+    local sql = string.format([[
+        DELETE FROM workflow_nodes WHERE workflow_id = %d AND node_id = %d
+    ]], workflow_id, node_id)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error deleting workflow node: " .. error)
+        return false
+    end
+
+    -- Delete connections involving this node
+    db_handle:execute(string.format([[
+        DELETE FROM workflow_connections WHERE workflow_id = %d AND (from_node = %d OR to_node = %d)
+    ]], workflow_id, node_id, node_id))
+
+    -- Update workflow timestamp
+    db_handle:execute(string.format([[
+        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
+    ]], workflow_id))
+
+    return true
+end
+
+-- Add a connection to a workflow
+function M.add_connection(workflow_id, from_node, from_port, to_node, to_port)
+    if not db_handle then
+        print("Database not initialized")
+        return false
+    end
+
+    local sql = string.format([[
+        INSERT INTO workflow_connections (workflow_id, from_node, from_port, to_node, to_port)
+        VALUES (%d, %d, %d, %d, %d)
+    ]], workflow_id, from_node, from_port, to_node, to_port)
+
+    local success, error = db_handle:execute(sql)
+    if not success then
+        print("Error adding workflow connection: " .. error)
+        return false
+    end
+
+    -- Update workflow timestamp
+    db_handle:execute(string.format([[
+        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
+    ]], workflow_id))
+
+    return true
+end
+
+-- Load workflow state (nodes and connections)
+function M.load_workflow(workflow_id)
+    if not db_handle then
+        print("Database not initialized")
+        return nil, nil
+    end
+
+    -- Load nodes
+    local nodes_result, nodes_error = db_handle:query(string.format([[
+        SELECT node_id, node_type_id, x, y
+        FROM workflow_nodes
+        WHERE workflow_id = %d
+        ORDER BY id
+    ]], workflow_id))
+
+    if nodes_error ~= "" then
+        print("Error loading workflow nodes: " .. nodes_error)
+        return nil, nil
+    end
+
+    -- Load connections
+    local conns_result, conns_error = db_handle:query(string.format([[
+        SELECT from_node, from_port, to_node, to_port
+        FROM workflow_connections
+        WHERE workflow_id = %d
+        ORDER BY id
+    ]], workflow_id))
+
+    if conns_error ~= "" then
+        print("Error loading workflow connections: " .. conns_error)
+        return nil, nil
+    end
+
+    -- Transform nodes to match expected format
+    local nodes = {}
+    if nodes_result then
+        for _, node in ipairs(nodes_result) do
+            table.insert(nodes, {
+                id = node.node_id,
+                type_index = node.node_type_id,
+                x = node.x,
+                y = node.y
+            })
+        end
+    end
+
+    -- Transform connections to match expected format
+    local connections = {}
+    if conns_result then
+        for _, conn in ipairs(conns_result) do
+            table.insert(connections, {
+                from_node = conn.from_node,
+                from_port = conn.from_port,
+                to_node = conn.to_node,
+                to_port = conn.to_port
+            })
+        end
+    end
+
+    return nodes, connections
 end
 
 return M

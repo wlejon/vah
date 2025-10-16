@@ -171,6 +171,34 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                     }
                 }
 
+                // UPDATE MAIN THREAD DATA IMMEDIATELY
+                // If we have a data context, update the DataStore with the merged payload
+                // This ensures the UI reflects user changes immediately, before server responds
+                if (!context_model.empty() && context_row != -1) {
+                    auto model_data = data_store_->GetModel(context_model);
+                    if (model_data && context_row >= 0 && context_row < static_cast<int>(model_data->size())) {
+                        // Create mutable copy
+                        DynamicTable mutable_data = *model_data;
+
+                        // Update the row with all payload fields
+                        for (const auto& [key, value] : payload) {
+                            mutable_data[context_row][key] = value;
+                        }
+
+                        // Write back to DataStore
+                        data_store_->SetModel(context_model, mutable_data);
+
+                        // Dirty the model to trigger re-render
+                        auto it_handle = data_model_handles_.find(context_model);
+                        if (it_handle != data_model_handles_.end()) {
+                            it_handle->second.DirtyVariable(context_model);
+                        }
+
+                        LOG_DEBUG("trigger('{}') updated main thread DataStore for model '{}' row {}",
+                                 event_name, context_model, context_row);
+                    }
+                }
+
                 // Enqueue to UIEvent queue for Lua threads to consume
                 UIEvent ui_event{event_name, payload};
                 ui_event_queue_->enqueue(std::move(ui_event));

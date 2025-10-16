@@ -14,6 +14,14 @@ local editor = {
     selected_node = nil
 }
 
+-- Active workflow state
+local active_workflow = {
+    id = nil,
+    name = nil
+}
+
+local workflows_list = {}
+
 -- ============================================
 -- Shared Functions
 -- ============================================
@@ -59,6 +67,251 @@ local function load_node_types()
 end
 
 -- ============================================
+-- Workflow Management Functions
+-- ============================================
+
+-- Load all workflows from database
+local function load_workflows()
+    if not database_initialized then
+        return
+    end
+
+    workflows_list = workflow_db.get_workflows()
+    print("Loaded " .. #workflows_list .. " workflows")
+
+    -- Bind to UI
+    data.bind("workflows", workflows_list)
+end
+
+-- Create a new workflow
+local function create_new_workflow(payload)
+    if not database_initialized then
+        return
+    end
+
+    local workflow_id = workflow_db.create_workflow("New Workflow")
+    if workflow_id then
+        print("Created new workflow with ID: " .. workflow_id)
+
+        -- Reload workflows list
+        load_workflows()
+
+        -- Switch to the new workflow
+        select_workflow({id = workflow_id})
+    else
+        print("ERROR: Failed to create new workflow")
+    end
+end
+
+-- Select and load a workflow
+function select_workflow(payload)
+    if not database_initialized then
+        return
+    end
+
+    local workflow_id = payload.id
+    if not workflow_id then
+        print("ERROR: No workflow_id in select_workflow payload")
+        return
+    end
+
+    -- Load workflow from database
+    local nodes, connections = workflow_db.load_workflow(workflow_id)
+    if nodes == nil then
+        print("ERROR: Failed to load workflow")
+        return
+    end
+
+    -- Update active workflow
+    active_workflow.id = workflow_id
+
+    -- Find workflow name
+    for _, wf in ipairs(workflows_list) do
+        if wf.id == workflow_id then
+            active_workflow.name = wf.name
+            break
+        end
+    end
+
+    print("Loaded workflow: " .. (active_workflow.name or "Unknown") .. " (ID: " .. workflow_id .. ")")
+    print("  Nodes: " .. #nodes .. ", Connections: " .. #connections)
+
+    -- Bind workflow data to make it available to workflow editor
+    -- Include a timestamp to force client to reinitialize
+    data.bind("workflow_nodes", nodes)
+    data.bind("workflow_connections", connections)
+    data.bind("active_workflow", {active_workflow})
+    data.bind("workflow_reload_trigger", {timestamp = os.time()})
+end
+
+
+-- Rename the active workflow
+local function rename_workflow(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    local new_name = payload.name or "Unnamed Workflow"
+
+    local success = workflow_db.update_workflow(active_workflow.id, new_name)
+    if success then
+        active_workflow.name = new_name
+        data.bind("active_workflow", {active_workflow})
+        load_workflows()
+        print("Renamed workflow to: " .. new_name)
+    else
+        print("ERROR: Failed to rename workflow")
+    end
+end
+
+-- Delete a workflow
+local function delete_workflow(payload)
+    if not database_initialized then
+        return
+    end
+
+    local workflow_id = payload.id
+    if not workflow_id then
+        print("ERROR: No workflow_id in delete_workflow payload")
+        return
+    end
+
+    local success = workflow_db.delete_workflow(workflow_id)
+    if success then
+        print("Deleted workflow ID: " .. workflow_id)
+
+        -- If this was the active workflow, clear it
+        if active_workflow.id == workflow_id then
+            active_workflow.id = nil
+            active_workflow.name = nil
+            data.bind("active_workflow", {})
+            data.bind("workflow_nodes", {})
+            data.bind("workflow_connections", {})
+        end
+
+        -- Reload workflows list
+        load_workflows()
+    else
+        print("ERROR: Failed to delete workflow")
+    end
+end
+
+-- Workflow change event handlers - update database and push to client
+local function on_workflow_node_created(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    print("on_workflow_node_created payload:")
+    for k, v in pairs(payload) do
+        print("  " .. k .. " = " .. tostring(v))
+    end
+
+    -- Add node to database
+    local success = workflow_db.add_node(
+        active_workflow.id,
+        payload.node_id,
+        payload.type_index,
+        payload.x,
+        payload.y
+    )
+
+    if not success then
+        print("ERROR: Failed to add node to database")
+        return
+    end
+
+    -- Reload workflow from database and push to client
+    local nodes, connections = workflow_db.load_workflow(active_workflow.id)
+    if nodes then
+        data.bind("workflow_nodes", nodes)
+        data.bind("workflow_connections", connections)
+        print("Added node to database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
+    end
+end
+
+local function on_workflow_node_moved(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    -- Update node position in database
+    local success = workflow_db.update_node_position(
+        active_workflow.id,
+        payload.node_id,
+        payload.x,
+        payload.y
+    )
+
+    if not success then
+        print("ERROR: Failed to update node position in database")
+        return
+    end
+
+    -- Reload workflow from database and push to client
+    local nodes, connections = workflow_db.load_workflow(active_workflow.id)
+    if nodes then
+        data.bind("workflow_nodes", nodes)
+        data.bind("workflow_connections", connections)
+    end
+end
+
+local function on_workflow_node_deleted(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    -- Delete node from database (also deletes related connections)
+    local success = workflow_db.delete_node(active_workflow.id, payload.node_id)
+
+    if not success then
+        print("ERROR: Failed to delete node from database")
+        return
+    end
+
+    -- Reload workflow from database and push to client
+    local nodes, connections = workflow_db.load_workflow(active_workflow.id)
+    if nodes then
+        data.bind("workflow_nodes", nodes)
+        data.bind("workflow_connections", connections)
+        print("Deleted node from database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
+    end
+end
+
+local function on_workflow_connection_added(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    -- Add connection to database
+    local success = workflow_db.add_connection(
+        active_workflow.id,
+        payload.from_node,
+        payload.from_port,
+        payload.to_node,
+        payload.to_port
+    )
+
+    if not success then
+        print("ERROR: Failed to add connection to database")
+        return
+    end
+
+    -- Reload workflow from database and push to client
+    local nodes, connections = workflow_db.load_workflow(active_workflow.id)
+    if nodes then
+        data.bind("workflow_nodes", nodes)
+        data.bind("workflow_connections", connections)
+        print("Added connection to database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
+    end
+end
+
+-- ============================================
 -- View Switching Functions
 -- ============================================
 
@@ -68,17 +321,32 @@ local function switch_to_workflow(payload)
     -- Reload node types from database (in case they were modified)
     load_node_types()
 
-    -- Hide node editor view
+    -- Hide other views
     ui.remove_element_class("node-editor-view", "active")
+    ui.remove_element_class("workflow-list-view", "active")
     -- Show workflow view
     ui.add_element_class("workflow-view", "active")
+end
+
+local function switch_to_workflow_list(payload)
+    print("Switching to workflow list view")
+
+    -- Reload workflows from database
+    load_workflows()
+
+    -- Hide other views
+    ui.remove_element_class("workflow-view", "active")
+    ui.remove_element_class("node-editor-view", "active")
+    -- Show workflow list view
+    ui.add_element_class("workflow-list-view", "active")
 end
 
 local function switch_to_node_editor(payload)
     print("Switching to node type editor view")
 
-    -- Hide workflow view
+    -- Hide other views
     ui.remove_element_class("workflow-view", "active")
+    ui.remove_element_class("workflow-list-view", "active")
     -- Show node editor view
     ui.add_element_class("node-editor-view", "active")
 end
@@ -201,19 +469,19 @@ local function save_node_type(payload)
     local inputs = {}
     local outputs = {}
 
-    -- The payload will have input_port_1, input_port_2, etc. for tracked inputs
+    -- The payload will have input_port_0, input_port_1, etc. for tracked inputs (0-based from RmlUi)
     -- and the original inputs/outputs arrays
     -- We need to check which ports exist and get their current values
     if editor.selected_node then
-        -- Build inputs array from tracked values
+        -- Build inputs array from tracked values (RmlUi uses 0-based indexing)
         for i = 1, #editor.selected_node.inputs do
-            local port_name = payload["input_port_" .. i] or editor.selected_node.inputs[i]
+            local port_name = payload["input_port_" .. (i - 1)] or editor.selected_node.inputs[i]
             table.insert(inputs, port_name)
         end
 
-        -- Build outputs array from tracked values
+        -- Build outputs array from tracked values (RmlUi uses 0-based indexing)
         for i = 1, #editor.selected_node.outputs do
-            local port_name = payload["output_port_" .. i] or editor.selected_node.outputs[i]
+            local port_name = payload["output_port_" .. (i - 1)] or editor.selected_node.outputs[i]
             table.insert(outputs, port_name)
         end
     end
@@ -243,14 +511,16 @@ local function save_node_type(payload)
         workflow_db.add_port(node_id, port_name, "output", i)
     end
 
-    -- Reload node types to reflect changes
+    -- Reload node types from database to get the updated values
     load_node_types()
 
-    -- Re-select the same node
+    -- Re-select the same node and bind it
+    -- This ensures both node_types and selected_node models are in sync
     for i, nt in ipairs(editor.node_types) do
         if nt.id == node_id then
             editor.selected_index = i
             editor.selected_node = editor.node_types[i]
+            -- Update selected_node binding with fresh database values
             data.bind("selected_node", {editor.selected_node})
             break
         end
@@ -301,7 +571,20 @@ function startup()
 
     -- Register event handlers for view switching
     event.register("switch_to_workflow", switch_to_workflow)
+    event.register("switch_to_workflow_list", switch_to_workflow_list)
     event.register("switch_to_node_editor", switch_to_node_editor)
+
+    -- Register event handlers for workflow management
+    event.register("new_workflow", create_new_workflow)
+    event.register("select_workflow", select_workflow)
+    event.register("rename_workflow", rename_workflow)
+    event.register("delete_workflow", delete_workflow)
+
+    -- Register workflow change event handlers (auto-persist to database)
+    event.register("workflow_node_created", on_workflow_node_created)
+    event.register("workflow_node_moved", on_workflow_node_moved)
+    event.register("workflow_node_deleted", on_workflow_node_deleted)
+    event.register("workflow_connection_added", on_workflow_connection_added)
 
     -- Register event handlers for node type editor
     event.register("select_node_type", select_node_type)
@@ -315,16 +598,36 @@ function startup()
 
     -- Initialize data bindings
     data.bind("selected_node", {})
+    data.bind("workflows", {})
+    data.bind("active_workflow", {})
+    data.bind("workflow_nodes", {})
+    data.bind("workflow_connections", {})
 
     -- Load node types from database
     load_node_types()
+
+    -- Load workflows from database
+    load_workflows()
+
+    -- Create a default workflow if none exists
+    if #workflows_list == 0 then
+        print("No workflows found, creating default workflow...")
+        local workflow_id = workflow_db.create_workflow("My First Workflow")
+        if workflow_id then
+            load_workflows()
+            select_workflow({id = workflow_id})
+        end
+    else
+        -- Load the most recently updated workflow
+        select_workflow({id = workflows_list[1].id})
+    end
 
     -- Load the unified UI
     ui.load_document("ui/workflow_app.rml", true, "workflow_app")
 end
 
 function update(dt)
-    -- Nothing to update continuously
+    -- No update logic needed - changes are automatically persisted to database
 end
 
 function shutdown()

@@ -345,3 +345,95 @@ input[type="text"]:focus {
 .save-btn:active {
     background-color: #3ab43a;
 }
+
+/* ============================================ */
+/* Workflow List View Styles */
+/* ============================================ */
+
+#workflow-list-view .main-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    position: absolute;
+    top: 40px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.workflows-list {
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.workflows-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.workflow-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background-color: #2d2f33;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.workflow-item:hover {
+    background-color: #353739;
+}
+
+.workflow-item-content {
+    flex: 1;
+}
+
+.workflow-item h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #ffffff;
+}
+
+.workflow-meta {
+    margin: 0;
+    font-size: 12px;
+    color: #808080;
+}
+
+/* Workflow info in header */
+.workflow-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.workflow-info h1 {
+    margin: 0;
+}
+
+.workflow-name-input {
+    font-size: 20px;
+    padding: 4px 8px;
+    width: 300px;
+}
+
+.rename-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    background-color: #5a5c5e;
+}
+
+.rename-btn:hover {
+    background-color: #6a6c6e;
+}
+
+.rename-btn:active {
+    background-color: #4a4c4e;
+}
