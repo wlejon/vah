@@ -1,0 +1,121 @@
+<rml>
+<head>
+    <title>Workflow Application</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="workflow_app.rcss"/>
+    <script>
+    require "workflow_editor"
+    </script>
+</head>
+<body>
+    <!-- Main application container -->
+    <div id="app-container">
+        <!-- Workflow Editor View -->
+        <div id="workflow-view" class="view active">
+            <div class="header">
+                <h1>Visual Workflow Editor</h1>
+                <button class="config-btn" onclick="trigger('switch_to_node_editor', {})">Configure Node Types</button>
+            </div>
+            <div class="container">
+                <canvas id="workflow-canvas"
+                        renderfunction="render_workflow"
+                        keyhandler="handle_workflow_key"
+                        mouseclickhandler="handle_workflow_click"
+                        mousemovehandler="handle_workflow_move"
+                        mousescrollhandler="handle_workflow_scroll"/>
+            </div>
+        </div>
+
+        <!-- Node Type Editor View -->
+        <div id="node-editor-view" class="view">
+            <div class="header">
+                <button class="back-btn" onclick="trigger('switch_to_workflow', {})">← Back to Workflow</button>
+                <h1>Node Type Editor</h1>
+                <button onclick="trigger('add_new_node_type', {})">+ New Node Type</button>
+            </div>
+
+            <div class="main-container">
+                <!-- Left side: List of node types -->
+                <div class="node-types-list">
+                    <h2>Node Types</h2>
+                    <div class="node-types-container" data-model="node_types" data-for="node_type,i : node_types">
+                        <div class="node-type-item" data-event-click="trigger('select_node_type')" data-attr-data-row-index="i">
+                            <div class="color-preview" data-attr-style-background-color="'rgba(' + node_type.color_r + ',' + node_type.color_g + ',' + node_type.color_b + ',' + node_type.color_a + ')'"></div>
+                            <span class="node-type-name">{{ node_type.name }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right side: Editor for selected node type -->
+                <div class="editor-panel" data-model="selected_node" data-if="selected_node.size > 0" data-for="node,i : selected_node">
+                    <h2>Edit Node Type</h2>
+
+                    <div class="form-section">
+                        <label>Name:</label>
+                        <input type="text" name="node_name" data-attr-value="node.name" data-attr-track="true" data-attr-field="'name'" />
+                    </div>
+
+                    <div class="form-section">
+                        <label>Color:</label>
+                        <div class="color-inputs">
+                            <div class="color-input-group">
+                                <label>R:</label>
+                                <input type="text" name="color_r" data-attr-value="node.color_r" data-attr-track="true" data-attr-field="'color_r'" size="3" maxlength="3"/>
+                            </div>
+                            <div class="color-input-group">
+                                <label>G:</label>
+                                <input type="text" name="color_g" data-attr-value="node.color_g" data-attr-track="true" data-attr-field="'color_g'" size="3" maxlength="3"/>
+                            </div>
+                            <div class="color-input-group">
+                                <label>B:</label>
+                                <input type="text" name="color_b" data-attr-value="node.color_b" data-attr-track="true" data-attr-field="'color_b'" size="3" maxlength="3"/>
+                            </div>
+                            <div class="color-input-group">
+                                <label>A:</label>
+                                <input type="text" name="color_a" data-attr-value="node.color_a" data-attr-track="true" data-attr-field="'color_a'" size="3" maxlength="3"/>
+                            </div>
+                        </div>
+                        <div class="color-preview-large" data-attr-style-background-color="'rgba(' + node.color_r + ',' + node.color_g + ',' + node.color_b + ',' + node.color_a + ')'"></div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="ports-header">
+                            <label>Input Ports:</label>
+                            <button onclick="trigger('add_input_port', {})">+ Add Input</button>
+                        </div>
+                        <div class="ports-list" data-for="port,i : node.inputs">
+                            <div class="port-item">
+                                <input type="text" data-attr-name="'input_port_' + i" data-attr-value="port" data-attr-track="true" data-attr-field="'input_port_' + i" />
+                                <button class="delete-btn" onclick="trigger('delete_input_port', {index = i})">×</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="ports-header">
+                            <label>Output Ports:</label>
+                            <button onclick="trigger('add_output_port', {})">+ Add Output</button>
+                        </div>
+                        <div class="ports-list" data-for="port,i : node.outputs">
+                            <div class="port-item">
+                                <input type="text" data-attr-name="'output_port_' + i" data-attr-value="port" data-attr-track="true" data-attr-field="'output_port_' + i" />
+                                <button class="delete-btn" onclick="trigger('delete_output_port', {index = i})">×</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="save-btn" onclick="trigger('save_node_type', {})">Save Changes</button>
+                        <button class="delete-btn" onclick="trigger('delete_node_type', {})">Delete Node Type</button>
+                    </div>
+                </div>
+
+                <!-- Empty state when no node type is selected -->
+                <div class="editor-panel empty-state" data-if="!selected_node">
+                    <p>Select a node type to edit, or create a new one</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
