@@ -36,4 +36,4 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-we've built an example in tetris and workflow editor how to use the canvas. i'm working through issues with them. in the tetris example, the piece often moves multiple times when i click once. i think we're handling the same click for multiple frames sometimes. 
+we've created the rendering side of the workflow system. it's looking great. you can see it in ui/workflow_editor.lua and related view files (rcss and rml). we're going to support this with a data oriented system. i want the types of nodes available to be controllable in a sqlite db and a view for creating and editing those node types. 

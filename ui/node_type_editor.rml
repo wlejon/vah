@@ -1,0 +1,98 @@
+<rml>
+<head>
+    <title>Node Type Editor</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="node_type_editor.rcss"/>
+    <script>
+    require "node_type_editor"
+    </script>
+</head>
+<body>
+    <div class="header">
+        <h1>Node Type Editor</h1>
+        <button onclick="add_new_node_type">+ New Node Type</button>
+    </div>
+
+    <div class="main-container">
+        <!-- Left side: List of node types -->
+        <div class="node-types-list">
+            <h2>Node Types</h2>
+            <div class="node-types-container" data-for="node_type,i : node_types">
+                <div class="node-type-item" data-class-selected="selected_index == i" onclick="select_node_type" data-index="{{ i }}">
+                    <div class="color-preview" data-style-background-color="rgba({{ node_type.color_r }}, {{ node_type.color_g }}, {{ node_type.color_b }}, {{ node_type.color_a }})"></div>
+                    <span class="node-type-name">{{ node_type.name }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right side: Editor for selected node type -->
+        <div class="editor-panel" data-if="selected_index ~= nil">
+            <h2>Edit Node Type</h2>
+
+            <div class="form-section">
+                <label>Name:</label>
+                <input type="text" name="node_name" data-value="{{ selected_node.name }}" />
+            </div>
+
+            <div class="form-section">
+                <label>Color:</label>
+                <div class="color-inputs">
+                    <div class="color-input-group">
+                        <label>R:</label>
+                        <input type="text" name="color_r" data-value="{{ selected_node.color_r }}" size="3" maxlength="3"/>
+                    </div>
+                    <div class="color-input-group">
+                        <label>G:</label>
+                        <input type="text" name="color_g" data-value="{{ selected_node.color_g }}" size="3" maxlength="3"/>
+                    </div>
+                    <div class="color-input-group">
+                        <label>B:</label>
+                        <input type="text" name="color_b" data-value="{{ selected_node.color_b }}" size="3" maxlength="3"/>
+                    </div>
+                    <div class="color-input-group">
+                        <label>A:</label>
+                        <input type="text" name="color_a" data-value="{{ selected_node.color_a }}" size="3" maxlength="3"/>
+                    </div>
+                </div>
+                <div class="color-preview-large" data-style-background-color="rgba({{ selected_node.color_r }}, {{ selected_node.color_g }}, {{ selected_node.color_b }}, {{ selected_node.color_a }})"></div>
+            </div>
+
+            <div class="form-section">
+                <div class="ports-header">
+                    <label>Input Ports:</label>
+                    <button onclick="add_input_port">+ Add Input</button>
+                </div>
+                <div class="ports-list" data-for="port,i : selected_node.inputs">
+                    <div class="port-item">
+                        <input type="text" name="input_port" data-value="{{ port }}" data-index="{{ i }}" />
+                        <button class="delete-btn" onclick="delete_input_port" data-index="{{ i }}">×</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="ports-header">
+                    <label>Output Ports:</label>
+                    <button onclick="add_output_port">+ Add Output</button>
+                </div>
+                <div class="ports-list" data-for="port,i : selected_node.outputs">
+                    <div class="port-item">
+                        <input type="text" name="output_port" data-value="{{ port }}" data-index="{{ i }}" />
+                        <button class="delete-btn" onclick="delete_output_port" data-index="{{ i }}">×</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="save-btn" onclick="save_node_type">Save Changes</button>
+                <button class="delete-btn" onclick="delete_node_type">Delete Node Type</button>
+            </div>
+        </div>
+
+        <!-- Empty state when no node type is selected -->
+        <div class="editor-panel empty-state" data-if="selected_index == nil">
+            <p>Select a node type to edit, or create a new one</p>
+        </div>
+    </div>
+</body>
+</rml>

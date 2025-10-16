@@ -1,5 +1,6 @@
 #include "RmlUiBridge.h"
 #include "Logger.h"
+#include "DataStore.h"
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
@@ -7,6 +8,7 @@
 namespace {
     // Global reference to the bridge for lua callback
     RmlUiBridge* g_bridge = nullptr;
+    DataStore* g_data_store = nullptr;
 
     // Lua callback for trigger function
     int lua_trigger(lua_State* L) {
@@ -50,29 +52,117 @@ namespace {
         return 0;  // No return values
     }
 
+    // Lua callback for data.get() function
+    int lua_data_get(lua_State* L) {
+        if (!g_data_store) {
+            lua_pushnil(L);
+            return 1;
+        }
+
+        // First argument: model name (required)
+        if (!lua_isstring(L, 1)) {
+            return luaL_error(L, "data.get() requires model name as first argument");
+        }
+        std::string model_name = lua_tostring(L, 1);
+
+        // Get the model from the data store
+        auto model_data = g_data_store->GetModel(model_name);
+        if (!model_data) {
+            lua_pushnil(L);
+            return 1;
+        }
+
+        // Helper function to recursively convert DynamicValue to Lua
+        std::function<void(const DynamicValue&)> push_value;
+        push_value = [L, &push_value](const DynamicValue& val) {
+            std::visit([L, &push_value](auto&& v) {
+                using T = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<T, std::monostate>) {
+                    lua_pushnil(L);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    lua_pushboolean(L, v);
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    lua_pushinteger(L, v);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    lua_pushnumber(L, v);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    lua_pushstring(L, v.c_str());
+                } else if constexpr (std::is_same_v<T, std::shared_ptr<DynamicMap>>) {
+                    // Handle nested objects/maps
+                    if (v) {
+                        lua_newtable(L);
+                        for (const auto& [key, nested_val] : v->fields) {
+                            // Check if key is a number (array index)
+                            char* end;
+                            long idx = strtol(key.c_str(), &end, 10);
+                            if (*end == '\0' && idx > 0) {
+                                // It's an array index (Lua uses 1-based)
+                                push_value(nested_val);
+                                lua_rawseti(L, -2, idx);
+                            } else {
+                                // It's a string key
+                                lua_pushstring(L, key.c_str());
+                                push_value(nested_val);
+                                lua_settable(L, -3);
+                            }
+                        }
+                    } else {
+                        lua_pushnil(L);
+                    }
+                } else {
+                    lua_pushnil(L);
+                }
+            }, val);
+        };
+
+        // Convert DynamicTable to Lua table
+        lua_newtable(L);  // Create array table
+        int row_index = 1;
+        for (const auto& row : *model_data) {
+            lua_newtable(L);  // Create row table
+            for (const auto& [field_name, field_value] : row) {
+                lua_pushstring(L, field_name.c_str());
+                push_value(field_value);
+                lua_settable(L, -3);  // Set field in row table
+            }
+            lua_rawseti(L, -2, row_index++);  // Add row to array
+        }
+
+        return 1;  // Return the table
+    }
+
 }
 
 RmlUiBridge::RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
     : ui_event_queue_(ui_event_queue)
     , context_(nullptr)
+    , data_store_(nullptr)
 {
     g_bridge = this;
 }
 
-void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context) {
-    // Store the context
+void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStore* data_store) {
+    // Store the context and data store
     context_ = context;
+    data_store_ = data_store;
+    g_data_store = data_store;
 
     // Register the trigger function globally in RmlUI's lua state
     lua_pushcfunction(L, lua_trigger);
     lua_setglobal(L, "trigger");
+
+    // Create data table with get() function
+    lua_newtable(L);
+    lua_pushcfunction(L, lua_data_get);
+    lua_setfield(L, -2, "get");
+    lua_setglobal(L, "data");
 
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger() function in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger() and data.get() functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {

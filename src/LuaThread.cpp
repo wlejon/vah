@@ -286,6 +286,10 @@ void LuaThread::ThreadMain() {
         lua_->open_libraries(sol::lib::base, sol::lib::package, sol::lib::math,
                             sol::lib::string, sol::lib::table, sol::lib::os);
 
+        // Add scripts directory to Lua package.path for require()
+        std::string current_path = (*lua_)["package"]["path"];
+        (*lua_)["package"]["path"] = current_path + ";./scripts/?.lua";
+
         // Setup bindings
         SetupLuaBindings();
 

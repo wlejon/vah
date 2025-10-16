@@ -1,51 +1,9 @@
 -- Workflow Node Editor
 -- A visual node-based editor built with NanoVG
+-- Rendering code only - runs in RmlUI Lua state
+-- Node types are provided via data binding from the workflow_editor thread
 
--- Node type definitions
-local node_types = {
-    {
-        name = "Number",
-        color = nvg.rgba(80, 120, 180, 255),
-        inputs = {},
-        outputs = {"Value"}
-    },
-    {
-        name = "Math",
-        color = nvg.rgba(120, 180, 120, 255),
-        inputs = {"A", "B"},
-        outputs = {"Result"}
-    },
-    {
-        name = "Compare",
-        color = nvg.rgba(180, 120, 180, 255),
-        inputs = {"A", "B"},
-        outputs = {"Greater", "Equal", "Less"}
-    },
-    {
-        name = "Branch",
-        color = nvg.rgba(200, 140, 80, 255),
-        inputs = {"Condition", "True", "False"},
-        outputs = {"Result"}
-    },
-    {
-        name = "Print",
-        color = nvg.rgba(160, 80, 80, 255),
-        inputs = {"Value"},
-        outputs = {}
-    },
-    {
-        name = "Time",
-        color = nvg.rgba(100, 160, 200, 255),
-        inputs = {},
-        outputs = {"Seconds", "Delta"}
-    },
-    {
-        name = "Event",
-        color = nvg.rgba(220, 180, 80, 255),
-        inputs = {"Trigger"},
-        outputs = {"On Event"}
-    }
-}
+local node_types = {}
 
 -- Editor state
 local editor = {
@@ -136,15 +94,23 @@ local function create_node(x, y, node_type_index)
         return nil
     end
 
+    -- Convert color from r,g,b,a components to nvg.rgba
+    local color = nvg.rgba(
+        node_type.color_r or 128,
+        node_type.color_g or 128,
+        node_type.color_b or 128,
+        node_type.color_a or 255
+    )
+
     local node = {
         id = editor.next_node_id,
         x = x,
         y = y,
         type_index = node_type_index,
         name = node_type.name,
-        color = node_type.color,
-        inputs = node_type.inputs,
-        outputs = node_type.outputs,
+        color = color,
+        inputs = node_type.inputs or {},
+        outputs = node_type.outputs or {},
     }
 
     editor.next_node_id = editor.next_node_id + 1
@@ -539,9 +505,15 @@ local function draw_node_menu(nvg_ctx)
         end
 
         -- Color indicator
+        local node_color = nvg.rgba(
+            node_type.color_r or 128,
+            node_type.color_g or 128,
+            node_type.color_b or 128,
+            node_type.color_a or 255
+        )
         nvg.beginPath(nvg_ctx)
         nvg.circle(nvg_ctx, menu_x + 15, item_y + item_height / 2, 6)
-        nvg.fillColor(nvg_ctx, node_type.color)
+        nvg.fillColor(nvg_ctx, node_color)
         nvg.fill(nvg_ctx)
 
         -- Node type name
@@ -564,15 +536,27 @@ end
 
 -- Initialize with some example nodes
 local function init_editor()
-    create_node(100, 100, 6) -- Time
-    create_node(400, 80, 2)  -- Math
-    create_node(400, 200, 1) -- Number
-    create_node(700, 120, 5) -- Print
+    -- Create example nodes if we have node types loaded
+    if #node_types > 0 then
+        -- Find node type indices by name for creating example nodes
+        local time_idx, math_idx, number_idx, print_idx
+        for i, nt in ipairs(node_types) do
+            if nt.name == "Time" then time_idx = i end
+            if nt.name == "Math" then math_idx = i end
+            if nt.name == "Number" then number_idx = i end
+            if nt.name == "Print" then print_idx = i end
+        end
 
-    -- Add some example connections
-    add_connection(1, 1, 2, 1) -- Time.Seconds -> Math.A
-    add_connection(3, 1, 2, 2) -- Number.Value -> Math.B
-    add_connection(2, 1, 4, 1) -- Math.Result -> Print.Value
+        if time_idx then create_node(100, 100, time_idx) end
+        if math_idx then create_node(400, 80, math_idx) end
+        if number_idx then create_node(400, 200, number_idx) end
+        if print_idx then create_node(700, 120, print_idx) end
+
+        -- Add some example connections
+        add_connection(1, 1, 2, 1) -- Time.Seconds -> Math.A
+        add_connection(3, 1, 2, 2) -- Number.Value -> Math.B
+        add_connection(2, 1, 4, 1) -- Math.Result -> Print.Value
+    end
 end
 
 -- Main render function
@@ -889,5 +873,15 @@ function handle_workflow_key(key, key_down)
     end
 end
 
--- Initialize editor with example nodes
-init_editor()
+-- Load node types from data store using data.get()
+if data and data.get then
+    node_types = data.get("node_types") or {}
+    print("[Rendering] Loaded " .. #node_types .. " node types from data store")
+
+    -- Initialize editor with example nodes
+    if #node_types > 0 then
+        init_editor()
+    end
+else
+    print("[Rendering] data.get() not available")
+end

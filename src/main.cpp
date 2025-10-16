@@ -207,7 +207,7 @@ public:
         // Setup NanoVG bindings for canvas elements
         NanoVGBindings::SetupBindings(rml_lua);
 
-        rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_);
+        rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_, data_store_.get());
 
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");

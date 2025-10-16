@@ -7,7 +7,10 @@ function startup()
     -- Choose which demo to run (comment/uncomment):
 
     -- Workflow Node Editor
-    ui.load_document("ui/workflow_editor.rml")
+    command.spawn_thread("scripts/workflow_editor.lua")
+
+    -- Node Type Editor (for managing workflow node types)
+    -- command.spawn_thread("scripts/node_type_editor.lua")
 
     -- Tetris Game
     -- ui.load_document("ui/tetris.rml")
