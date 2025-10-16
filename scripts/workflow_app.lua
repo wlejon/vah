@@ -218,12 +218,6 @@ local function save_node_type(payload)
         end
     end
 
-    print("Saving node type ID: " .. node_id)
-    print("  Name: " .. name)
-    print("  Color: " .. color_r .. ", " .. color_g .. ", " .. color_b .. ", " .. color_a)
-    print("  Inputs: " .. #inputs)
-    print("  Outputs: " .. #outputs)
-
     -- Update node type in database
     local success = workflow_db.update_node_type(
         node_id,
@@ -249,8 +243,6 @@ local function save_node_type(payload)
         workflow_db.add_port(node_id, port_name, "output", i)
     end
 
-    print("Node type saved successfully")
-
     -- Reload node types to reflect changes
     load_node_types()
 
@@ -275,16 +267,12 @@ local function delete_node_type(payload)
     local node_type_id = payload.id
     local node_type_name = payload.name or "Unknown"
 
-    print("Deleting node type: " .. node_type_name .. " (ID: " .. node_type_id .. ")")
-
     local success = workflow_db.delete_node_type(node_type_id)
 
     if not success then
         print("ERROR: Failed to delete node type")
         return
     end
-
-    print("Node type deleted successfully")
 
     -- Clear selection
     editor.selected_index = nil
