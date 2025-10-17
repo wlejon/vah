@@ -5,6 +5,25 @@
     <link type="text/rcss" href="workflow_app.rcss"/>
     <script>
     require "workflow_editor"
+
+    -- View navigation functions - accept document parameter from inline event handlers
+    function switch_to_workflow_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', true)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+    end
+
+    function switch_to_workflow_list_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', true)
+    end
+
+    function switch_to_node_editor_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', true)
+    end
     </script>
 </head>
 <body>
@@ -17,9 +36,9 @@
                     <h1>{{ wf.name }}</h1>
                 </div>
                 <div class="button-group-header">
-                    <button onclick="trigger('switch_to_workflow_list')">Workflows</button>
+                    <button onclick="switch_to_workflow_list_view(document); trigger('reload_workflows')">Workflows</button>
                     <button onclick="trigger('new_workflow')">New Workflow</button>
-                    <button class="config-btn" onclick="trigger('switch_to_node_editor')">Configure Node Types</button>
+                    <button class="config-btn" onclick="switch_to_node_editor_view(document)">Configure Node Types</button>
                 </div>
             </div>
             <div class="container">
@@ -35,7 +54,7 @@
         <!-- Workflow List View -->
         <div id="workflow-list-view" class="view">
             <div class="header">
-                <button class="back-btn" onclick="trigger('switch_to_workflow', {})">← Back to Workflow</button>
+                <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>My Workflows</h1>
                 <button onclick="trigger('new_workflow', {})">+ New Workflow</button>
             </div>
@@ -44,11 +63,11 @@
                 <div class="workflows-list">
                     <div class="workflows-container" data-model="workflows" data-for="workflow,i : workflows">
                         <div class="workflow-item" data-attr-data-row-index="i">
-                            <div class="workflow-item-content" data-event-click="trigger('select_workflow')">
+                            <div class="workflow-item-content" onclick="trigger('select_workflow'); switch_to_workflow_view(document)">
                                 <h3>{{ workflow.name }}</h3>
                                 <p class="workflow-meta">Updated: {{ workflow.updated_at }}</p>
                             </div>
-                            <button class="delete-btn" data-event-click="trigger('delete_workflow')">×</button>
+                            <button class="delete-btn" onclick="trigger('delete_workflow')">×</button>
                         </div>
                     </div>
                 </div>
@@ -58,7 +77,7 @@
         <!-- Node Type Editor View -->
         <div id="node-editor-view" class="view">
             <div class="header">
-                <button class="back-btn" onclick="trigger('switch_to_workflow', {})">← Back to Workflow</button>
+                <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>Node Type Editor</h1>
                 <button onclick="trigger('add_new_node_type', {})">+ New Node Type</button>
             </div>

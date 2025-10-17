@@ -1,4 +1,4 @@
--- Workflow Node Editor (Refactored)
+-- Workflow Node Editor
 -- This is now a thin wrapper around the modular workflow editor
 -- All actual logic has been split into workflow_editor/ modules
 

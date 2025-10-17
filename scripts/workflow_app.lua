@@ -312,43 +312,12 @@ local function on_workflow_connection_added(payload)
 end
 
 -- ============================================
--- View Switching Functions
+-- Reload Functions (for view switching)
 -- ============================================
 
-local function switch_to_workflow(payload)
-    print("Switching to workflow editor view")
-
-    -- Reload node types from database (in case they were modified)
-    load_node_types()
-
-    -- Hide other views
-    ui.remove_element_class("node-editor-view", "active")
-    ui.remove_element_class("workflow-list-view", "active")
-    -- Show workflow view
-    ui.add_element_class("workflow-view", "active")
-end
-
-local function switch_to_workflow_list(payload)
-    print("Switching to workflow list view")
-
-    -- Reload workflows from database
+local function reload_workflows_handler(payload)
+    print("Reloading workflows from database")
     load_workflows()
-
-    -- Hide other views
-    ui.remove_element_class("workflow-view", "active")
-    ui.remove_element_class("node-editor-view", "active")
-    -- Show workflow list view
-    ui.add_element_class("workflow-list-view", "active")
-end
-
-local function switch_to_node_editor(payload)
-    print("Switching to node type editor view")
-
-    -- Hide other views
-    ui.remove_element_class("workflow-view", "active")
-    ui.remove_element_class("workflow-list-view", "active")
-    -- Show node editor view
-    ui.add_element_class("node-editor-view", "active")
 end
 
 -- ============================================
@@ -569,10 +538,8 @@ function startup()
     database_initialized = true
     print("Workflow database initialized successfully")
 
-    -- Register event handlers for view switching
-    event.register("switch_to_workflow", switch_to_workflow)
-    event.register("switch_to_workflow_list", switch_to_workflow_list)
-    event.register("switch_to_node_editor", switch_to_node_editor)
+    -- Register reload handler for workflow list view
+    event.register("reload_workflows", reload_workflows_handler)
 
     -- Register event handlers for workflow management
     event.register("new_workflow", create_new_workflow)
