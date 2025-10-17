@@ -287,7 +287,6 @@ function M.load_node_types()
         table.insert(node_types, node_type)
     end
 
-    print("Loaded " .. #node_types .. " node types from database")
     return node_types
 end
 

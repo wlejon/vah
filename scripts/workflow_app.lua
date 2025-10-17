@@ -35,8 +35,6 @@ local function load_node_types()
     -- Load from database (already includes color components)
     node_types_data = workflow_db.load_node_types()
 
-    print("Loaded " .. #node_types_data .. " node types")
-
     -- Bind data to the UI for workflow editor
     data.bind("node_types", node_types_data)
 
@@ -77,7 +75,6 @@ local function load_workflows()
     end
 
     workflows_list = workflow_db.get_workflows()
-    print("Loaded " .. #workflows_list .. " workflows")
 
     -- Bind to UI
     data.bind("workflows", workflows_list)
@@ -91,8 +88,6 @@ local function create_new_workflow(payload)
 
     local workflow_id = workflow_db.create_workflow("New Workflow")
     if workflow_id then
-        print("Created new workflow with ID: " .. workflow_id)
-
         -- Reload workflows list
         load_workflows()
 
@@ -133,9 +128,6 @@ function select_workflow(payload)
         end
     end
 
-    print("Loaded workflow: " .. (active_workflow.name or "Unknown") .. " (ID: " .. workflow_id .. ")")
-    print("  Nodes: " .. #nodes .. ", Connections: " .. #connections)
-
     -- Bind workflow data to make it available to workflow editor
     -- Include a timestamp to force client to reinitialize
     data.bind("workflow_nodes", nodes)
@@ -159,7 +151,6 @@ local function rename_workflow(payload)
         active_workflow.name = new_name
         data.bind("active_workflow", {active_workflow})
         load_workflows()
-        print("Renamed workflow to: " .. new_name)
     else
         print("ERROR: Failed to rename workflow")
     end
@@ -179,8 +170,6 @@ local function delete_workflow(payload)
 
     local success = workflow_db.delete_workflow(workflow_id)
     if success then
-        print("Deleted workflow ID: " .. workflow_id)
-
         -- If this was the active workflow, clear it
         if active_workflow.id == workflow_id then
             active_workflow.id = nil

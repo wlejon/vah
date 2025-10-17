@@ -110,9 +110,6 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                             payload[key] = value;
                         }
 
-                        LOG_DEBUG("trigger('{}') injected row {} from model '{}' ({} fields)",
-                                 event_name, context_row, context_model, row.size());
-
                         // Store the row element for input extraction
                         // Walk back up from current element to find the element with data-row-index
                         Rml::Element* el = event.GetTargetElement();
@@ -132,9 +129,6 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                     PayloadMap tracked_values = ExtractTrackedInputValues(row_element);
                     for (const auto& [key, value] : tracked_values) {
                         payload[key] = value;  // Override with current input values
-                    }
-                    if (!tracked_values.empty()) {
-                        LOG_DEBUG("trigger('{}') merged {} tracked input values", event_name, tracked_values.size());
                     }
                 }
 
@@ -193,17 +187,12 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                         if (it_handle != data_model_handles_.end()) {
                             it_handle->second.DirtyVariable(context_model);
                         }
-
-                        LOG_DEBUG("trigger('{}') updated main thread DataStore for model '{}' row {}",
-                                 event_name, context_model, context_row);
                     }
                 }
 
                 // Enqueue to UIEvent queue for Lua threads to consume
                 UIEvent ui_event{event_name, payload};
                 ui_event_queue_->enqueue(std::move(ui_event));
-
-                LOG_DEBUG("DataModelManager: Triggered event '{}' with {} payload items", event_name, payload.size());
             });
 
             // Store the definition so it stays alive
@@ -215,8 +204,6 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
 
             // Mark as dirty to trigger initial render
             model_handle.DirtyVariable(model_name);
-
-            LOG_INFO("Created data model '{}' (marked dirty for initial render)", model_name);
         } else {
             LOG_WARN("Failed to create data model '{}'", model_name);
         }
@@ -262,7 +249,6 @@ PayloadMap DataModelManager::ExtractTrackedInputValues(Rml::Element* root) {
 
                 if (!field_name.empty()) {
                     result[field_name] = value;
-                    LOG_DEBUG("ExtractTrackedInputValues: {} = '{}'", field_name, value);
                 }
             }
         }
@@ -275,6 +261,5 @@ PayloadMap DataModelManager::ExtractTrackedInputValues(Rml::Element* root) {
 
     walk(root);
 
-    LOG_DEBUG("ExtractTrackedInputValues: extracted {} fields", result.size());
     return result;
 }

@@ -104,7 +104,6 @@ local function initialize()
     -- Load node types from data store
     if data and data.get then
         node_types = data.get("node_types") or {}
-        print("[Workflow Editor] Loaded " .. #node_types .. " node types from data store")
     else
         print("[Workflow Editor] data.get() not available")
     end

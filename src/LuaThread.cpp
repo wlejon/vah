@@ -238,8 +238,6 @@ void LuaThread::LoadFromLuaFile(const std::string& file_path) {
 
         // Call the load hook with the data
         CallLoadHook(data);
-
-        LOG_DEBUG("LuaThread {}: Loaded save data from '{}'", id_, file_path);
     } catch (const std::exception& e) {
         LOG_ERROR("LuaThread {}: Error loading from file '{}': {}", id_, file_path, e.what());
     }
@@ -434,7 +432,6 @@ void LuaThread::SetupLuaBindings() {
 
     event_table["register"] = [this](const std::string& event_name, sol::function handler) {
         event_handlers_[event_name] = handler;
-        LOG_DEBUG("Lua thread {} registered handler for event '{}'", id_, event_name);
     };
 
     (*lua_)["event"] = event_table;
@@ -470,7 +467,6 @@ void LuaThread::SetupLuaBindings() {
         cmd.show = show.value_or(true);
         cmd.document_id = doc_id.value_or("");
         command_queue_->enqueue(std::move(cmd));
-        LOG_DEBUG("Lua thread {} queued LoadUIDocument: {}", id_, path);
     };
 
     ui_table["show_document"] = [this](const std::string& doc_id) {
