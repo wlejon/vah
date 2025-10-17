@@ -138,17 +138,21 @@ bool NotificationPlugin::Update() {
     int new_count = static_cast<int>(new_cache.size());
 
     // Check if count changed
-    bool changed = (new_count != *notification_count_);
+    bool count_changed = (new_count != *notification_count_);
 
-    // Update cache and count
+    // Always update the underlying data
     *notification_cache_ = std::move(new_cache);
     *notification_count_ = new_count;
 
-    // Always dirty to ensure UI updates properly
-    notif_model_handle_->DirtyVariable("notifications");
-    notif_model_handle_->DirtyVariable("count");
+    // Only dirty if count actually changed to minimize RmlUi re-evaluation
+    // Content changes will be picked up on next explicit dirty
+    if (count_changed) {
+        notif_model_handle_->DirtyVariable("notifications");
+        notif_model_handle_->DirtyVariable("count");
+        return true;
+    }
 
-    return true;
+    return false;
 }
 
 void NotificationPlugin::OnContextDestroy(Rml::Context* context) {
