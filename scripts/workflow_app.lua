@@ -204,11 +204,6 @@ local function on_workflow_node_created(payload)
         return
     end
 
-    print("on_workflow_node_created payload:")
-    for k, v in pairs(payload) do
-        print("  " .. k .. " = " .. tostring(v))
-    end
-
     -- Add node to database
     local success = workflow_db.add_node(
         active_workflow.id,
@@ -228,7 +223,6 @@ local function on_workflow_node_created(payload)
     if nodes then
         data.bind("workflow_nodes", nodes)
         data.bind("workflow_connections", connections)
-        print("Added node to database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
     end
 end
 
@@ -278,7 +272,6 @@ local function on_workflow_node_deleted(payload)
     if nodes then
         data.bind("workflow_nodes", nodes)
         data.bind("workflow_connections", connections)
-        print("Deleted node from database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
     end
 end
 
@@ -307,7 +300,6 @@ local function on_workflow_connection_added(payload)
     if nodes then
         data.bind("workflow_nodes", nodes)
         data.bind("workflow_connections", connections)
-        print("Added connection to database, reloaded " .. #nodes .. " nodes, " .. #connections .. " connections")
     end
 end
 
@@ -316,7 +308,6 @@ end
 -- ============================================
 
 local function reload_workflows_handler(payload)
-    print("Reloading workflows from database")
     load_workflows()
 end
 
@@ -337,7 +328,6 @@ local function select_node_type(payload)
         if nt.id == node_id then
             editor.selected_index = i
             editor.selected_node = editor.node_types[i]
-            print("Selected node type: " .. editor.selected_node.name)
 
             -- Update data model - wrap selected_node in an array for data binding
             data.bind("selected_node", {editor.selected_node})
@@ -353,7 +343,6 @@ local function add_new_node_type(payload)
     local node_id = workflow_db.create_node_type("New Node", 128, 128, 128, 255)
 
     if node_id then
-        print("Created new node type with ID: " .. node_id)
         load_node_types()
     else
         print("ERROR: Failed to create new node type")
@@ -368,7 +357,6 @@ local function add_input_port(payload)
 
     table.insert(editor.selected_node.inputs, "New Input")
     data.bind("selected_node", {editor.selected_node})
-    print("Added input port")
 end
 
 -- Add output port to selected node
@@ -379,7 +367,6 @@ local function add_output_port(payload)
 
     table.insert(editor.selected_node.outputs, "New Output")
     data.bind("selected_node", {editor.selected_node})
-    print("Added output port")
 end
 
 -- Delete input port
@@ -392,7 +379,6 @@ local function delete_input_port(payload)
     if index and index >= 1 and index <= #editor.selected_node.inputs then
         table.remove(editor.selected_node.inputs, index)
         data.bind("selected_node", {editor.selected_node})
-        print("Deleted input port at index " .. index)
     end
 end
 
@@ -406,7 +392,6 @@ local function delete_output_port(payload)
     if index and index >= 1 and index <= #editor.selected_node.outputs then
         table.remove(editor.selected_node.outputs, index)
         data.bind("selected_node", {editor.selected_node})
-        print("Deleted output port at index " .. index)
     end
 end
 
@@ -608,7 +593,6 @@ Version: 1.0.0</pre>
 
     -- Create a default workflow if none exists
     if #workflows_list == 0 then
-        print("No workflows found, creating default workflow...")
         local workflow_id = workflow_db.create_workflow("My First Workflow")
         if workflow_id then
             load_workflows()
