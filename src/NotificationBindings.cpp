@@ -24,6 +24,7 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
         notif.dismissible = notification_data.get_or("dismissible", true);
         notif.expandable = notification_data.get_or("expandable", false);
         notif.expanded_content = notification_data.get_or<std::string>("expanded_content", "");
+        notif.ttl_seconds = notification_data.get_or("ttl", 5.0);
 
         // Extract metadata if provided
         sol::optional<sol::table> metadata_opt = notification_data.get<sol::optional<sol::table>>("metadata");
@@ -60,6 +61,7 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
         notif.timestamp = NotificationFeed::GetCurrentTime();
         notif.dismissible = false;
         notif.expandable = false;
+        notif.ttl_seconds = 0.0;  // Progress notifications persist until dismissed
 
         feed->AddNotification(std::move(notif));
     };
@@ -75,6 +77,7 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
         notif.timestamp = NotificationFeed::GetCurrentTime();
         notif.dismissible = true;
         notif.expandable = false;
+        notif.ttl_seconds = 5.0;  // Default TTL
 
         feed->AddNotification(std::move(notif));
     };
@@ -90,6 +93,7 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
         notif.timestamp = NotificationFeed::GetCurrentTime();
         notif.dismissible = true;
         notif.expandable = false;
+        notif.ttl_seconds = 0.0;  // Errors persist until dismissed
 
         feed->AddNotification(std::move(notif));
     };
@@ -105,6 +109,7 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
         notif.timestamp = NotificationFeed::GetCurrentTime();
         notif.dismissible = true;
         notif.expandable = false;
+        notif.ttl_seconds = 5.0;  // Default TTL
 
         feed->AddNotification(std::move(notif));
     };

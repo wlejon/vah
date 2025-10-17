@@ -29,6 +29,7 @@ struct Notification {
     bool expandable;                     // Has detailed view?
     std::string expanded_content;        // RML content for expanded view
     PayloadMap metadata;                 // Command-specific data
+    double ttl_seconds = 5.0;            // Time to live in seconds (0 = persist forever)
 };
 
 class NotificationFeed {
@@ -53,6 +54,9 @@ public:
 
     // Get notification by ID (for expansion)
     const Notification* Get(const std::string& notification_id) const;
+
+    // Remove expired notifications based on TTL
+    void CleanupExpired();
 
     // Generate unique notification ID
     static std::string GenerateId();

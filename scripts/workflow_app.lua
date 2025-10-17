@@ -541,7 +541,32 @@ function startup()
 
     database_initialized = true
     print("Workflow database initialized successfully")
-    notifications.info("Database Ready", "Workflow database initialized")
+
+    -- Test expandable notification
+    notifications.add({
+        type = 0,  -- Info
+        title = "Workflow System Info",
+        message = "Click to view system details",
+        thread = "Workflow App",
+        dismissible = true,
+        expandable = true,
+        ttl = 0,
+        expanded_content = [[
+<p>The workflow system is now ready for use.</p>
+<p><strong>Features:</strong></p>
+<ul>
+    <li>Visual node-based workflow editor</li>
+    <li>Custom node type creation</li>
+    <li>Persistent workflow storage</li>
+    <li>Real-time database synchronization</li>
+</ul>
+<pre>System Status: Online
+Database: SQLite (workflow.db)
+Node Types Loaded: ]] .. #node_types_data .. [[
+
+Version: 1.0.0</pre>
+        ]]
+    })
 
     -- Register reload handler for workflow list view
     event.register("reload_workflows", reload_workflows_handler)

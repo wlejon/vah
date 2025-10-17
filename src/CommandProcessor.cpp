@@ -112,6 +112,7 @@ void CommandProcessor::InterceptForNotification(const Command& cmd) {
             notif.timestamp = NotificationFeed::GetCurrentTime();
             notif.dismissible = true;
             notif.expandable = false;
+            notif.ttl_seconds = 5.0;
             notification_feed_->AddNotification(std::move(notif));
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
@@ -124,6 +125,7 @@ void CommandProcessor::InterceptForNotification(const Command& cmd) {
             notif.timestamp = NotificationFeed::GetCurrentTime();
             notif.dismissible = false;
             notif.expandable = false;
+            notif.ttl_seconds = 5.0;
             notification_feed_->AddNotification(std::move(notif));
         }
         else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
@@ -136,6 +138,7 @@ void CommandProcessor::InterceptForNotification(const Command& cmd) {
             notif.timestamp = NotificationFeed::GetCurrentTime();
             notif.dismissible = true;
             notif.expandable = false;
+            notif.ttl_seconds = 5.0;
             notification_feed_->AddNotification(std::move(notif));
         }
         else if constexpr (std::is_same_v<T, Commands::StopThread>) {
@@ -148,6 +151,7 @@ void CommandProcessor::InterceptForNotification(const Command& cmd) {
             notif.timestamp = NotificationFeed::GetCurrentTime();
             notif.dismissible = true;
             notif.expandable = false;
+            notif.ttl_seconds = 5.0;
             notification_feed_->AddNotification(std::move(notif));
         }
         else if constexpr (std::is_same_v<T, Commands::Print>) {

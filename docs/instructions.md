@@ -37,6 +37,9 @@ for assistance, please read the code directly or the documentation. they can be 
 this task fits within your context, there's no need to use subagents.
 
 you've built a notification overlay as an internal document for vah to render through rmlui. it's looking pretty good. please perform a code review.
+
+i want to add TLL to the notifications. default should be 5 seconds. 0 should persist it. 
+
 ## current git status
 
 PS D:\projects\vah> git status

@@ -231,6 +231,7 @@ public:
             notif_handle.RegisterMember("dismissible", &Notification::dismissible);
             notif_handle.RegisterMember("expandable", &Notification::expandable);
             notif_handle.RegisterMember("expanded_content", &Notification::expanded_content);
+            notif_handle.RegisterMember("ttl_seconds", &Notification::ttl_seconds);
         }
         notif_constructor.RegisterArray<std::vector<Notification>>();
 

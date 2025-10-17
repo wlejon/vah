@@ -52,6 +52,23 @@ const Notification* NotificationFeed::Get(const std::string& notification_id) co
     return nullptr;
 }
 
+void NotificationFeed::CleanupExpired() {
+    double current_time = GetCurrentTime();
+
+    // Remove notifications that have expired (TTL > 0 and time exceeded)
+    auto it = notifications_.begin();
+    while (it != notifications_.end()) {
+        if (it->ttl_seconds > 0.0) {
+            double elapsed = current_time - it->timestamp;
+            if (elapsed >= it->ttl_seconds) {
+                it = notifications_.erase(it);
+                continue;
+            }
+        }
+        ++it;
+    }
+}
+
 std::string NotificationFeed::GenerateId() {
     auto now = std::chrono::system_clock::now();
     auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);

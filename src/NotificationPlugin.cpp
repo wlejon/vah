@@ -130,11 +130,21 @@ bool NotificationPlugin::Update() {
     }
     last_update_time_ = current_time;
 
-    // Update the notification cache from the feed
-    *notification_cache_ = notification_feed_->GetRecent(100);
-    *notification_count_ = static_cast<int>(notification_cache_->size());
+    // Cleanup expired notifications based on TTL
+    notification_feed_->CleanupExpired();
 
-    // Dirty the notifications data model to trigger UI update
+    // Get new cache and count
+    std::vector<Notification> new_cache = notification_feed_->GetRecent(100);
+    int new_count = static_cast<int>(new_cache.size());
+
+    // Check if count changed
+    bool changed = (new_count != *notification_count_);
+
+    // Update cache and count
+    *notification_cache_ = std::move(new_cache);
+    *notification_count_ = new_count;
+
+    // Always dirty to ensure UI updates properly
     notif_model_handle_->DirtyVariable("notifications");
     notif_model_handle_->DirtyVariable("count");
 
