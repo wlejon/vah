@@ -7,40 +7,38 @@ NotificationFeed::NotificationFeed() {
 }
 
 void NotificationFeed::AddNotification(Notification&& notification) {
-    // Add to front (most recent first)
-    notifications_.push_front(std::move(notification));
+    // Add to front (most recent first) - using vector insert
+    notifications_.insert(notifications_.begin(), std::move(notification));
 
     // Trim if exceeds max
-    while (notifications_.size() > max_notifications_) {
-        notifications_.pop_back();
-    }
-}
-
-std::vector<Notification> NotificationFeed::GetRecent(size_t count) {
-    std::vector<Notification> result;
-    size_t limit = std::min(count, notifications_.size());
-    result.reserve(limit);
-
-    for (size_t i = 0; i < limit; i++) {
-        result.push_back(notifications_[i]);
+    if (notifications_.size() > max_notifications_) {
+        notifications_.resize(max_notifications_);
     }
 
-    return result;
+    // Trigger change callback
+    TriggerChange();
 }
+
 
 void NotificationFeed::Dismiss(const std::string& notification_id) {
     for (auto it = notifications_.begin(); it != notifications_.end(); ++it) {
         if (it->id == notification_id) {
             notifications_.erase(it);
             LOG_INFO("Dismissed notification: {}", notification_id);
+            TriggerChange();
             return;
         }
     }
 }
 
 void NotificationFeed::Clear() {
+    if (notifications_.empty()) {
+        return;  // No change
+    }
+
     notifications_.clear();
     LOG_INFO("Cleared all notifications");
+    TriggerChange();
 }
 
 const Notification* NotificationFeed::Get(const std::string& notification_id) const {
@@ -55,6 +53,8 @@ const Notification* NotificationFeed::Get(const std::string& notification_id) co
 void NotificationFeed::CleanupExpired() {
     double current_time = GetCurrentTime();
 
+    bool any_removed = false;
+
     // Remove notifications that have expired (TTL > 0 and time exceeded)
     auto it = notifications_.begin();
     while (it != notifications_.end()) {
@@ -62,10 +62,22 @@ void NotificationFeed::CleanupExpired() {
             double elapsed = current_time - it->timestamp;
             if (elapsed >= it->ttl_seconds) {
                 it = notifications_.erase(it);
+                any_removed = true;
                 continue;
             }
         }
         ++it;
+    }
+
+    // Only trigger change if we actually removed something
+    if (any_removed) {
+        TriggerChange();
+    }
+}
+
+void NotificationFeed::TriggerChange() {
+    if (on_change_callback_) {
+        on_change_callback_();
     }
 }
 

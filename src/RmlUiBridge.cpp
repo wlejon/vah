@@ -229,11 +229,7 @@ namespace {
                 if (stream) {
                     bool is_active = stream->IsClassSet("active");
                     stream->SetClass("active", !is_active);
-
-                    // If opening, update the notifications to ensure latest data
-                    if (!is_active) {
-                        NotificationOverlay::Update();
-                    }
+                    // No need to manually update - data binding is always current
                 }
             }
         }

@@ -235,18 +235,27 @@ public:
         }
         notif_constructor.RegisterArray<std::vector<Notification>>();
 
-        // Bind directly to the notifications vector in NotificationFeed
-        // We'll update this vector before rendering
-        notif_constructor.Bind("notifications", &notification_cache_);
-
-        // Bind count variable for the notification count display
+        // Bind directly to NotificationFeed's internal vector (no cache!)
+        notif_constructor.Bind("notifications", &notification_feed_->GetNotifications());
         notif_constructor.Bind("count", &notification_count_);
 
         notif_model_handle_ = notif_constructor.GetModelHandle();
 
+        // Setup callback to mark dirty when notifications change
+        notification_feed_->SetOnChangeCallback([this]() {
+            // Update count
+            notification_count_ = notification_feed_->GetCount();
+
+            // Mark dirty so RmlUi knows to re-render
+            if (notif_model_handle_) {
+                notif_model_handle_.DirtyVariable("notifications");
+                notif_model_handle_.DirtyVariable("count");
+            }
+        });
+
         // Initialize notification overlay (global, always visible)
         if (!NotificationOverlay::Initialise(rml_context_, notification_feed_.get(),
-                                            &notification_cache_, &notif_model_handle_, &notification_count_)) {
+                                            &notif_model_handle_)) {
             LOG_ERROR("Failed to initialize notification overlay");
         } else {
             // Show the notification overlay
@@ -614,8 +623,8 @@ private:
     }
 
     void Update() {
-        // Update notification overlay (syncs feed to cache and updates UI)
-        NotificationOverlay::Update();
+        // Cleanup expired notifications (once per frame is plenty)
+        NotificationOverlay::CleanupExpired();
 
         if (rml_context_) {
             rml_context_->Update();
@@ -664,8 +673,7 @@ private:
     std::unique_ptr<CommandProcessor> command_processor_;
     std::unique_ptr<NotificationFeed> notification_feed_;
     Rml::DataModelHandle notif_model_handle_;
-    std::vector<Notification> notification_cache_;  // Cache for data binding
-    int notification_count_ = 0;  // Size of notification cache for data binding
+    int notification_count_ = 0;  // Count for data binding
 
     // File watcher for RML/RCSS hot reload
     std::unique_ptr<efsw::FileWatcher> ui_file_watcher_;

@@ -17,9 +17,7 @@ public:
 
     // Initialize notification overlay on a context
     bool Initialise(Rml::Context* context, NotificationFeed* notification_feed,
-                    std::vector<Notification>* notification_cache,
-                    Rml::DataModelHandle* notif_model_handle,
-                    int* notification_count);
+                    Rml::DataModelHandle* notif_model_handle);
 
     // Shutdown and cleanup
     void Shutdown();
@@ -28,9 +26,11 @@ public:
     void SetVisible(bool visibility);
     bool IsVisible() const;
 
-    // Update notification data (call when feed changes)
-    // Returns true if update was performed, false if throttled
-    bool Update();
+    // Mark data model as dirty (called by NotificationFeed change callback)
+    void MarkDirty();
+
+    // Cleanup expired notifications (call periodically, e.g., once per second)
+    void CleanupExpired();
 
     // Plugin lifecycle callbacks
     void OnContextDestroy(Rml::Context* context) override;
@@ -45,9 +45,7 @@ private:
 
     Rml::Context* host_context_;
     NotificationFeed* notification_feed_;
-    std::vector<Notification>* notification_cache_;
     Rml::DataModelHandle* notif_model_handle_;
-    int* notification_count_;
 
     Rml::ElementDocument* notification_document_;
 
@@ -55,21 +53,16 @@ private:
 
     bool visible_;
 
-    // Throttling for updates
-    double last_update_time_ = 0.0;
-    double update_throttle_seconds_ = 0.1;  // Max 10 updates per second
-
     static NotificationPlugin* instance_;
 };
 
 namespace NotificationOverlay {
     // Public API
     bool Initialise(Rml::Context* context, NotificationFeed* notification_feed,
-                    std::vector<Notification>* notification_cache,
-                    Rml::DataModelHandle* notif_model_handle,
-                    int* notification_count);
+                    Rml::DataModelHandle* notif_model_handle);
     void Shutdown();
     void SetVisible(bool visibility);
     bool IsVisible();
-    bool Update();
+    void MarkDirty();
+    void CleanupExpired();
 }

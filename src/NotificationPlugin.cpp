@@ -18,9 +18,7 @@ ElementNotificationDocument::ElementNotificationDocument(const Rml::String& tag)
 NotificationPlugin::NotificationPlugin()
     : host_context_(nullptr)
     , notification_feed_(nullptr)
-    , notification_cache_(nullptr)
     , notif_model_handle_(nullptr)
-    , notification_count_(nullptr)
     , notification_document_(nullptr)
     , visible_(false)
 {
@@ -34,19 +32,15 @@ NotificationPlugin::~NotificationPlugin() {
 }
 
 bool NotificationPlugin::Initialise(Rml::Context* context, NotificationFeed* notification_feed,
-                                    std::vector<Notification>* notification_cache,
-                                    Rml::DataModelHandle* notif_model_handle,
-                                    int* notification_count) {
-    if (!context || !notification_feed || !notification_cache || !notif_model_handle || !notification_count) {
+                                    Rml::DataModelHandle* notif_model_handle) {
+    if (!context || !notification_feed || !notif_model_handle) {
         LOG_ERROR("NotificationPlugin::Initialise: Invalid parameters");
         return false;
     }
 
     host_context_ = context;
     notification_feed_ = notification_feed;
-    notification_cache_ = notification_cache;
     notif_model_handle_ = notif_model_handle;
-    notification_count_ = notification_count;
 
     // Register custom element instancer for notification documents
     notification_instancer_ = Rml::MakeUnique<Rml::ElementInstancerGeneric<ElementNotificationDocument>>();
@@ -118,41 +112,25 @@ bool NotificationPlugin::IsVisible() const {
     return visible_;
 }
 
-bool NotificationPlugin::Update() {
-    if (!notification_document_ || !host_context_ || !notification_cache_ || !notif_model_handle_ || !notification_count_) {
-        return false;
+void NotificationPlugin::MarkDirty() {
+    if (!notif_model_handle_) {
+        return;
     }
 
-    // Throttle updates to prevent excessive re-renders
-    double current_time = Rml::GetSystemInterface()->GetElapsedTime();
-    if (current_time - last_update_time_ < update_throttle_seconds_) {
-        return false;  // Throttled
+    // Immediately mark the data model as dirty
+    // RmlUi will re-evaluate on next render
+    notif_model_handle_->DirtyVariable("notifications");
+    notif_model_handle_->DirtyVariable("count");
+}
+
+void NotificationPlugin::CleanupExpired() {
+    if (!notification_feed_) {
+        return;
     }
-    last_update_time_ = current_time;
 
     // Cleanup expired notifications based on TTL
+    // This will trigger the change callback if any are removed
     notification_feed_->CleanupExpired();
-
-    // Get new cache and count
-    std::vector<Notification> new_cache = notification_feed_->GetRecent(100);
-    int new_count = static_cast<int>(new_cache.size());
-
-    // Check if count changed
-    bool count_changed = (new_count != *notification_count_);
-
-    // Always update the underlying data
-    *notification_cache_ = std::move(new_cache);
-    *notification_count_ = new_count;
-
-    // Only dirty if count actually changed to minimize RmlUi re-evaluation
-    // Content changes will be picked up on next explicit dirty
-    if (count_changed) {
-        notif_model_handle_->DirtyVariable("notifications");
-        notif_model_handle_->DirtyVariable("count");
-        return true;
-    }
-
-    return false;
 }
 
 void NotificationPlugin::OnContextDestroy(Rml::Context* context) {
@@ -189,16 +167,14 @@ void NotificationPlugin::SetupEventHandlers() {
 namespace NotificationOverlay {
 
 bool Initialise(Rml::Context* context, NotificationFeed* notification_feed,
-                std::vector<Notification>* notification_cache,
-                Rml::DataModelHandle* notif_model_handle,
-                int* notification_count) {
+                Rml::DataModelHandle* notif_model_handle) {
     if (NotificationPlugin::GetInstance() != nullptr) {
         LOG_WARN("NotificationOverlay already initialized");
         return false;
     }
 
     NotificationPlugin* plugin = new NotificationPlugin();
-    if (!plugin->Initialise(context, notification_feed, notification_cache, notif_model_handle, notification_count)) {
+    if (!plugin->Initialise(context, notification_feed, notif_model_handle)) {
         delete plugin;
         return false;
     }
@@ -206,6 +182,7 @@ bool Initialise(Rml::Context* context, NotificationFeed* notification_feed,
     // Register with RmlUi plugin system
     Rml::RegisterPlugin(plugin);
 
+    // Note: Callback is setup in main.cpp to update cache and mark dirty
     return true;
 }
 
@@ -230,9 +207,18 @@ bool IsVisible() {
     return plugin ? plugin->IsVisible() : false;
 }
 
-bool Update() {
+void MarkDirty() {
     NotificationPlugin* plugin = NotificationPlugin::GetInstance();
-    return plugin ? plugin->Update() : false;
+    if (plugin) {
+        plugin->MarkDirty();
+    }
+}
+
+void CleanupExpired() {
+    NotificationPlugin* plugin = NotificationPlugin::GetInstance();
+    if (plugin) {
+        plugin->CleanupExpired();
+    }
 }
 
 } // namespace NotificationOverlay

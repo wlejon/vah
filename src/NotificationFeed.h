@@ -2,9 +2,9 @@
 
 #include <string>
 #include <vector>
-#include <deque>
 #include <memory>
 #include <chrono>
+#include <functional>
 #include "InputState.h"
 
 enum class NotificationType {
@@ -34,29 +34,35 @@ struct Notification {
 
 class NotificationFeed {
 public:
+    using OnChangeCallback = std::function<void()>;
+
     NotificationFeed();
     ~NotificationFeed() = default;
 
-    // Add notification to feed
+    // Add notification to feed (triggers onChange callback)
     void AddNotification(Notification&& notification);
 
-    // Get recent notifications (for data binding)
-    std::vector<Notification> GetRecent(size_t count = 50);
+    // Direct access to notifications vector for data binding
+    std::vector<Notification>& GetNotifications() { return notifications_; }
+    const std::vector<Notification>& GetNotifications() const { return notifications_; }
 
-    // Get all notifications
-    const std::deque<Notification>& GetAll() const { return notifications_; }
+    // Get count for data binding
+    int GetCount() const { return static_cast<int>(notifications_.size()); }
 
-    // Dismiss a notification
+    // Dismiss a notification (triggers onChange callback)
     void Dismiss(const std::string& notification_id);
 
-    // Clear all notifications
+    // Clear all notifications (triggers onChange callback)
     void Clear();
 
     // Get notification by ID (for expansion)
     const Notification* Get(const std::string& notification_id) const;
 
-    // Remove expired notifications based on TTL
+    // Remove expired notifications based on TTL (triggers onChange callback if any removed)
     void CleanupExpired();
+
+    // Set callback for when notifications change
+    void SetOnChangeCallback(OnChangeCallback callback) { on_change_callback_ = callback; }
 
     // Generate unique notification ID
     static std::string GenerateId();
@@ -65,6 +71,9 @@ public:
     static double GetCurrentTime();
 
 private:
-    std::deque<Notification> notifications_;  // FIFO queue
-    size_t max_notifications_ = 200;          // Keep last 200
+    void TriggerChange();  // Call after modifications to notify listeners
+
+    std::vector<Notification> notifications_;  // Most recent first
+    size_t max_notifications_ = 200;           // Keep last 200
+    OnChangeCallback on_change_callback_;      // Called when notifications change
 };
