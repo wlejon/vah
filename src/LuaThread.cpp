@@ -5,6 +5,7 @@
 #include "SqliteBindings.h"
 #include "HttpBindings.h"
 #include "FileWatcherBindings.h"
+#include "FileIngestionBindings.h"
 #include "DataStore.h"
 #include <httplib.h>
 #include <chrono>
@@ -418,6 +419,9 @@ void LuaThread::SetupLuaBindings() {
 
     // Setup file watcher bindings (each thread owns its watcher)
     FileWatcherBindings::SetupBindings(*lua_);
+
+    // Setup file ingestion bindings
+    FileIngestionBindings::SetupBindings(*lua_);
 
     // Bind event registration system
     auto event_table = lua_->create_table();

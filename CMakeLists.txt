@@ -52,6 +52,8 @@ add_executable(vah
     src/NanoVGText.cpp
     src/NanoVGImage.cpp
     src/NanoVGUtils.cpp
+    src/FileIngestion.cpp
+    src/FileIngestionBindings.cpp
 )
 
 target_include_directories(vah PRIVATE

@@ -36,6 +36,4 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-we've created the rendering side of the workflow system. it's looking great. you can see it in ui/workflow_editor.lua and related view files (rcss and rml). we created the database support side for the workflow nodes and we created an editor for the nodes. currently, the application runs through "main" and this spawns the workflow. it's a little workflow app that shows the node editor as well. currently, when i edit the workflow, it does not persist. the active workflow should be saved to a db and we should allow the user to create new ones/modify old ones. 
-
-
+once you understand manufold-client, please review vah and determine what pieces remain to be built in the foundation to properly support the clean building of the manufold-client.

@@ -6,6 +6,7 @@
 #include <RmlUi/Debugger.h>
 #include <iostream>
 #include <memory>
+#include <filesystem>
 
 #include "Logger.h"
 #include "RmlUi_Renderer_GL3.h"
@@ -325,15 +326,30 @@ private:
                     break;
 
                 case SDL_DROPFILE:
-                    // Handle file drag and drop
+                    // Handle file/folder drag and drop
                     if (event.drop.file) {
-                        std::string dropped_file(event.drop.file);
+                        std::string dropped_path(event.drop.file);
                         SDL_free(event.drop.file);
 
-                        LOG_INFO("File drop detected: {}", dropped_file);
-                        // Trigger UI event with file path
+                        LOG_INFO("Drop detected: {}", dropped_path);
+
+                        // Determine if it's a file or directory
                         PayloadMap payload;
-                        payload["path"] = dropped_file;
+                        payload["path"] = dropped_path;
+
+                        try {
+                            if (std::filesystem::is_directory(dropped_path)) {
+                                payload["is_directory"] = true;
+                                LOG_INFO("Dropped item is a directory");
+                            } else {
+                                payload["is_directory"] = false;
+                                LOG_INFO("Dropped item is a file");
+                            }
+                        } catch (const std::exception& e) {
+                            LOG_WARN("Error checking dropped path '{}': {}", dropped_path, e.what());
+                            payload["is_directory"] = false;
+                        }
+
                         ui_event_queue_->enqueue(UIEvent{"file_drop", payload});
                     }
                     break;
