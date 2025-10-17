@@ -63,11 +63,11 @@
                 <div class="workflows-list">
                     <div class="workflows-container" data-model="workflows" data-for="workflow,i : workflows">
                         <div class="workflow-item" data-attr-data-row-index="i">
-                            <div class="workflow-item-content" onclick="trigger('select_workflow'); switch_to_workflow_view(document)">
+                            <div class="workflow-item-content" data-event-click="trigger('select_workflow')" onclick="switch_to_workflow_view(document)">
                                 <h3>{{ workflow.name }}</h3>
                                 <p class="workflow-meta">Updated: {{ workflow.updated_at }}</p>
                             </div>
-                            <button class="delete-btn" onclick="trigger('delete_workflow')">×</button>
+                            <button class="delete-btn" data-event-click="trigger('delete_workflow')">×</button>
                         </div>
                     </div>
                 </div>
