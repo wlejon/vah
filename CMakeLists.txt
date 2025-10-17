@@ -54,6 +54,9 @@ add_executable(vah
     src/NanoVGUtils.cpp
     src/FileIngestion.cpp
     src/FileIngestionBindings.cpp
+    src/NotificationFeed.cpp
+    src/NotificationBindings.cpp
+    src/NotificationPlugin.cpp
 )
 
 target_include_directories(vah PRIVATE

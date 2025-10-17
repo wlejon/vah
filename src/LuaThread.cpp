@@ -6,6 +6,7 @@
 #include "HttpBindings.h"
 #include "FileWatcherBindings.h"
 #include "FileIngestionBindings.h"
+#include "NotificationBindings.h"
 #include "DataStore.h"
 #include <httplib.h>
 #include <chrono>
@@ -136,7 +137,8 @@ namespace {
 LuaThread::LuaThread(int id, const std::string& script_path,
                      moodycamel::ConcurrentQueue<Command>* command_queue,
                      moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
-                     DataStore* data_store)
+                     DataStore* data_store,
+                     NotificationFeed* notification_feed)
     : id_(id)
     , script_path_(script_path)
     , state_(State::Starting)
@@ -145,6 +147,7 @@ LuaThread::LuaThread(int id, const std::string& script_path,
     , command_queue_(command_queue)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
+    , notification_feed_(notification_feed)
     , response_queue_(std::make_unique<moodycamel::ConcurrentQueue<Response>>())
     , next_request_id_(1)
     , parent_thread_id_(0)
@@ -422,6 +425,9 @@ void LuaThread::SetupLuaBindings() {
 
     // Setup file ingestion bindings
     FileIngestionBindings::SetupBindings(*lua_);
+
+    // Setup notification bindings
+    NotificationBindings::SetupBindings(*lua_, notification_feed_);
 
     // Bind event registration system
     auto event_table = lua_->create_table();

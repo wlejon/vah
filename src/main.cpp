@@ -23,6 +23,9 @@
 #include "CommandProcessor.h"
 #include "ElementCanvas.h"
 #include "NanoVGBindings.h"
+#include "NotificationFeed.h"
+#include "NotificationBindings.h"
+#include "NotificationPlugin.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -174,7 +177,8 @@ public:
         command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
         ui_event_queue_ = std::make_unique<moodycamel::ConcurrentQueue<UIEvent>>();
         data_store_ = std::make_unique<DataStore>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get());
+        notification_feed_ = std::make_unique<NotificationFeed>();
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get(), notification_feed_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(ui_event_queue_.get());
 
         // Initialize managers
@@ -185,7 +189,8 @@ public:
         command_processor_ = std::make_unique<CommandProcessor>(
             thread_manager_.get(),
             document_manager_.get(),
-            data_model_manager_.get()
+            data_model_manager_.get(),
+            notification_feed_.get()
         );
 
         // Setup RmlUI lua bindings - pass context so we can create data models
@@ -209,6 +214,44 @@ public:
         NanoVGBindings::SetupBindings(rml_lua);
 
         rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_, data_store_.get());
+
+        // Setup global notification feed reference for Lua callbacks
+        extern NotificationFeed* g_notification_feed;
+        g_notification_feed = notification_feed_.get();
+
+        // Register notification data model with RmlUi
+        Rml::DataModelConstructor notif_constructor = rml_context_->CreateDataModel("notifications");
+        if (auto notif_handle = notif_constructor.RegisterStruct<Notification>()) {
+            notif_handle.RegisterMember("id", &Notification::id);
+            notif_handle.RegisterMember("type", &Notification::type);
+            notif_handle.RegisterMember("title", &Notification::title);
+            notif_handle.RegisterMember("message", &Notification::message);
+            notif_handle.RegisterMember("thread_name", &Notification::thread_name);
+            notif_handle.RegisterMember("timestamp", &Notification::timestamp);
+            notif_handle.RegisterMember("dismissible", &Notification::dismissible);
+            notif_handle.RegisterMember("expandable", &Notification::expandable);
+            notif_handle.RegisterMember("expanded_content", &Notification::expanded_content);
+        }
+        notif_constructor.RegisterArray<std::vector<Notification>>();
+
+        // Bind directly to the notifications vector in NotificationFeed
+        // We'll update this vector before rendering
+        notif_constructor.Bind("notifications", &notification_cache_);
+
+        // Bind count variable for the notification count display
+        notif_constructor.Bind("count", &notification_count_);
+
+        notif_model_handle_ = notif_constructor.GetModelHandle();
+
+        // Initialize notification overlay (global, always visible)
+        if (!NotificationOverlay::Initialise(rml_context_, notification_feed_.get(),
+                                            &notification_cache_, &notif_model_handle_, &notification_count_)) {
+            LOG_ERROR("Failed to initialize notification overlay");
+        } else {
+            // Show the notification overlay
+            NotificationOverlay::SetVisible(true);
+            LOG_INFO("Notification overlay initialized and visible");
+        }
 
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");
@@ -247,6 +290,9 @@ public:
     void Shutdown() {
         LOG_INFO("Shutting down Vah Engine...");
 
+        // Shutdown notification overlay
+        NotificationOverlay::Shutdown();
+
         // Stop file watcher
         ui_file_watch_listener_.reset();
         ui_file_watcher_.reset();
@@ -268,6 +314,9 @@ public:
             rml_context_->UnloadAllDocuments();
             rml_context_ = nullptr;
         }
+
+        // Shutdown debugger before RmlUi
+        Rml::Debugger::Shutdown();
 
         Rml::Shutdown();
 
@@ -564,6 +613,9 @@ private:
     }
 
     void Update() {
+        // Update notification overlay (syncs feed to cache and updates UI)
+        NotificationOverlay::Update();
+
         if (rml_context_) {
             rml_context_->Update();
         }
@@ -609,6 +661,10 @@ private:
     std::unique_ptr<DocumentManager> document_manager_;
     std::unique_ptr<DataModelManager> data_model_manager_;
     std::unique_ptr<CommandProcessor> command_processor_;
+    std::unique_ptr<NotificationFeed> notification_feed_;
+    Rml::DataModelHandle notif_model_handle_;
+    std::vector<Notification> notification_cache_;  // Cache for data binding
+    int notification_count_ = 0;  // Size of notification cache for data binding
 
     // File watcher for RML/RCSS hot reload
     std::unique_ptr<efsw::FileWatcher> ui_file_watcher_;

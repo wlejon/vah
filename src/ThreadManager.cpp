@@ -123,10 +123,12 @@ namespace {
 
 ThreadManager::ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
                              moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
-                             DataStore* data_store)
+                             DataStore* data_store,
+                             NotificationFeed* notification_feed)
     : command_queue_(command_queue)
     , ui_event_queue_(ui_event_queue)
     , data_store_(data_store)
+    , notification_feed_(notification_feed)
 {
 }
 
@@ -144,7 +146,7 @@ LuaThread* ThreadManager::GetThread(int thread_id) const {
 int ThreadManager::SpawnThread(const std::string& script_path) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_, notification_feed_);
     thread->Start();
 
     threads_.push_back(std::move(thread));
@@ -156,7 +158,7 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
 int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread_id, int parent_request_id) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_, notification_feed_);
 
     if (parent_thread_id != 0) {
         thread->SetParent(parent_thread_id, parent_request_id);

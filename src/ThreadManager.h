@@ -9,12 +9,14 @@
 #include "InputState.h"
 
 class DataStore;
+class NotificationFeed;
 
 class ThreadManager {
 public:
     ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
                   moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
-                  DataStore* data_store);
+                  DataStore* data_store,
+                  NotificationFeed* notification_feed);
     ~ThreadManager();
 
     // Thread lifecycle
@@ -51,6 +53,7 @@ private:
     moodycamel::ConcurrentQueue<Command>* command_queue_;
     moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
     DataStore* data_store_;
+    NotificationFeed* notification_feed_;
 
     std::vector<std::unique_ptr<LuaThread>> threads_;
 };

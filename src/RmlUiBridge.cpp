@@ -1,9 +1,14 @@
 #include "RmlUiBridge.h"
 #include "Logger.h"
 #include "DataStore.h"
+#include "NotificationFeed.h"
+#include "NotificationPlugin.h"
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
+
+// Global references for lua callbacks (accessible from main.cpp)
+NotificationFeed* g_notification_feed = nullptr;
 
 namespace {
     // Global reference to the bridge for lua callback
@@ -210,6 +215,57 @@ namespace {
         return 1;  // Return the table
     }
 
+    // Lua callback for toggle_notification_feed
+    int lua_toggle_notification_feed(lua_State* L) {
+        // The notification overlay is global, so we find it by ID in the context
+        // First argument is the calling document (we don't actually need it)
+
+        // We need to find the vah-notification-overlay document in the context
+        // For now, just toggle the stream class directly via the global context
+        if (g_bridge && g_bridge->GetContext()) {
+            Rml::ElementDocument* overlay_doc = g_bridge->GetContext()->GetDocument("vah-notification-overlay");
+            if (overlay_doc) {
+                Rml::Element* stream = overlay_doc->GetElementById("notification-stream");
+                if (stream) {
+                    bool is_active = stream->IsClassSet("active");
+                    stream->SetClass("active", !is_active);
+
+                    // If opening, update the notifications to ensure latest data
+                    if (!is_active) {
+                        NotificationOverlay::Update();
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    // Lua callback for clear_notifications
+    int lua_clear_notifications(lua_State* L) {
+        if (g_notification_feed) {
+            g_notification_feed->Clear();
+            // Update the UI
+            NotificationOverlay::Update();
+        }
+        return 0;
+    }
+
+    // Lua callback for dismiss_notification
+    int lua_dismiss_notification(lua_State* L) {
+        // Arguments: event, notif_id
+        if (!lua_isstring(L, 2)) {
+            return luaL_error(L, "dismiss_notification requires notification ID");
+        }
+
+        std::string notif_id = lua_tostring(L, 2);
+        if (g_notification_feed) {
+            g_notification_feed->Dismiss(notif_id);
+            // Update the UI
+            NotificationOverlay::Update();
+        }
+        return 0;
+    }
+
 }
 
 RmlUiBridge::RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
@@ -238,12 +294,22 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     lua_setfield(L, -2, "update_row");
     lua_setglobal(L, "data");
 
+    // Register notification event handlers
+    lua_pushcfunction(L, lua_toggle_notification_feed);
+    lua_setglobal(L, "toggle_notification_feed");
+
+    lua_pushcfunction(L, lua_clear_notifications);
+    lua_setglobal(L, "clear_notifications");
+
+    lua_pushcfunction(L, lua_dismiss_notification);
+    lua_setglobal(L, "dismiss_notification");
+
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger() and data.get() functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger(), data, and notification functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {

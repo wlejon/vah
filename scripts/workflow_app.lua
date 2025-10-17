@@ -529,14 +529,19 @@ end
 function startup()
     print("Workflow Application started (thread_id: " .. thread_id .. ")")
 
+    -- Send startup notification
+    notifications.success("Workflow App Started", "Initializing workflow application...")
+
     -- Initialize workflow database
     if not workflow_db.init() then
         print("ERROR: Failed to initialize workflow database")
+        notifications.error("Database Error", "Failed to initialize workflow database")
         return
     end
 
     database_initialized = true
     print("Workflow database initialized successfully")
+    notifications.info("Database Ready", "Workflow database initialized")
 
     -- Register reload handler for workflow list view
     event.register("reload_workflows", reload_workflows_handler)

@@ -1,0 +1,306 @@
+<rml>
+<head>
+    <title>Notifications</title>
+    <link type="text/rcss" href="ui/reset.rcss"/>
+    <style>
+        body {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 20%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999999;
+            font-family: roboto;
+            background-color: transparent;
+        }
+
+        #feed-toggle {
+            position: fixed;
+            bottom: 20dp;
+            right: 20dp;
+            background-color: #2c3e50;
+            border-radius: 20dp;
+            padding: 10dp 15dp;
+            cursor: pointer;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 8dp;
+        }
+
+        #feed-toggle:hover {
+            background-color: #34495e;
+        }
+
+        #feed-toggle .icon {
+            font-size: 16dp;
+            color: #3498db;
+        }
+
+        #feed-toggle .count {
+            font-size: 14dp;
+            font-weight: bold;
+            color: white;
+        }
+
+        #notification-stream {
+            position: fixed;
+            right: -400dp;
+            top: 0;
+            width: 400dp;
+            height: 100%;
+            background-color: rgba(30, 30, 30, 150);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #notification-stream.active {
+            right: 0;
+        }
+
+        #close-feed {
+            position: absolute;
+            top: 10dp;
+            right: 10dp;
+            background-color: #34495e;
+            color: white;
+            border-width: 0;
+            border-radius: 4dp;
+            padding: 8dp 12dp;
+            cursor: pointer;
+            font-size: 14dp;
+            z-index: 10;
+        }
+
+        #close-feed:hover {
+            background-color: #e74c3c;
+        }
+
+        .stream-header {
+            padding: 20dp;
+            border-bottom-width: 1dp;
+            border-bottom-color: rgba(255, 255, 255, 30);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .stream-header h3 {
+            font-size: 18dp;
+            font-weight: bold;
+            color: white;
+            margin: 0;
+        }
+
+        .stream-header button {
+            background-color: #34495e;
+            color: white;
+            border-width: 0;
+            border-radius: 4dp;
+            padding: 6dp 12dp;
+            cursor: pointer;
+            font-size: 12dp;
+        }
+
+        .stream-header button:hover {
+            background-color: #3f5771;
+        }
+
+        .notification-items {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+
+        .notification-item {
+            display: flex;
+            padding: 15dp;
+            border-bottom-width: 1dp;
+            border-bottom-color: rgba(255, 255, 255, 30);
+            cursor: pointer;
+            align-items: flex-start;
+            gap: 12dp;
+        }
+
+        .notification-item:hover {
+            background-color: rgba(255, 255, 255, 30);
+        }
+
+        .notif-icon {
+            font-size: 20dp;
+            min-width: 24dp;
+            text-align: center;
+        }
+
+        /* Color coding by type */
+        .notification-item.info {
+            border-left-width: 3dp;
+            border-left-color: #3498db;
+        }
+        .notification-item.info .notif-icon {
+            color: #3498db;
+        }
+
+        .notification-item.progress {
+            border-left-width: 3dp;
+            border-left-color: #1abc9c;
+        }
+        .notification-item.progress .notif-icon {
+            color: #1abc9c;
+        }
+
+        .notification-item.success {
+            border-left-width: 3dp;
+            border-left-color: #2ecc71;
+        }
+        .notification-item.success .notif-icon {
+            color: #2ecc71;
+        }
+
+        .notification-item.warning {
+            border-left-width: 3dp;
+            border-left-color: #f39c12;
+        }
+        .notification-item.warning .notif-icon {
+            color: #f39c12;
+        }
+
+        .notification-item.error {
+            border-left-width: 3dp;
+            border-left-color: #e74c3c;
+        }
+        .notification-item.error .notif-icon {
+            color: #e74c3c;
+        }
+
+        .notification-item.agent-question {
+            border-left-width: 3dp;
+            border-left-color: #9b59b6;
+        }
+        .notification-item.agent-question .notif-icon {
+            color: #9b59b6;
+        }
+
+        .notification-item.agent-thinking {
+            border-left-width: 3dp;
+            border-left-color: #95a5a6;
+        }
+        .notification-item.agent-thinking .notif-icon {
+            color: #95a5a6;
+        }
+
+        .notification-item.file-op {
+            border-left-width: 3dp;
+            border-left-color: #e67e22;
+        }
+        .notification-item.file-op .notif-icon {
+            color: #e67e22;
+        }
+
+        .notif-content {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4dp;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .notif-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8dp;
+        }
+
+        .notif-title {
+            font-size: 14dp;
+            font-weight: 500;
+            color: white;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .notif-thread {
+            font-size: 11dp;
+            color: rgba(255, 255, 255, 150);
+            white-space: nowrap;
+        }
+
+        .notif-message {
+            font-size: 12dp;
+            color: rgba(255, 255, 255, 200);
+            margin: 0;
+        }
+
+        .dismiss-btn {
+            font-size: 18dp;
+            color: rgba(255, 255, 255, 150);
+            background-color: transparent;
+            border-width: 0;
+            cursor: pointer;
+            padding: 0;
+            width: 20dp;
+            height: 20dp;
+            line-height: 20dp;
+            text-align: center;
+        }
+
+        .dismiss-btn:hover {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="feed-toggle" onclick="toggle_notification_feed(document)">
+        <span class="count" data-model="notifications">{{ count }}</span>
+    </div>
+
+    <div id="notification-stream">
+        <div class="stream-header">
+            <h3>Activity</h3>
+            <button id="close-feed" onclick="toggle_notification_feed(document)">X</button>
+        </div>
+
+        <div class="notification-items" data-model="notifications">
+            <div class="notification-item" data-for="notif : notifications"
+                 data-class-info="notif.type == 0"
+                 data-class-progress="notif.type == 1"
+                 data-class-success="notif.type == 2"
+                 data-class-warning="notif.type == 3"
+                 data-class-error="notif.type == 4"
+                 data-class-agent-question="notif.type == 5"
+                 data-class-agent-thinking="notif.type == 6"
+                 data-class-file-op="notif.type == 7">
+
+                <div class="notif-icon">
+                    <span data-if="notif.type == 0">i</span>
+                    <span data-if="notif.type == 1">...</span>
+                    <span data-if="notif.type == 2">OK</span>
+                    <span data-if="notif.type == 3">!</span>
+                    <span data-if="notif.type == 4">X</span>
+                    <span data-if="notif.type == 5">?</span>
+                    <span data-if="notif.type == 6">...</span>
+                    <span data-if="notif.type == 7">F</span>
+                </div>
+
+                <div class="notif-content">
+                    <div class="notif-header">
+                        <span class="notif-title">{{ notif.title }}</span>
+                        <span class="notif-thread">{{ notif.thread_name }}</span>
+                    </div>
+                    <p class="notif-message" data-if="notif.message">{{ notif.message }}</p>
+                </div>
+
+                <button class="dismiss-btn"
+                        data-if="notif.dismissible"
+                        onclick="dismiss_notification(event, notif.id)">×</button>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>

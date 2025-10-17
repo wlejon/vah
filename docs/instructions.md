@@ -36,4 +36,31 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-once you understand manufold-client, please review vah and determine what pieces remain to be built in the foundation to properly support the clean building of the manufold-client.
+you've built a notification overlay as an internal document for vah to render through rmlui. it's looking pretty good. please perform a code review.
+## current git status
+
+PS D:\projects\vah> git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   CMakeLists.txt
+        modified:   scripts/workflow_app.lua
+        modified:   src/CommandProcessor.cpp
+        modified:   src/CommandProcessor.h
+        modified:   src/LuaThread.cpp
+        modified:   src/LuaThread.h
+        modified:   src/RmlUiBridge.cpp
+        modified:   src/ThreadManager.cpp
+        modified:   src/ThreadManager.h
+        modified:   src/main.cpp
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        src/NotificationBindings.cpp
+        src/NotificationBindings.h
+        src/NotificationFeed.cpp
+        src/NotificationFeed.h
+        src/NotificationPlugin.cpp
+        src/NotificationPlugin.h
+        ui/internal/

@@ -15,6 +15,7 @@
 // Forward declarations
 namespace httplib { class Server; }
 class DataStore;
+class NotificationFeed;
 
 class LuaThread {
 public:
@@ -30,7 +31,8 @@ public:
     LuaThread(int id, const std::string& script_path,
               moodycamel::ConcurrentQueue<Command>* command_queue,
               moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
-              DataStore* data_store);
+              DataStore* data_store,
+              NotificationFeed* notification_feed);
     ~LuaThread();
 
     // Start the thread (non-blocking)
@@ -89,6 +91,7 @@ private:
     moodycamel::ConcurrentQueue<Command>* command_queue_;
     moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
     DataStore* data_store_;
+    NotificationFeed* notification_feed_;
     std::unique_ptr<moodycamel::ConcurrentQueue<Response>> response_queue_;
 
     struct PendingRequest {
