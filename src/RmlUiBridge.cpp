@@ -401,7 +401,10 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
     lua_setglobal(L, "rmlui_context");
 
-    LOG_INFO("RmlUiBridge: Registered trigger(), data, and notification functions in RmlUI lua state");
+    // Register DOM introspection API
+    DomIntrospection::RegisterLuaBindings(L);
+
+    LOG_INFO("RmlUiBridge: Registered trigger(), data, notification, and DOM introspection functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {

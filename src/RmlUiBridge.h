@@ -5,6 +5,7 @@
 #include <string>
 #include <moodycamel/concurrentqueue.h>
 #include "InputState.h"
+#include "DomIntrospection.h"
 
 class DataStore;  // Forward declaration
 

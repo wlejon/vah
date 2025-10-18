@@ -36,4 +36,6 @@ for assistance, please read the code directly or the documentation. they can be 
 
 this task fits within your context, there's no need to use subagents.
 
-you've built a notification overlay as an internal document for vah to render through rmlui. it's looking pretty good. please perform a code review.
+once you understand the longer term goal, manufold-client, please review what we have. 
+
+i want to put the html lexer/parser in lua to good use. i want to extract useful text from markup and render it in rml. to do this, we'll have to create a dynamic view. one that we can feed a string of markup and it'll render it. so we're taking content from the web, reducing it's complexity to just what's needed (the content the page was made for) and then, based on what it is (list, tables, text, etc), we create a minimalist rml view for it. this minimalist view of external web pages gives us an excellent web browser for agents. 

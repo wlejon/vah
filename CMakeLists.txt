@@ -57,6 +57,7 @@ add_executable(vah
     src/NotificationFeed.cpp
     src/NotificationBindings.cpp
     src/NotificationPlugin.cpp
+    src/DomIntrospection.cpp
 )
 
 target_include_directories(vah PRIVATE

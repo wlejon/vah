@@ -4,6 +4,9 @@
 function startup()
     print("Main Lua thread started")
 
+    -- Spawn AI agent thread (auto-start, waits for user input via global queue)
+    command.spawn_thread("scripts/agent/core.lua")
+
     -- Choose which demo to run (comment/uncomment):
 
     -- Unified Workflow Application (combines workflow editor and node type editor)
@@ -31,7 +34,7 @@ function startup()
     -- command.spawn_thread("scripts/http_server.lua")
     -- command.spawn_thread("scripts/http_client.lua")
 
-    print("Demo initialized")
+    print("Application initialized (with AI agent)")
 end
 
 function update(dt)
