@@ -6,8 +6,10 @@ function startup()
 
     -- Choose which demo to run (comment/uncomment):
 
+    command.spawn_thread("scripts/chat.lua")
+
     -- Unified Workflow Application (combines workflow editor and node type editor)
-    command.spawn_thread("scripts/workflow_app.lua")
+    -- command.spawn_thread("scripts/workflow_app.lua")
 
     -- Tetris Game
     -- ui.load_document("ui/tetris.rml")
@@ -30,8 +32,6 @@ function startup()
     -- HTTP SSE demo (server and client)
     -- command.spawn_thread("scripts/http_server.lua")
     -- command.spawn_thread("scripts/http_client.lua")
-
-    print("Application initialized (with AI agent)")
 end
 
 function update(dt)

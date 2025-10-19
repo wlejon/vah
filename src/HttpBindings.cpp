@@ -245,6 +245,8 @@ std::tuple<sol::object, std::string> Post(
         std::string body;
         std::string content_type = "application/json";
         int timeout = 30;
+        sol::optional<sol::function> on_event;
+        sol::optional<sol::function> on_error;
 
         if (config) {
             // Parse headers
@@ -270,9 +272,109 @@ std::tuple<sol::object, std::string> Post(
             if (auto t = config->get<sol::optional<int>>("timeout")) {
                 timeout = t.value();
             }
+
+            // Check for streaming
+            on_event = config->get<sol::optional<sol::function>>("on_event");
+            on_error = config->get<sol::optional<sol::function>>("on_error");
         }
 
-        // Non-streaming mode (POST streaming would be different)
+        // Streaming mode
+        if (on_event) {
+            // Get LuaThread pointer for cancellation support
+            void* ptr = lua.registry()["__luathread_ptr"];
+            LuaThread* thread = static_cast<LuaThread*>(ptr);
+
+            httplib::Client client(url_parts.host, url_parts.port);
+            client.set_connection_timeout(30);
+            client.set_read_timeout(timeout);
+
+            std::string event_type;
+            std::string event_data;
+            std::string buffer;
+
+            auto res = client.Post(url_parts.path, headers, body, content_type,
+                [&](const char* data, size_t len) {
+                    // Check if thread is stopping (abort the stream)
+                    if (thread && thread->ShouldStop()) {
+                        return false;
+                    }
+
+                    buffer.append(data, len);
+
+                    // Process complete lines
+                    size_t pos;
+                    while ((pos = buffer.find('\n')) != std::string::npos) {
+                        std::string line = buffer.substr(0, pos);
+                        buffer = buffer.substr(pos + 1);
+
+                        // Remove \r if present
+                        if (!line.empty() && line.back() == '\r') {
+                            line.pop_back();
+                        }
+
+                        if (line.empty()) {
+                            // Empty line marks end of event
+                            if (!event_data.empty()) {
+                                try {
+                                    sol::state_view lua(on_event.value().lua_state());
+
+                                    // Try to parse as JSON
+                                    sol::object lua_data = sol::nil;
+                                    try {
+                                        auto json_obj = nlohmann::json::parse(event_data);
+                                        lua_data = JsonBindings::JsonToLua(lua, json_obj);
+                                    } catch (...) {
+                                        // If not JSON, pass as string
+                                        lua_data = sol::make_object(lua, event_data);
+                                    }
+
+                                    // Call Lua callback with event type and data
+                                    std::string evt = event_type.empty() ? "message" : event_type;
+                                    on_event.value()(evt, lua_data);
+                                }
+                                catch (const std::exception& e) {
+                                    if (on_error) {
+                                        (*on_error)(std::string("Parse error: ") + e.what());
+                                    }
+                                    return false; // Stop streaming
+                                }
+                            }
+                            event_type.clear();
+                            event_data.clear();
+                        }
+                        else if (line.find("event: ") == 0) {
+                            event_type = line.substr(7);
+                        }
+                        else if (line.find("data: ") == 0) {
+                            if (!event_data.empty()) {
+                                event_data += "\n";
+                            }
+                            event_data += line.substr(6);
+                        }
+                        // Ignore other SSE fields (id, retry, etc.)
+                    }
+
+                    return true; // Continue streaming
+                });
+
+            if (!res) {
+                if (on_error) {
+                    (*on_error)("HTTP request failed: " + httplib::to_string(res.error()));
+                }
+                return {sol::nil, "Streaming request failed"};
+            }
+
+            if (res->status != 200) {
+                if (on_error) {
+                    (*on_error)("HTTP error: " + std::to_string(res->status));
+                }
+                return {sol::nil, "HTTP error: " + std::to_string(res->status)};
+            }
+
+            return {sol::nil, ""};
+        }
+
+        // Non-streaming mode
         httplib::Client client(url_parts.host, url_parts.port);
         client.set_connection_timeout(timeout);
 

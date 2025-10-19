@@ -38,4 +38,18 @@ this task fits within your context, there's no need to use subagents.
 
 once you understand the longer term goal, manufold-client, please review what we have. 
 
-i want to put the html lexer/parser in lua to good use. i want to extract useful text from markup and render it in rml. to do this, we'll have to create a dynamic view. one that we can feed a string of markup and it'll render it. so we're taking content from the web, reducing it's complexity to just what's needed (the content the page was made for) and then, based on what it is (list, tables, text, etc), we create a minimalist rml view for it. this minimalist view of external web pages gives us an excellent web browser for agents. 
+i want to build onto our workflow system a chat system. each chat message is a single node on the workflow. we'll have the standard chat log on the left, half the screen, on the other half we have the workflow that represents the chat. if the user wants to explore a chain of thought, they can go back, click anywhere on the node chain, edit/add/adjust the node, continue anew from here, adding a fork in the workflow.
+
+all tool calls the llm makes are also represented as nodes. 
+
+i'll essentially want to be able to branch at any point. i'll give an example usage:
+
+the llm has been asked to create a few files. it does and is ready for the next task. i want it to modify a file and we have a conversation to have that happen. i could have this conversation in a few ways. 
+
+a) i could continue in the same chain. the 3 files are created, i ask follow adjustments. 
+b) i could start a new chat on each file i want to change, as each file is represented as a tool call and a node. i can open the file representation, start a new chat to modify the file. once all the files are modified, i could go back to the first conversation and continue. the finalized updated files will be represented in the tool calls in this continued conversation.
+c) i could branch on each file separately and continue from each point to resolve only one file at a time. just like in b, i could then continue the original conversation with the modifications in place.
+
+in that example, i'm trying to show aspects of usage i want that we need to design for. 
+
+

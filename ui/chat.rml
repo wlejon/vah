@@ -1,0 +1,41 @@
+<rml>
+<head>
+    <title>Chat</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="chat.rcss"/>
+    <script>
+        function send_chat_message(document)
+            local input = document:GetElementById('chat_input')
+            if input then
+                local value = input:GetAttribute('value')
+                if value and value ~= '' then
+                    trigger('send_message', {text = value})
+                    input:SetAttribute('value', '')
+                end
+            end
+        end
+    </script>
+</head>
+<body>
+    <div class="header" data-model="chat">
+        <div data-for="c : chat">
+            <h1>Chat</h1>
+            <p class="status">{{c.status}}</p>
+        </div>
+    </div>
+
+    <div class="messages-container" data-model="chat">
+        <div data-for="c : chat">
+            <div data-for="msg : c.messages">
+                <div class="message" data-attr-class="'message ' + msg.role" data-rml="msg.content_rml"></div>
+            </div>
+            <div data-if="c.is_streaming" class="streaming" data-rml="c.current_response"></div>
+        </div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="chat_input" />
+        <button onclick="send_chat_message(document)">Send</button>
+        <button class="secondary" data-event-click="trigger('clear_chat')">Clear</button>
+    </div>
+</body>
+</rml>
