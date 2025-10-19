@@ -32,24 +32,10 @@ for assistance, please read the code directly or the documentation. they can be 
 - D:/projects/RmlUi
 - D:/projects/RmlUiDoc
 
+Our loaded font does not have support for icons. stick to ascii in our loaded Roboto font. if you want icons/emojis, style the appropriate tag for the feel you're after instead.
+
 ## current task
 
 this task fits within your context, there's no need to use subagents.
 
-once you understand the longer term goal, manufold-client, please review what we have. 
-
-i want to build onto our workflow system a chat system. each chat message is a single node on the workflow. we'll have the standard chat log on the left, half the screen, on the other half we have the workflow that represents the chat. if the user wants to explore a chain of thought, they can go back, click anywhere on the node chain, edit/add/adjust the node, continue anew from here, adding a fork in the workflow.
-
-all tool calls the llm makes are also represented as nodes. 
-
-i'll essentially want to be able to branch at any point. i'll give an example usage:
-
-the llm has been asked to create a few files. it does and is ready for the next task. i want it to modify a file and we have a conversation to have that happen. i could have this conversation in a few ways. 
-
-a) i could continue in the same chain. the 3 files are created, i ask follow adjustments. 
-b) i could start a new chat on each file i want to change, as each file is represented as a tool call and a node. i can open the file representation, start a new chat to modify the file. once all the files are modified, i could go back to the first conversation and continue. the finalized updated files will be represented in the tool calls in this continued conversation.
-c) i could branch on each file separately and continue from each point to resolve only one file at a time. just like in b, i could then continue the original conversation with the modifications in place.
-
-in that example, i'm trying to show aspects of usage i want that we need to design for. 
-
-
+your current task is in [text editor element plan](text-editor-element-plan.md). 
