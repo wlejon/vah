@@ -38,4 +38,4 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-you've implemented a text editor but just the viewer portion. next we need to support editing text files. we need to properly mime type files and determine if we can edit it. then we need to place a blinking cursor in the mouse position and accept keyboard inputs. we need to support common keyboard shortcuts. create a configuration system for keyboard inputs so they can be remapped. 
+you've implemented a text editor as a custom rmlui element. please make the editing cursor blink faster. the editor needs to handle spaces vs tabs gracefully. tab should create four spaces and it should be configurable if tabs instead place tabs. the ElementTextEditor is getting too large however. i also want additions so we should break down this file into reasonable logical files. please review what's there and tell me what you think the breakdown should look like.

@@ -3,7 +3,7 @@
 #include <RmlUi/Core.h>
 #include <string>
 #include <unordered_map>
-#include "DataStore.h"  // For DynamicTable type
+#include "DataStore.h"  // For DynamicTable and DynamicValue types
 
 class DocumentManager {
 public:
@@ -26,6 +26,7 @@ public:
     void SetTextEditorTokens(const std::string& element_id, const DynamicTable& tokens);
     void SetTextEditorEditable(const std::string& element_id, bool editable);
     void SetTextEditorModified(const std::string& element_id, bool modified);
+    void SetTextEditorConfig(const std::string& element_id, const std::string& config_key, const DynamicValue& value);
     std::string GetTextEditorContent(const std::string& element_id);
     bool GetTextEditorModified(const std::string& element_id);
 

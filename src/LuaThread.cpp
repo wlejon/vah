@@ -546,6 +546,14 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    ui_table["set_texteditor_config"] = [this](const std::string& element_id, const std::string& config_key, sol::object value) {
+        Commands::SetTextEditorConfig cmd;
+        cmd.element_id = element_id;
+        cmd.config_key = config_key;
+        cmd.value = ObjectToDynamicValue(value);
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
 
     // Bind data model operations

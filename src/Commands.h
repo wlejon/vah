@@ -105,6 +105,12 @@ namespace Commands {
         bool modified;
     };
 
+    struct SetTextEditorConfig {
+        std::string element_id;
+        std::string config_key;
+        DynamicValue value;
+    };
+
     struct UpdateDataModel {
         std::string model_name;
         DynamicTable data;
@@ -152,6 +158,7 @@ using Command = std::variant<
     Commands::SetTextEditorTokens,
     Commands::SetTextEditorEditable,
     Commands::SetTextEditorModified,
+    Commands::SetTextEditorConfig,
     Commands::UpdateDataModel,
     Commands::TriggerTextEditorModified,
     Commands::FileChanged,

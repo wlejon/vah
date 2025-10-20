@@ -194,6 +194,55 @@ void DocumentManager::SetTextEditorModified(const std::string& element_id, bool 
     editor->SetModified(modified);
 }
 
+void DocumentManager::SetTextEditorConfig(const std::string& element_id, const std::string& config_key, const DynamicValue& value) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("SetTextEditorConfig: Element '{}' not found", element_id);
+        return;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("SetTextEditorConfig: Element '{}' is not a texteditor", element_id);
+        return;
+    }
+
+    // Get config
+    auto& config = editor->GetConfig();
+
+    // Apply config value based on key
+    if (config_key == "cursor_blink_period") {
+        if (std::holds_alternative<double>(value)) {
+            config.cursor_blink_period = std::get<double>(value);
+        } else {
+            LOG_WARN("SetTextEditorConfig: cursor_blink_period requires a number");
+        }
+    } else if (config_key == "cursor_width") {
+        if (std::holds_alternative<double>(value)) {
+            config.cursor_width = static_cast<float>(std::get<double>(value));
+        } else {
+            LOG_WARN("SetTextEditorConfig: cursor_width requires a number");
+        }
+    } else if (config_key == "use_spaces_for_tab") {
+        if (std::holds_alternative<bool>(value)) {
+            config.use_spaces_for_tab = std::get<bool>(value);
+        } else {
+            LOG_WARN("SetTextEditorConfig: use_spaces_for_tab requires a boolean");
+        }
+    } else if (config_key == "tab_width") {
+        if (std::holds_alternative<int64_t>(value)) {
+            config.tab_width = static_cast<int>(std::get<int64_t>(value));
+        } else {
+            LOG_WARN("SetTextEditorConfig: tab_width requires an integer");
+        }
+    } else {
+        LOG_WARN("SetTextEditorConfig: Unknown config key '{}'", config_key);
+    }
+
+    LOG_INFO("SetTextEditorConfig: Set '{}' config '{}' for texteditor '{}'", config_key, element_id, element_id);
+}
+
 std::string DocumentManager::GetTextEditorContent(const std::string& element_id) {
     auto element = FindElementById(element_id);
     if (!element) {

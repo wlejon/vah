@@ -62,6 +62,9 @@ add_executable(vah
     src/TextLayout.cpp
     src/SelectionManager.cpp
     src/SyntaxHighlighter.cpp
+    src/TextEditorConfig.cpp
+    src/TextEditorRenderer.cpp
+    src/TextEditorInput.cpp
     src/ElementTextEditor.cpp
 )
 

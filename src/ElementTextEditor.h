@@ -3,15 +3,14 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/Input.h>
-#include <RmlUi/Core/Geometry.h>
 #include "TextBuffer.h"
 #include "TextLayout.h"
 #include "SelectionManager.h"
+#include "TextEditorConfig.h"
+#include "TextEditorRenderer.h"
+#include "TextEditorInput.h"
 #include "DataStore.h"  // For DynamicTable type
-#include "InputState.h"  // For PayloadMap
 #include <memory>
-#include <vector>
-#include <functional>
 
 /**
  * ElementTextEditor - A custom RmlUi element for viewing and editing text.
@@ -54,6 +53,9 @@ public:
     bool IsModified() const;
     void SetModified(bool modified);
 
+    // Access to config for Lua binding
+    TextEditorConfig& GetConfig() { return *config_; }
+
 protected:
     // Called every frame to update state
     void OnUpdate() override;
@@ -65,55 +67,20 @@ protected:
     bool GetIntrinsicDimensions(Rml::Vector2f& dimensions, float& ratio) override;
 
 private:
-    void GenerateGeometry();
-    void GenerateTextGeometry();
-    void GenerateSelectionGeometry();
-    void GenerateCursorGeometry();
     void DispatchContentChangeEvent();
-
-    // Convert mouse position to text position
-    TextBuffer::Position ScreenToText(float screen_x, float screen_y);
-
-    // Handle mouse events
-    void OnMouseDown(float mouse_x, float mouse_y);
-    void OnMouseMove(float mouse_x, float mouse_y);
-    void OnMouseUp();
-
-    // Handle keyboard events
-    void OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers);
-
-    // Handle text input
-    void OnTextInput(const std::string& text);
+    void OnDirty();
+    void OnContentChange();
+    void OnSave();
 
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
     std::unique_ptr<SelectionManager> selection_;
-
-    // Syntax highlighting tokens (set via command from Lua thread)
-    DynamicTable tokens_;
-
-    // Rendering
-    struct TextGeometry {
-        Rml::Geometry geometry;
-        Rml::Texture texture;
-    };
-    std::vector<TextGeometry> text_geometries_;
-    Rml::Geometry selection_geometry_;
-    Rml::Geometry cursor_geometry_;
-
-    // Dirty flags
-    bool selection_dirty_;
-    bool cursor_dirty_;
-    bool font_ready_;
+    std::unique_ptr<TextEditorConfig> config_;
+    std::unique_ptr<TextEditorRenderer> renderer_;
+    std::unique_ptr<TextEditorInput> input_;
 
     // Editor state
     bool editable_;
     bool modified_;
-    TextBuffer::Position cursor_pos_;
     double cursor_blink_time_;
-    bool cursor_visible_;
-
-    // Mouse state
-    bool mouse_dragging_;
-    Rml::Vector2f last_mouse_pos_;
 };
