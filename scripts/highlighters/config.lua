@@ -20,4 +20,7 @@ return {
     -- RCSS/CSS files
     rcss = "highlighters.rcss_highlighter",
     css = "highlighters.rcss_highlighter",
+
+    -- md
+    md = "highlighters.markdown_highlighter",
 }
