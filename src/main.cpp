@@ -90,7 +90,7 @@ public:
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
         window_ = SDL_CreateWindow("Vah", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                   1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+                                   1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
         if (!window_) {
             LOG_ERROR("Failed to create window: {}", SDL_GetError());
             return false;

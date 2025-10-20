@@ -38,4 +38,4 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-you recently rewrote the event dispatcher code. we're now updating the code to have a main "launcher" that can open the various other apps present. please review scripts/main.lua and the various apps and ui's. create a launcher we load up by default that opens the various files. we want a general "close" button that we can use to go back to the launcher. we probably should have the "whole app" type UI be "internal" like the notification system is. we can make the internal document about app navigation as a whole. for now, just have it be a close button but we'll add a "file" menu, for example, in the future so keep it well architected. 
+i had a [code review](code-review.md) created. Please review it and read the code. tell me if you agree or disagree. if you are in agreement, i'll have you work on the critical issues.
