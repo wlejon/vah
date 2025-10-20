@@ -7,13 +7,13 @@
 #include <RmlUi/Core/Mesh.h>
 #include <SDL2/SDL.h>
 #include <map>
+#include <chrono>
 
-ElementTextEditor::ElementTextEditor(const Rml::String& tag, DataStore* data_store)
+ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     : Rml::Element(tag)
     , buffer_(std::make_unique<TextBuffer>())
     , layout_(std::make_unique<TextLayout>())
     , selection_(std::make_unique<SelectionManager>())
-    , data_store_(data_store)
     , selection_dirty_(false)
     , font_ready_(false)
     , mouse_dragging_(false)
@@ -106,6 +106,11 @@ std::string ElementTextEditor::GetSelectedText() const {
     return selection_->ExtractText(*buffer_);
 }
 
+void ElementTextEditor::SetTokens(const DynamicTable& tokens) {
+    tokens_ = tokens;
+    LOG_INFO("ElementTextEditor: Received {} syntax tokens", tokens.size());
+}
+
 void ElementTextEditor::OnUpdate() {
     // Retry font initialization if not ready
     if (!font_ready_) {
@@ -186,10 +191,7 @@ void ElementTextEditor::GenerateTextGeometry() {
         return;
     }
 
-    // Get syntax highlighting tokens from DataStore
-    // Token model name format: "editor_tokens_<element_id>"
-    std::string token_model_name = "editor_tokens_" + GetId();
-
+    // Get syntax highlighting tokens (set via command from Lua thread)
     struct Token {
         int line;
         int start_col;
@@ -198,37 +200,32 @@ void ElementTextEditor::GenerateTextGeometry() {
     };
     std::vector<Token> tokens;
 
-    // Read tokens from DataStore if available
-    if (data_store_ && data_store_->HasModel(token_model_name)) {
-        auto token_table = data_store_->GetModel(token_model_name);
-        if (token_table) {
-            for (const auto& row : *token_table) {
-                Token token;
+    // Convert tokens from DynamicTable to local format
+    for (const auto& row : tokens_) {
+        Token token;
 
-                // Extract token fields from DynamicRow
-                auto get_int = [&](const std::string& key, int default_val) -> int {
-                    auto it = row.find(key);
-                    if (it != row.end()) {
-                        if (std::holds_alternative<int64_t>(it->second)) {
-                            return static_cast<int>(std::get<int64_t>(it->second));
-                        }
-                    }
-                    return default_val;
-                };
-
-                token.line = get_int("line", 0);
-                token.start_col = get_int("start_col", 0);
-                token.end_col = get_int("end_col", 0);
-
-                int r = get_int("r", 255);
-                int g = get_int("g", 255);
-                int b = get_int("b", 255);
-                int a = get_int("a", 255);
-                token.color = Rml::Colourb(r, g, b, a);
-
-                tokens.push_back(token);
+        // Extract token fields from DynamicRow
+        auto get_int = [&](const std::string& key, int default_val) -> int {
+            auto it = row.find(key);
+            if (it != row.end()) {
+                if (std::holds_alternative<int64_t>(it->second)) {
+                    return static_cast<int>(std::get<int64_t>(it->second));
+                }
             }
-        }
+            return default_val;
+        };
+
+        token.line = get_int("line", 0);
+        token.start_col = get_int("start_col", 0);
+        token.end_col = get_int("end_col", 0);
+
+        int r = get_int("r", 255);
+        int g = get_int("g", 255);
+        int b = get_int("b", 255);
+        int a = get_int("a", 255);
+        token.color = Rml::Colourb(r, g, b, a);
+
+        tokens.push_back(token);
     }
 
     // Build token map for quick lookup: map[line] -> list of tokens on that line

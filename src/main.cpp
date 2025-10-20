@@ -178,7 +178,7 @@ public:
         Rml::Factory::RegisterElementInstancer("canvas", canvas_instancer_.get());
         LOG_INFO("Registered custom element: canvas");
 
-        texteditor_instancer_ = std::make_unique<ElementTextEditorInstancer>(data_store_.get());
+        texteditor_instancer_ = std::make_unique<ElementTextEditorInstancer>();
         Rml::Factory::RegisterElementInstancer("texteditor", texteditor_instancer_.get());
         LOG_INFO("Registered custom element: texteditor");
 

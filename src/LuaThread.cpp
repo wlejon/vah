@@ -525,6 +525,13 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    ui_table["set_texteditor_tokens"] = [this](const std::string& element_id, sol::table tokens) {
+        Commands::SetTextEditorTokens cmd;
+        cmd.element_id = element_id;
+        cmd.tokens = TableToDynamicTable(tokens);
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
 
     // Bind data model operations

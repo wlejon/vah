@@ -90,6 +90,11 @@ namespace Commands {
         std::string content;
     };
 
+    struct SetTextEditorTokens {
+        std::string element_id;
+        DynamicTable tokens;  // Array of token objects
+    };
+
     struct UpdateDataModel {
         std::string model_name;
         DynamicTable data;
@@ -128,6 +133,7 @@ using Command = std::variant<
     Commands::AddElementClass,
     Commands::RemoveElementClass,
     Commands::SetTextEditorContent,
+    Commands::SetTextEditorTokens,
     Commands::UpdateDataModel,
     Commands::FileChanged,
     Commands::AddFileWatch,

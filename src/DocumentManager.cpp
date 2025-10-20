@@ -139,6 +139,24 @@ void DocumentManager::SetTextEditorContent(const std::string& element_id, const 
     LOG_INFO("SetTextEditorContent: Set {} bytes to texteditor '{}'", content.size(), element_id);
 }
 
+void DocumentManager::SetTextEditorTokens(const std::string& element_id, const DynamicTable& tokens) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("SetTextEditorTokens: Element '{}' not found", element_id);
+        return;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("SetTextEditorTokens: Element '{}' is not a texteditor", element_id);
+        return;
+    }
+
+    // Set tokens
+    editor->SetTokens(tokens);
+}
+
 void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
     if (!context_) return;
 

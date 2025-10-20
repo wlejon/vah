@@ -7,7 +7,7 @@
 #include "TextBuffer.h"
 #include "TextLayout.h"
 #include "SelectionManager.h"
-#include "DataStore.h"
+#include "DataStore.h"  // For DynamicTable type
 #include <memory>
 #include <vector>
 
@@ -31,7 +31,7 @@
  */
 class ElementTextEditor : public Rml::Element, public Rml::EventListener {
 public:
-    ElementTextEditor(const Rml::String& tag, DataStore* data_store);
+    ElementTextEditor(const Rml::String& tag);
     virtual ~ElementTextEditor();
 
     // Called when element is added to the document tree
@@ -47,6 +47,7 @@ public:
     void SetText(const std::string& text);
     std::string GetText() const;
     std::string GetSelectedText() const;
+    void SetTokens(const DynamicTable& tokens);
 
 protected:
     // Called every frame to update state
@@ -77,7 +78,9 @@ private:
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
     std::unique_ptr<SelectionManager> selection_;
-    DataStore* data_store_;  // Not owned
+
+    // Syntax highlighting tokens (set via command from Lua thread)
+    DynamicTable tokens_;
 
     // Rendering
     struct TextGeometry {

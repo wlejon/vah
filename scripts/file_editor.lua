@@ -150,29 +150,28 @@ function open_file(file_path)
             print("Skipping syntax highlighting: File too large (" .. format_size(size) .. ")")
         end
         -- Clear any existing tokens
-        data.bind("editor_tokens_code_editor", {})
+        ui.set_texteditor_tokens("code_editor", {})
     end
 end
 
--- Compute syntax tokens and bind them to the data model
+-- Compute syntax tokens and send them via command
 function compute_and_bind_tokens(ext, content)
     local highlighter = get_highlighter_for_extension(ext)
     if not highlighter then
         -- No highlighter available, clear tokens
-        data.bind("editor_tokens_code_editor", {})
+        ui.set_texteditor_tokens("code_editor", {})
         return
     end
 
     -- Call the highlighter function
     local tokens = highlighter(content)
     if tokens and #tokens > 0 then
-        -- Bind the tokens to the data model
-        -- ElementTextEditor will read from "editor_tokens_code_editor"
-        data.bind("editor_tokens_code_editor", tokens)
+        -- Send tokens to ElementTextEditor via command
+        ui.set_texteditor_tokens("code_editor", tokens)
         print("Applied syntax highlighting: " .. #tokens .. " tokens")
     else
         -- No tokens, clear
-        data.bind("editor_tokens_code_editor", {})
+        ui.set_texteditor_tokens("code_editor", {})
     end
 end
 
