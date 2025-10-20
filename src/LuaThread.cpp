@@ -518,63 +518,28 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
-    ui_table["set_texteditor_content"] = [this](const std::string& element_id, const std::string& content, sol::optional<std::string> syntax_highlighter_name) {
+    ui_table["set_texteditor_content"] = [this](const std::string& element_id, const std::string& content, sol::object highlighter_obj) {
         Commands::SetTextEditorContent cmd;
         cmd.element_id = element_id;
         cmd.content = content;
 
-        // Create callback that calls the Lua function from THIS Lua state
-        if (syntax_highlighter_name && !syntax_highlighter_name.value().empty()) {
-            std::string func_name = syntax_highlighter_name.value();
-
-            // Capture lua_ (the Sol2 state) to call the highlighter function
-            cmd.highlighter_callback = [this, func_name](const std::string& text) -> std::vector<SyntaxHighlighter::Token> {
-                std::vector<SyntaxHighlighter::Token> tokens;
-
-                // Call the Lua function
-                sol::protected_function highlighter = (*lua_)[func_name];
-                if (!highlighter.valid()) {
-                    LOG_WARN("Syntax highlighter function '{}' not found", func_name);
-                    return tokens;
+        // Accept either a string (function name) or a function directly
+        if (highlighter_obj.valid()) {
+            if (highlighter_obj.is<std::string>()) {
+                // Legacy: string function name
+                std::string func_name = highlighter_obj.as<std::string>();
+                if (!func_name.empty()) {
+                    cmd.highlighter_callback = [this, func_name](const std::string& text) -> std::vector<SyntaxHighlighter::Token> {
+                        return CallLuaHighlighter(func_name, text);
+                    };
                 }
-
-                auto result = highlighter(text);
-                if (!result.valid()) {
-                    sol::error err = result;
-                    LOG_ERROR("Error calling syntax highlighter '{}': {}", func_name, err.what());
-                    return tokens;
-                }
-
-                // Parse returned token array
-                sol::object ret_obj = result;
-                if (!ret_obj.is<sol::table>()) {
-                    LOG_WARN("Syntax highlighter '{}' did not return a table", func_name);
-                    return tokens;
-                }
-
-                sol::table token_array = ret_obj.as<sol::table>();
-                for (size_t i = 1; i <= token_array.size(); ++i) {
-                    sol::object token_obj = token_array[i];
-                    if (token_obj.is<sol::table>()) {
-                        sol::table token_table = token_obj.as<sol::table>();
-
-                        SyntaxHighlighter::Token token;
-                        token.line = token_table["line"].get_or(0);
-                        token.start_col = token_table["start_col"].get_or(0);
-                        token.end_col = token_table["end_col"].get_or(0);
-
-                        int r = token_table["r"].get_or(255);
-                        int g = token_table["g"].get_or(255);
-                        int b = token_table["b"].get_or(255);
-                        int a = token_table["a"].get_or(255);
-                        token.color = Rml::Colourb(r, g, b, a);
-
-                        tokens.push_back(token);
-                    }
-                }
-
-                return tokens;
-            };
+            } else if (highlighter_obj.is<sol::protected_function>()) {
+                // New: function object
+                sol::protected_function highlighter_func = highlighter_obj.as<sol::protected_function>();
+                cmd.highlighter_callback = [this, highlighter_func](const std::string& text) -> std::vector<SyntaxHighlighter::Token> {
+                    return CallLuaHighlighterFunc(highlighter_func, text);
+                };
+            }
         }
 
         command_queue_->enqueue(std::move(cmd));
@@ -633,4 +598,58 @@ void LuaThread::SetupLuaBindings() {
         cmd.message = message;
         command_queue_->enqueue(std::move(cmd));
     };
+}
+
+std::vector<SyntaxHighlighter::Token> LuaThread::CallLuaHighlighter(const std::string& func_name, const std::string& text) {
+    std::vector<SyntaxHighlighter::Token> tokens;
+
+    // Call the Lua function by name
+    sol::protected_function highlighter = (*lua_)[func_name];
+    if (!highlighter.valid()) {
+        LOG_WARN("Syntax highlighter function '{}' not found", func_name);
+        return tokens;
+    }
+
+    return CallLuaHighlighterFunc(highlighter, text);
+}
+
+std::vector<SyntaxHighlighter::Token> LuaThread::CallLuaHighlighterFunc(const sol::protected_function& highlighter, const std::string& text) {
+    std::vector<SyntaxHighlighter::Token> tokens;
+
+    auto result = highlighter(text);
+    if (!result.valid()) {
+        sol::error err = result;
+        LOG_ERROR("Error calling syntax highlighter: {}", err.what());
+        return tokens;
+    }
+
+    // Parse returned token array
+    sol::object ret_obj = result;
+    if (!ret_obj.is<sol::table>()) {
+        LOG_WARN("Syntax highlighter did not return a table");
+        return tokens;
+    }
+
+    sol::table token_array = ret_obj.as<sol::table>();
+    for (size_t i = 1; i <= token_array.size(); ++i) {
+        sol::object token_obj = token_array[i];
+        if (token_obj.is<sol::table>()) {
+            sol::table token_table = token_obj.as<sol::table>();
+
+            SyntaxHighlighter::Token token;
+            token.line = token_table["line"].get_or(0);
+            token.start_col = token_table["start_col"].get_or(0);
+            token.end_col = token_table["end_col"].get_or(0);
+
+            int r = token_table["r"].get_or(255);
+            int g = token_table["g"].get_or(255);
+            int b = token_table["b"].get_or(255);
+            int a = token_table["a"].get_or(255);
+            token.color = Rml::Colourb(r, g, b, a);
+
+            tokens.push_back(token);
+        }
+    }
+
+    return tokens;
 }

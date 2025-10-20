@@ -90,8 +90,8 @@ private:
     Rml::Geometry selection_geometry_;
 
     // Dirty flags
-    bool text_dirty_;
     bool selection_dirty_;
+    bool font_ready_;
 
     // Mouse state
     bool mouse_dragging_;

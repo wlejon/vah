@@ -33,8 +33,14 @@ void TextLayout::CalculateFontMetrics() {
         return;
     }
 
-    // Get metrics
+    // Get metrics and validate
     const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
+    if (metrics.ascent <= 0.0f || metrics.descent <= 0.0f || metrics.line_spacing <= 0) {
+        LOG_WARN("TextLayout: Invalid font metrics for '{}' (ascent={}, descent={}, line_spacing={}), using defaults",
+                 font_family_, metrics.ascent, metrics.descent, metrics.line_spacing);
+        return;
+    }
+
     line_height_ = static_cast<float>(metrics.line_spacing);
 
     // Measure character width using 'M'
@@ -42,6 +48,11 @@ void TextLayout::CalculateFontMetrics() {
     Rml::String language = "en";
     Rml::TextShapingContext context{language};
     int advance = font_engine->GetStringWidth(font_handle, test_string, context);
+    if (advance <= 0) {
+        LOG_WARN("TextLayout: Invalid character width measurement for '{}', using default", font_family_);
+        return;
+    }
+
     char_width_ = static_cast<float>(advance);
 
     LOG_INFO("TextLayout: Font metrics - char_width={}, line_height={}", char_width_, line_height_);

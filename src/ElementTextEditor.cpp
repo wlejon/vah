@@ -14,8 +14,8 @@ ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     , layout_(std::make_unique<TextLayout>())
     , selection_(std::make_unique<SelectionManager>())
     , highlighter_(std::make_unique<SyntaxHighlighter>())
-    , text_dirty_(true)
     , selection_dirty_(false)
+    , font_ready_(false)
     , mouse_dragging_(false)
     , last_mouse_pos_(0.0f, 0.0f)
 {
@@ -95,7 +95,6 @@ void ElementTextEditor::ProcessEvent(Rml::Event& event) {
 
 void ElementTextEditor::SetText(const std::string& text) {
     buffer_->SetText(text);
-    text_dirty_ = true;
     highlighter_->InvalidateCache();
     DirtyLayout();
 }
@@ -110,20 +109,26 @@ std::string ElementTextEditor::GetSelectedText() const {
 
 void ElementTextEditor::SetSyntaxHighlighter(SyntaxHighlighter::TokenCallback callback) {
     highlighter_->SetTokenHighlighter(callback);
-    text_dirty_ = true;
     DirtyLayout();
 }
 
 void ElementTextEditor::SetReferenceHighlighter(SyntaxHighlighter::ReferenceCallback callback, const std::string& file_path) {
     highlighter_->SetReferenceHighlighter(callback, file_path);
-    text_dirty_ = true;
     DirtyLayout();
 }
 
 void ElementTextEditor::OnUpdate() {
-    if (text_dirty_ || selection_dirty_) {
-        GenerateGeometry();
+    // Retry font initialization if not ready
+    if (!font_ready_) {
+        layout_->SetFont("jetbrains mono", 14);
+        // Check if it succeeded by seeing if we have valid metrics
+        if (layout_->GetCharWidth() > 0.0f && layout_->GetLineHeight() > 0.0f) {
+            font_ready_ = true;
+            LOG_INFO("ElementTextEditor: Font ready");
+        }
     }
+
+    GenerateGeometry();
 }
 
 void ElementTextEditor::OnRender() {
@@ -144,10 +149,7 @@ void ElementTextEditor::OnRender() {
 }
 
 void ElementTextEditor::GenerateGeometry() {
-    if (text_dirty_) {
-        GenerateTextGeometry();
-        text_dirty_ = false;
-    }
+    GenerateTextGeometry();
 
     if (selection_dirty_) {
         GenerateSelectionGeometry();
@@ -180,7 +182,15 @@ void ElementTextEditor::GenerateTextGeometry() {
     );
 
     if (!font_handle) {
-        LOG_ERROR("ElementTextEditor: Failed to get font handle");
+        return;
+    }
+
+    // Get font metrics and validate they're ready
+    const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
+    if (metrics.ascent <= 0.0f || metrics.descent <= 0.0f || metrics.line_spacing <= 0.0f) {
+        // Font metrics invalid - font not fully initialized yet
+        LOG_WARN("ElementTextEditor: Font metrics not ready (ascent={}, descent={}, line_spacing={}), retrying next frame",
+                 metrics.ascent, metrics.descent, metrics.line_spacing);
         return;
     }
 
@@ -196,9 +206,6 @@ void ElementTextEditor::GenerateTextGeometry() {
 
     float line_height = layout_->GetLineHeight();
     int line_count = buffer_->GetLineCount();
-
-    // Get font metrics to calculate baseline offset
-    const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
     float baseline_offset = metrics.ascent;
 
     // We'll generate text line by line using FontEngineInterface::GenerateString

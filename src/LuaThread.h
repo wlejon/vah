@@ -79,6 +79,10 @@ private:
     void SetupLuaBindings();
     void ProcessResponses();
 
+    // Syntax highlighter helpers
+    std::vector<SyntaxHighlighter::Token> CallLuaHighlighter(const std::string& func_name, const std::string& text);
+    std::vector<SyntaxHighlighter::Token> CallLuaHighlighterFunc(const sol::protected_function& func, const std::string& text);
+
     int id_;
     std::string script_path_;
     std::atomic<State> state_;

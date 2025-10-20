@@ -1,6 +1,10 @@
 -- File Editor
 -- Integrated file browser and text editor
 
+-- Load highlighter configuration
+local highlighter_config = require("highlighters.config")
+local loaded_highlighters = {}
+
 local current_path = fs.get_cwd()
 local current_file = nil
 local editor_element = nil
@@ -126,22 +130,26 @@ function open_file(file_path)
     editor_data.file_info = format_size(size) .. " · " .. count_lines(content) .. " lines"
     data.bind("editor_info", {editor_data})
 
-    -- Determine file type and set syntax highlighter
-    local syntax_highlighter = ""
+    -- Determine file type and get highlighter
     local ext = file_path:match("%.([^%.]+)$")
-    if ext then
-        ext = ext:lower()
-        if ext == "lua" then
-            syntax_highlighter = "lua_syntax_highlighter"
-        elseif ext == "cpp" or ext == "h" or ext == "c" or ext == "hpp" or ext == "cc" or ext == "cmake" or ext == "txt" then
-            syntax_highlighter = "cpp_syntax_highlighter"
-        elseif ext == "js" or ext == "json" then
-            syntax_highlighter = "js_syntax_highlighter"
+    local highlighter = nil
+
+    -- Skip syntax highlighting for large files (> 1MB) or binary files
+    local max_size = 1024 * 1024  -- 1MB
+    local is_binary = content:find('\0') ~= nil
+
+    if size <= max_size and not is_binary then
+        highlighter = get_highlighter_for_extension(ext)
+    else
+        if is_binary then
+            print("Skipping syntax highlighting: Binary file detected")
+        else
+            print("Skipping syntax highlighting: File too large (" .. format_size(size) .. ")")
         end
     end
 
     -- Set text in editor using UI command
-    ui.set_texteditor_content("code_editor", content, syntax_highlighter)
+    ui.set_texteditor_content("code_editor", content, highlighter)
     print("Loaded file: " .. file_path .. " (" .. size .. " bytes)")
 end
 
@@ -151,6 +159,44 @@ function count_lines(text)
         count = count + 1
     end
     return count
+end
+
+-- Get highlighter function for a file extension
+function get_highlighter_for_extension(ext)
+    if not ext then return nil end
+
+    ext = ext:lower()
+    local module_path = highlighter_config[ext]
+    if not module_path then
+        return nil
+    end
+
+    -- Load and cache highlighter module
+    if not loaded_highlighters[module_path] then
+        local success, module = pcall(require, module_path)
+        if success then
+            loaded_highlighters[module_path] = module
+        else
+            print("Warning: Failed to load highlighter: " .. module_path .. " - " .. tostring(module))
+            return nil
+        end
+    end
+
+    local highlighter = loaded_highlighters[module_path]
+    if highlighter and highlighter.highlight then
+        -- Wrap in pcall to catch any errors during highlighting
+        return function(text)
+            local success, result = pcall(highlighter.highlight, text)
+            if success then
+                return result
+            else
+                print("Warning: Syntax highlighter error for " .. ext .. ": " .. tostring(result))
+                return {}  -- Return empty tokens on error
+            end
+        end
+    end
+
+    return nil
 end
 
 function startup()
@@ -183,269 +229,4 @@ end
 
 function shutdown()
     print("File editor shutting down")
-end
-
--- Lua Syntax Highlighter
-function lua_syntax_highlighter(text)
-    local tokens = {}
-
-    local keywords = {
-        ["local"] = true, ["function"] = true, ["end"] = true,
-        ["if"] = true, ["then"] = true, ["else"] = true, ["elseif"] = true,
-        ["for"] = true, ["do"] = true, ["while"] = true, ["repeat"] = true,
-        ["until"] = true, ["return"] = true, ["break"] = true, ["in"] = true,
-        ["and"] = true, ["or"] = true, ["not"] = true, ["true"] = true, ["false"] = true,
-        ["nil"] = true
-    }
-
-    local keyword_color = {r = 86, g = 156, b = 214, a = 255}
-    local string_color = {r = 206, g = 145, b = 120, a = 255}
-    local comment_color = {r = 106, g = 153, b = 85, a = 255}
-    local number_color = {r = 181, g = 206, b = 168, a = 255}
-
-    local lines = {}
-    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
-        table.insert(lines, line)
-    end
-
-    for line_num, line in ipairs(lines) do
-        local line_index = line_num - 1
-
-        -- Comments
-        local comment_start = line:find("%-%-")
-        if comment_start then
-            table.insert(tokens, {
-                line = line_index,
-                start_col = comment_start - 1,
-                end_col = #line,
-                r = comment_color.r,
-                g = comment_color.g,
-                b = comment_color.b,
-                a = comment_color.a
-            })
-        end
-
-        -- Strings
-        for s, e in line:gmatch("()[\"'].-()[\"']") do
-            table.insert(tokens, {
-                line = line_index,
-                start_col = s - 1,
-                end_col = e - 1,
-                r = string_color.r,
-                g = string_color.g,
-                b = string_color.b,
-                a = string_color.a
-            })
-        end
-
-        -- Keywords
-        for word in line:gmatch("[%a_][%w_]*") do
-            if keywords[word] then
-                local start_pos = 1
-                while true do
-                    local s, e = line:find("%f[%a_]" .. word .. "%f[^%w_]", start_pos)
-                    if not s then break end
-
-                    local in_comment = comment_start and s >= comment_start
-                    if not in_comment then
-                        table.insert(tokens, {
-                            line = line_index,
-                            start_col = s - 1,
-                            end_col = e,
-                            r = keyword_color.r,
-                            g = keyword_color.g,
-                            b = keyword_color.b,
-                            a = keyword_color.a
-                        })
-                    end
-
-                    start_pos = e + 1
-                end
-            end
-        end
-
-        -- Numbers
-        for s, e in line:gmatch("()%d+%.?%d*()") do
-            local in_comment = comment_start and s >= comment_start
-            if not in_comment then
-                table.insert(tokens, {
-                    line = line_index,
-                    start_col = s - 1,
-                    end_col = e - 1,
-                    r = number_color.r,
-                    g = number_color.g,
-                    b = number_color.b,
-                    a = number_color.a
-                })
-            end
-        end
-    end
-
-    return tokens
-end
-
--- C++ Syntax Highlighter (simplified)
-function cpp_syntax_highlighter(text)
-    local tokens = {}
-
-    local keywords = {
-        ["class"] = true, ["struct"] = true, ["enum"] = true,
-        ["public"] = true, ["private"] = true, ["protected"] = true,
-        ["virtual"] = true, ["static"] = true, ["const"] = true,
-        ["if"] = true, ["else"] = true, ["for"] = true, ["while"] = true,
-        ["return"] = true, ["break"] = true, ["continue"] = true,
-        ["void"] = true, ["int"] = true, ["float"] = true, ["double"] = true,
-        ["bool"] = true, ["char"] = true, ["auto"] = true,
-        ["namespace"] = true, ["using"] = true, ["include"] = true
-    }
-
-    local keyword_color = {r = 86, g = 156, b = 214, a = 255}
-    local string_color = {r = 206, g = 145, b = 120, a = 255}
-    local comment_color = {r = 106, g = 153, b = 85, a = 255}
-    local number_color = {r = 181, g = 206, b = 168, a = 255}
-
-    local lines = {}
-    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
-        table.insert(lines, line)
-    end
-
-    for line_num, line in ipairs(lines) do
-        local line_index = line_num - 1
-
-        -- Comments
-        local comment_start = line:find("//")
-        if comment_start then
-            table.insert(tokens, {
-                line = line_index,
-                start_col = comment_start - 1,
-                end_col = #line,
-                r = comment_color.r,
-                g = comment_color.g,
-                b = comment_color.b,
-                a = comment_color.a
-            })
-        end
-
-        -- Strings
-        for s, e in line:gmatch("()[\"'].-()[\"']") do
-            table.insert(tokens, {
-                line = line_index,
-                start_col = s - 1,
-                end_col = e - 1,
-                r = string_color.r,
-                g = string_color.g,
-                b = string_color.b,
-                a = string_color.a
-            })
-        end
-
-        -- Keywords
-        for word in line:gmatch("[%a_][%w_]*") do
-            if keywords[word] then
-                local start_pos = 1
-                while true do
-                    local s, e = line:find("%f[%a_]" .. word .. "%f[^%w_]", start_pos)
-                    if not s then break end
-
-                    local in_comment = comment_start and s >= comment_start
-                    if not in_comment then
-                        table.insert(tokens, {
-                            line = line_index,
-                            start_col = s - 1,
-                            end_col = e,
-                            r = keyword_color.r,
-                            g = keyword_color.g,
-                            b = keyword_color.b,
-                            a = keyword_color.a
-                        })
-                    end
-
-                    start_pos = e + 1
-                end
-            end
-        end
-    end
-
-    return tokens
-end
-
--- JavaScript Syntax Highlighter (simplified)
-function js_syntax_highlighter(text)
-    local tokens = {}
-
-    local keywords = {
-        ["function"] = true, ["const"] = true, ["let"] = true, ["var"] = true,
-        ["if"] = true, ["else"] = true, ["for"] = true, ["while"] = true,
-        ["return"] = true, ["break"] = true, ["continue"] = true,
-        ["class"] = true, ["extends"] = true, ["import"] = true, ["export"] = true,
-        ["true"] = true, ["false"] = true, ["null"] = true, ["undefined"] = true
-    }
-
-    local keyword_color = {r = 86, g = 156, b = 214, a = 255}
-    local string_color = {r = 206, g = 145, b = 120, a = 255}
-    local comment_color = {r = 106, g = 153, b = 85, a = 255}
-
-    local lines = {}
-    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
-        table.insert(lines, line)
-    end
-
-    for line_num, line in ipairs(lines) do
-        local line_index = line_num - 1
-
-        -- Comments
-        local comment_start = line:find("//")
-        if comment_start then
-            table.insert(tokens, {
-                line = line_index,
-                start_col = comment_start - 1,
-                end_col = #line,
-                r = comment_color.r,
-                g = comment_color.g,
-                b = comment_color.b,
-                a = comment_color.a
-            })
-        end
-
-        -- Strings
-        for s, e in line:gmatch("()[\"'`].-()[\"'`]") do
-            table.insert(tokens, {
-                line = line_index,
-                start_col = s - 1,
-                end_col = e - 1,
-                r = string_color.r,
-                g = string_color.g,
-                b = string_color.b,
-                a = string_color.a
-            })
-        end
-
-        -- Keywords
-        for word in line:gmatch("[%a_][%w_]*") do
-            if keywords[word] then
-                local start_pos = 1
-                while true do
-                    local s, e = line:find("%f[%a_]" .. word .. "%f[^%w_]", start_pos)
-                    if not s then break end
-
-                    local in_comment = comment_start and s >= comment_start
-                    if not in_comment then
-                        table.insert(tokens, {
-                            line = line_index,
-                            start_col = s - 1,
-                            end_col = e,
-                            r = keyword_color.r,
-                            g = keyword_color.g,
-                            b = keyword_color.b,
-                            a = keyword_color.a
-                        })
-                    end
-
-                    start_pos = e + 1
-                end
-            end
-        end
-    end
-
-    return tokens
 end
