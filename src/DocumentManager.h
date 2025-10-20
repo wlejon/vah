@@ -24,6 +24,10 @@ public:
     void RemoveElementClass(const std::string& element_id, const std::string& class_name);
     void SetTextEditorContent(const std::string& element_id, const std::string& content);
     void SetTextEditorTokens(const std::string& element_id, const DynamicTable& tokens);
+    void SetTextEditorEditable(const std::string& element_id, bool editable);
+    void SetTextEditorModified(const std::string& element_id, bool modified);
+    std::string GetTextEditorContent(const std::string& element_id);
+    bool GetTextEditorModified(const std::string& element_id);
 
     // File change handling (for hot reload)
     void HandleRmlFileChanged(const std::string& normalized_path);

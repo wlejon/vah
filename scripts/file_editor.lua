@@ -5,9 +5,13 @@
 local highlighter_config = require("highlighters.config")
 local loaded_highlighters = {}
 
+-- Load MIME type detection
+local mime = require("mime_types")
+
 local current_path = fs.get_cwd()
 local current_file = nil
 local editor_element = nil
+local current_file_ext = nil
 
 -- Data models
 local browser_data = {
@@ -17,7 +21,10 @@ local browser_data = {
 
 local editor_data = {
     file_path = "No file open",
-    file_info = ""
+    file_info = "",
+    file_type = "",
+    is_editable = false,
+    is_modified = false
 }
 
 function format_size(size)
@@ -125,32 +132,48 @@ function open_file(file_path)
     -- Get file size
     local size = #content
 
+    -- Detect file type and editability
+    local file_type = mime.get_type_description(file_path)
+    local is_editable = mime.is_editable(file_path) and not mime.is_binary(content)
+
     -- Update editor info
     editor_data.file_path = file_path
     editor_data.file_info = format_size(size) .. " · " .. count_lines(content) .. " lines"
+    editor_data.file_type = file_type
+    editor_data.is_editable = is_editable
+    editor_data.is_modified = false
     data.bind("editor_info", {editor_data})
 
     -- Set text in editor first (renders immediately with no highlighting)
     ui.set_texteditor_content("code_editor", content)
-    print("Loaded file: " .. file_path .. " (" .. size .. " bytes)")
 
-    -- Determine file type and compute syntax highlighting
-    local ext = file_path:match("%.([^%.]+)$")
+    -- Set editable state
+    ui.set_texteditor_editable("code_editor", is_editable)
+
+    if is_editable then
+        print("Loaded file: " .. file_path .. " (" .. size .. " bytes) [EDITABLE]")
+    else
+        print("Loaded file: " .. file_path .. " (" .. size .. " bytes) [READ-ONLY]")
+    end
+
+    -- Store file extension for re-highlighting
+    current_file_ext = file_path:match("%.([^%.]+)$")
 
     -- Skip syntax highlighting for large files (> 1MB) or binary files
     local max_size = 1024 * 1024  -- 1MB
-    local is_binary = content:find('\0') ~= nil
+    local is_binary_file = mime.is_binary(content)
 
-    if size <= max_size and not is_binary then
-        compute_and_bind_tokens(ext, content)
+    if size <= max_size and not is_binary_file then
+        compute_and_bind_tokens(current_file_ext, content)
     else
-        if is_binary then
+        if is_binary_file then
             print("Skipping syntax highlighting: Binary file detected")
         else
             print("Skipping syntax highlighting: File too large (" .. format_size(size) .. ")")
         end
         -- Clear any existing tokens
         ui.set_texteditor_tokens("code_editor", {})
+        current_file_ext = nil  -- Disable re-highlighting for large/binary files
     end
 end
 
@@ -221,6 +244,21 @@ function get_highlighter_for_extension(ext)
     return nil
 end
 
+function save_file()
+    if not current_file then
+        print("No file is currently open")
+        return
+    end
+
+    if not editor_data.is_editable then
+        print("Cannot save: File is read-only")
+        return
+    end
+
+    -- Get content from editor (we'll receive it via the save event)
+    -- This function will be called by the save event handler
+end
+
 function startup()
     print("File editor started (thread_id: " .. thread_id .. ")")
 
@@ -232,6 +270,53 @@ function startup()
             -- File clicked - open in editor
             local full_path = get_full_path(payload.target)
             open_file(full_path)
+        end
+    end)
+
+    -- Register save event handler (triggered by Ctrl+S in editor)
+    event.register("save", function(payload)
+        if not current_file then
+            print("No file to save")
+            return
+        end
+
+        local content = payload.content
+        if not content then
+            print("No content to save")
+            return
+        end
+
+        -- Write file
+        local success, error = fs.write_file(current_file, content)
+        if error ~= "" then
+            print("Error saving file: " .. error)
+            return
+        end
+
+        print("Saved: " .. current_file .. " (" .. #content .. " bytes)")
+
+        -- Re-compute syntax highlighting with the new content
+        local ext = current_file:match("%.([^%.]+)$")
+        if ext then
+            compute_and_bind_tokens(ext, content)
+        end
+
+        -- Mark as not modified
+        ui.set_texteditor_modified("code_editor", false)
+        editor_data.is_modified = false
+        data.bind("editor_info", {editor_data})
+    end)
+
+    -- Register modified event handler (triggered when editor content changes)
+    event.register("modified", function(payload)
+        if payload.element_id == "code_editor" then
+            editor_data.is_modified = payload.modified
+            data.bind("editor_info", {editor_data})
+
+            -- Re-highlight immediately when content is modified
+            if payload.modified and payload.content and current_file_ext then
+                compute_and_bind_tokens(current_file_ext, payload.content)
+            end
         end
     end)
 

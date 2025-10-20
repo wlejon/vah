@@ -15,7 +15,13 @@ ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     , layout_(std::make_unique<TextLayout>())
     , selection_(std::make_unique<SelectionManager>())
     , selection_dirty_(false)
+    , cursor_dirty_(false)
     , font_ready_(false)
+    , editable_(false)
+    , modified_(false)
+    , cursor_pos_(0, 0)
+    , cursor_blink_time_(0.0)
+    , cursor_visible_(true)
     , mouse_dragging_(false)
     , last_mouse_pos_(0.0f, 0.0f)
 {
@@ -40,6 +46,7 @@ void ElementTextEditor::OnChildAdd(Rml::Element* element) {
         AddEventListener(Rml::EventId::Keydown, this);
         // Listen for drag events since we have drag: drag; set
         AddEventListener(Rml::EventId::Dragend, this);
+        AddEventListener(Rml::EventId::Textinput, this);
     }
 }
 
@@ -53,6 +60,7 @@ void ElementTextEditor::OnChildRemove(Rml::Element* element) {
         RemoveEventListener(Rml::EventId::Mouseup, this);
         RemoveEventListener(Rml::EventId::Keydown, this);
         RemoveEventListener(Rml::EventId::Dragend, this);
+        RemoveEventListener(Rml::EventId::Textinput, this);
 
         LOG_INFO("ElementTextEditor removed from document tree");
     }
@@ -91,10 +99,19 @@ void ElementTextEditor::ProcessEvent(Rml::Event& event) {
 
         OnKeyDown(key, modifiers);
     }
+    else if (event == Rml::EventId::Textinput) {
+        if (editable_) {
+            Rml::String text = event.GetParameter<Rml::String>("text", "");
+            if (!text.empty()) {
+                OnTextInput(std::string(text));
+            }
+        }
+    }
 }
 
 void ElementTextEditor::SetText(const std::string& text) {
     buffer_->SetText(text);
+    modified_ = false;  // Reset modified flag when setting new text
     DirtyLayout();
 }
 
@@ -111,6 +128,33 @@ void ElementTextEditor::SetTokens(const DynamicTable& tokens) {
     LOG_INFO("ElementTextEditor: Received {} syntax tokens", tokens.size());
 }
 
+void ElementTextEditor::SetEditable(bool editable) {
+    editable_ = editable;
+    if (editable) {
+        cursor_dirty_ = true;
+    }
+}
+
+bool ElementTextEditor::IsModified() const {
+    return modified_;
+}
+
+void ElementTextEditor::SetModified(bool modified) {
+    if (modified_ != modified) {
+        modified_ = modified;
+
+        // Dispatch modified event with content for re-highlighting
+        Rml::Dictionary parameters;
+        parameters["element_id"] = GetId();
+        parameters["modified"] = modified;
+        if (modified) {
+            // Include content when marking as modified (for re-highlighting)
+            parameters["content"] = buffer_->GetText();
+        }
+        DispatchEvent("modified", parameters);
+    }
+}
+
 void ElementTextEditor::OnUpdate() {
     // Retry font initialization if not ready
     if (!font_ready_) {
@@ -120,6 +164,17 @@ void ElementTextEditor::OnUpdate() {
             font_ready_ = true;
             LOG_INFO("ElementTextEditor: Font ready");
         }
+    }
+
+    // Update cursor blink animation
+    if (editable_) {
+        auto now = std::chrono::steady_clock::now();
+        double time = std::chrono::duration<double>(now.time_since_epoch()).count();
+
+        // Blink cursor every 0.5 seconds
+        double blink_phase = fmod(time, 1.0);
+        cursor_visible_ = (blink_phase < 0.5);
+        cursor_dirty_ = true;
     }
 
     // Always regenerate text geometry every frame to prevent garbled rendering
@@ -134,6 +189,11 @@ void ElementTextEditor::OnRender() {
     // Render selection geometry first (behind text)
     if (selection_geometry_) {
         selection_geometry_.Render(absolute_offset);
+    }
+
+    // Render cursor (behind text but above selection)
+    if (editable_ && cursor_visible_ && cursor_geometry_) {
+        cursor_geometry_.Render(absolute_offset);
     }
 
     // Render text geometries
@@ -151,6 +211,11 @@ void ElementTextEditor::GenerateGeometry() {
     if (selection_dirty_) {
         GenerateSelectionGeometry();
         selection_dirty_ = false;
+    }
+
+    if (cursor_dirty_ && editable_) {
+        GenerateCursorGeometry();
+        cursor_dirty_ = false;
     }
 }
 
@@ -466,6 +531,55 @@ void ElementTextEditor::GenerateSelectionGeometry() {
     }
 }
 
+void ElementTextEditor::GenerateCursorGeometry() {
+    // Release old cursor geometry
+    if (cursor_geometry_) {
+        cursor_geometry_.Release();
+    }
+
+    if (!editable_) {
+        return;
+    }
+
+    auto* render_manager = GetRenderManager();
+    if (!render_manager) {
+        return;
+    }
+
+    // Clamp cursor position to buffer bounds
+    cursor_pos_ = buffer_->ClampPosition(cursor_pos_);
+
+    // Build cursor quad (vertical line)
+    Rml::Mesh mesh;
+    Rml::ColourbPremultiplied cursor_color = Rml::Colourb(255, 255, 255, 140).ToPremultiplied();
+
+    float line_height = layout_->GetLineHeight();
+    float char_width = layout_->GetCharWidth();
+    float cursor_width = 2.0f;  // 2 pixels wide
+
+    float x = static_cast<float>(cursor_pos_.column) * char_width;
+    float y = static_cast<float>(cursor_pos_.line) * line_height;
+
+    // Create vertical line quad
+    int base = static_cast<int>(mesh.vertices.size());
+    mesh.vertices.push_back({Rml::Vector2f(x, y), cursor_color, Rml::Vector2f(0, 0)});
+    mesh.vertices.push_back({Rml::Vector2f(x + cursor_width, y), cursor_color, Rml::Vector2f(0, 0)});
+    mesh.vertices.push_back({Rml::Vector2f(x + cursor_width, y + line_height), cursor_color, Rml::Vector2f(0, 0)});
+    mesh.vertices.push_back({Rml::Vector2f(x, y + line_height), cursor_color, Rml::Vector2f(0, 0)});
+
+    mesh.indices.push_back(base + 0);
+    mesh.indices.push_back(base + 1);
+    mesh.indices.push_back(base + 2);
+    mesh.indices.push_back(base + 0);
+    mesh.indices.push_back(base + 2);
+    mesh.indices.push_back(base + 3);
+
+    // Create geometry from mesh
+    if (mesh) {
+        cursor_geometry_ = render_manager->MakeGeometry(std::move(mesh));
+    }
+}
+
 TextBuffer::Position ElementTextEditor::ScreenToText(float screen_x, float screen_y) {
     // Get element offset - must match the box area used in OnRender()
     Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
@@ -489,6 +603,13 @@ void ElementTextEditor::OnMouseDown(float mouse_x, float mouse_y) {
 
     selection_->SetAnchor(pos);
     selection_->SetCursor(pos);
+
+    // Update cursor position if editable
+    if (editable_) {
+        cursor_pos_ = pos;
+        cursor_dirty_ = true;
+        cursor_visible_ = true;  // Reset blink when clicking
+    }
 
     mouse_dragging_ = true;
     last_mouse_pos_ = Rml::Vector2f(mouse_x, mouse_y);
@@ -516,13 +637,264 @@ void ElementTextEditor::OnMouseUp() {
 }
 
 void ElementTextEditor::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers) {
-    // Handle Ctrl+C for copy
+    // Handle Ctrl+C for copy (works in both editable and read-only mode)
     if (key == Rml::Input::KI_C && (modifiers & Rml::Input::KM_CTRL)) {
         std::string selected = GetSelectedText();
         if (!selected.empty()) {
             SDL_SetClipboardText(selected.c_str());
         }
+        return;
     }
+
+    // Only handle editing keys if editable
+    if (!editable_) {
+        return;
+    }
+
+    // Handle Ctrl+S for save
+    if (key == Rml::Input::KI_S && (modifiers & Rml::Input::KM_CTRL)) {
+        if (editable_) {
+            // Dispatch a custom save event that Lua can listen to
+            Rml::Dictionary parameters;
+            parameters["element_id"] = GetId();
+            parameters["content"] = buffer_->GetText();
+            DispatchEvent("save", parameters);
+        }
+        return;
+    }
+
+    // Handle Ctrl+V for paste
+    if (key == Rml::Input::KI_V && (modifiers & Rml::Input::KM_CTRL)) {
+        if (SDL_HasClipboardText()) {
+            char* clipboard_text = SDL_GetClipboardText();
+            if (clipboard_text) {
+                // Delete selection if any
+                if (selection_->HasSelection()) {
+                    TextBuffer::Position start, end;
+                    selection_->GetSelectionRange(start, end);
+                    buffer_->DeleteRange(start, end);
+                    cursor_pos_ = start;
+                    selection_->ClearSelection();
+                }
+
+                // Insert clipboard text
+                buffer_->InsertText(cursor_pos_, clipboard_text);
+
+                // Move cursor to end of inserted text
+                for (const char* p = clipboard_text; *p; ++p) {
+                    if (*p == '\n') {
+                        cursor_pos_.line++;
+                        cursor_pos_.column = 0;
+                    } else {
+                        cursor_pos_.column++;
+                    }
+                }
+
+                SDL_free(clipboard_text);
+                tokens_.clear();  // Clear tokens when text changes
+                DispatchContentChangeEvent();
+                modified_ = true;
+                cursor_dirty_ = true;
+                selection_dirty_ = true;
+                DirtyLayout();
+            }
+        }
+        return;
+    }
+
+    // Handle backspace
+    if (key == Rml::Input::KI_BACK) {
+        bool made_change = false;
+        if (selection_->HasSelection()) {
+            // Delete selection
+            TextBuffer::Position start, end;
+            selection_->GetSelectionRange(start, end);
+            buffer_->DeleteRange(start, end);
+            cursor_pos_ = start;
+            selection_->ClearSelection();
+            made_change = true;
+        } else if (cursor_pos_.column > 0) {
+            // Delete character before cursor
+            cursor_pos_.column--;
+            buffer_->DeleteChar(cursor_pos_);
+            made_change = true;
+        } else if (cursor_pos_.line > 0) {
+            // Join with previous line
+            int prev_line_len = static_cast<int>(buffer_->GetLine(cursor_pos_.line - 1).length());
+            buffer_->JoinLines(cursor_pos_.line - 1);
+            cursor_pos_.line--;
+            cursor_pos_.column = prev_line_len;
+            made_change = true;
+        }
+        if (made_change) {
+            tokens_.clear();  // Clear tokens when text changes
+            DispatchContentChangeEvent();
+            modified_ = true;
+        }
+        cursor_dirty_ = true;
+        selection_dirty_ = true;
+        DirtyLayout();
+        return;
+    }
+
+    // Handle delete
+    if (key == Rml::Input::KI_DELETE) {
+        if (selection_->HasSelection()) {
+            // Delete selection
+            TextBuffer::Position start, end;
+            selection_->GetSelectionRange(start, end);
+            buffer_->DeleteRange(start, end);
+            cursor_pos_ = start;
+            selection_->ClearSelection();
+        } else {
+            // Delete character at cursor
+            buffer_->DeleteChar(cursor_pos_);
+        }
+        tokens_.clear();  // Clear tokens when text changes
+        DispatchContentChangeEvent();
+        modified_ = true;
+        cursor_dirty_ = true;
+        selection_dirty_ = true;
+        DirtyLayout();
+        return;
+    }
+
+    // Handle enter/return
+    if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER) {
+        // Delete selection if any
+        if (selection_->HasSelection()) {
+            TextBuffer::Position start, end;
+            selection_->GetSelectionRange(start, end);
+            buffer_->DeleteRange(start, end);
+            cursor_pos_ = start;
+            selection_->ClearSelection();
+        }
+
+        // Insert newline
+        buffer_->InsertChar(cursor_pos_, '\n');
+        cursor_pos_.line++;
+        cursor_pos_.column = 0;
+        tokens_.clear();  // Clear tokens when text changes
+        DispatchContentChangeEvent();
+        modified_ = true;
+        cursor_dirty_ = true;
+        selection_dirty_ = true;
+        DirtyLayout();
+        return;
+    }
+
+    // Handle arrow keys
+    if (key == Rml::Input::KI_LEFT) {
+        if (cursor_pos_.column > 0) {
+            cursor_pos_.column--;
+        } else if (cursor_pos_.line > 0) {
+            cursor_pos_.line--;
+            cursor_pos_.column = static_cast<int>(buffer_->GetLine(cursor_pos_.line).length());
+        }
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+
+    if (key == Rml::Input::KI_RIGHT) {
+        int line_len = static_cast<int>(buffer_->GetLine(cursor_pos_.line).length());
+        if (cursor_pos_.column < line_len) {
+            cursor_pos_.column++;
+        } else if (cursor_pos_.line < buffer_->GetLineCount() - 1) {
+            cursor_pos_.line++;
+            cursor_pos_.column = 0;
+        }
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+
+    if (key == Rml::Input::KI_UP) {
+        if (cursor_pos_.line > 0) {
+            cursor_pos_.line--;
+            int line_len = static_cast<int>(buffer_->GetLine(cursor_pos_.line).length());
+            cursor_pos_.column = std::min(cursor_pos_.column, line_len);
+        }
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+
+    if (key == Rml::Input::KI_DOWN) {
+        if (cursor_pos_.line < buffer_->GetLineCount() - 1) {
+            cursor_pos_.line++;
+            int line_len = static_cast<int>(buffer_->GetLine(cursor_pos_.line).length());
+            cursor_pos_.column = std::min(cursor_pos_.column, line_len);
+        }
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+
+    // Handle Home
+    if (key == Rml::Input::KI_HOME) {
+        cursor_pos_.column = 0;
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+
+    // Handle End
+    if (key == Rml::Input::KI_END) {
+        cursor_pos_.column = static_cast<int>(buffer_->GetLine(cursor_pos_.line).length());
+        cursor_dirty_ = true;
+        selection_->ClearSelection();
+        selection_dirty_ = true;
+        return;
+    }
+}
+
+void ElementTextEditor::OnTextInput(const std::string& text) {
+    if (!editable_ || text.empty()) {
+        return;
+    }
+
+    // Delete selection if any
+    if (selection_->HasSelection()) {
+        TextBuffer::Position start, end;
+        selection_->GetSelectionRange(start, end);
+        buffer_->DeleteRange(start, end);
+        cursor_pos_ = start;
+        selection_->ClearSelection();
+    }
+
+    // Insert text at cursor
+    for (char c : text) {
+        if (c >= 32 || c == '\t') {  // Printable characters and tab
+            buffer_->InsertChar(cursor_pos_, c);
+            cursor_pos_.column++;
+        }
+    }
+
+    // Clear tokens when text changes - they'll be updated by Lua shortly
+    tokens_.clear();
+
+    // Dispatch content change event for re-highlighting
+    DispatchContentChangeEvent();
+
+    modified_ = true;
+    cursor_dirty_ = true;
+    selection_dirty_ = true;
+    DirtyLayout();
+}
+
+void ElementTextEditor::DispatchContentChangeEvent() {
+    // Dispatch modified event with current content for re-highlighting
+    Rml::Dictionary parameters;
+    parameters["element_id"] = GetId();
+    parameters["modified"] = true;
+    parameters["content"] = buffer_->GetText();
+    DispatchEvent("modified", parameters);
 }
 
 bool ElementTextEditor::GetIntrinsicDimensions(Rml::Vector2f& dimensions, float& ratio) {

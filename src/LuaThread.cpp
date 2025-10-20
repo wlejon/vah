@@ -532,6 +532,20 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    ui_table["set_texteditor_editable"] = [this](const std::string& element_id, bool editable) {
+        Commands::SetTextEditorEditable cmd;
+        cmd.element_id = element_id;
+        cmd.editable = editable;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["set_texteditor_modified"] = [this](const std::string& element_id, bool modified) {
+        Commands::SetTextEditorModified cmd;
+        cmd.element_id = element_id;
+        cmd.modified = modified;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
 
     // Bind data model operations

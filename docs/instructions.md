@@ -38,5 +38,4 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-
-review how the syntax highlighting works and create one for markdown, please. 
+you've implemented a text editor but just the viewer portion. next we need to support editing text files. we need to properly mime type files and determine if we can edit it. then we need to place a blinking cursor in the mouse position and accept keyboard inputs. we need to support common keyboard shortcuts. create a configuration system for keyboard inputs so they can be remapped. 

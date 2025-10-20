@@ -102,14 +102,57 @@
             align-items: center;
         }
 
+        .editor-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .editor-header-right {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-end;
+        }
+
         .file-path {
             color: #89b4fa;
             font-size: 13px;
         }
 
+        .modified-indicator {
+            color: #f9e2af;
+            font-size: 13px;
+            margin-left: 8px;
+            font-weight: bold;
+        }
+
+        .file-type {
+            color: #a6adc8;
+            font-size: 11px;
+        }
+
         .file-info {
             color: #6c7086;
             font-size: 12px;
+        }
+
+        .editable-badge {
+            color: #a6e3a1;
+            font-size: 11px;
+            background: #1e1e2e;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px #a6e3a1;
+        }
+
+        .readonly-badge {
+            color: #f38ba8;
+            font-size: 11px;
+            background: #1e1e2e;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px #f38ba8;
         }
 
         .editor-content {
@@ -197,14 +240,24 @@
         <div class="editor-panel">
             <div class="editor-header" data-model="editor_info">
                 <div data-for="info : editor_info">
-                    <span class="file-path">{{info.file_path}}</span>
-                    <span class="file-info">{{info.file_info}}</span>
+                    <div class="editor-header-left">
+                        <div>
+                            <span class="file-path">{{info.file_path}}</span>
+                            <span data-if="info.is_modified" class="modified-indicator">●</span>
+                        </div>
+                        <span class="file-type">{{info.file_type}}</span>
+                    </div>
+                    <div class="editor-header-right">
+                        <span class="file-info">{{info.file_info}}</span>
+                        <span data-if="info.is_editable" class="editable-badge">EDITABLE</span>
+                        <span data-if="!info.is_editable" class="readonly-badge">READ-ONLY</span>
+                    </div>
                 </div>
             </div>
 
             <div class="editor-content">
                 <div class="editor-scroll-container">
-                    <texteditor id="code_editor" />
+                    <texteditor id="code_editor" onmodified="trigger('modified', {element_id = event.parameters.element_id, modified = event.parameters.modified, content = event.parameters.content})" onsave="trigger('save', {element_id = event.parameters.element_id, content = event.parameters.content})" />
                 </div>
             </div>
         </div>

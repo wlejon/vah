@@ -8,8 +8,10 @@
 #include "TextLayout.h"
 #include "SelectionManager.h"
 #include "DataStore.h"  // For DynamicTable type
+#include "InputState.h"  // For PayloadMap
 #include <memory>
 #include <vector>
+#include <functional>
 
 /**
  * ElementTextEditor - A custom RmlUi element for viewing and editing text.
@@ -48,6 +50,9 @@ public:
     std::string GetText() const;
     std::string GetSelectedText() const;
     void SetTokens(const DynamicTable& tokens);
+    void SetEditable(bool editable);
+    bool IsModified() const;
+    void SetModified(bool modified);
 
 protected:
     // Called every frame to update state
@@ -63,6 +68,8 @@ private:
     void GenerateGeometry();
     void GenerateTextGeometry();
     void GenerateSelectionGeometry();
+    void GenerateCursorGeometry();
+    void DispatchContentChangeEvent();
 
     // Convert mouse position to text position
     TextBuffer::Position ScreenToText(float screen_x, float screen_y);
@@ -74,6 +81,9 @@ private:
 
     // Handle keyboard events
     void OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers);
+
+    // Handle text input
+    void OnTextInput(const std::string& text);
 
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
@@ -89,10 +99,19 @@ private:
     };
     std::vector<TextGeometry> text_geometries_;
     Rml::Geometry selection_geometry_;
+    Rml::Geometry cursor_geometry_;
 
     // Dirty flags
     bool selection_dirty_;
+    bool cursor_dirty_;
     bool font_ready_;
+
+    // Editor state
+    bool editable_;
+    bool modified_;
+    TextBuffer::Position cursor_pos_;
+    double cursor_blink_time_;
+    bool cursor_visible_;
 
     // Mouse state
     bool mouse_dragging_;

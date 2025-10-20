@@ -157,6 +157,77 @@ void DocumentManager::SetTextEditorTokens(const std::string& element_id, const D
     editor->SetTokens(tokens);
 }
 
+void DocumentManager::SetTextEditorEditable(const std::string& element_id, bool editable) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("SetTextEditorEditable: Element '{}' not found", element_id);
+        return;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("SetTextEditorEditable: Element '{}' is not a texteditor", element_id);
+        return;
+    }
+
+    // Set editable state
+    editor->SetEditable(editable);
+    LOG_INFO("SetTextEditorEditable: Set texteditor '{}' to {}", element_id, editable ? "editable" : "read-only");
+}
+
+void DocumentManager::SetTextEditorModified(const std::string& element_id, bool modified) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("SetTextEditorModified: Element '{}' not found", element_id);
+        return;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("SetTextEditorModified: Element '{}' is not a texteditor", element_id);
+        return;
+    }
+
+    // Set modified state
+    editor->SetModified(modified);
+}
+
+std::string DocumentManager::GetTextEditorContent(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("GetTextEditorContent: Element '{}' not found", element_id);
+        return "";
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("GetTextEditorContent: Element '{}' is not a texteditor", element_id);
+        return "";
+    }
+
+    return editor->GetText();
+}
+
+bool DocumentManager::GetTextEditorModified(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("GetTextEditorModified: Element '{}' not found", element_id);
+        return false;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("GetTextEditorModified: Element '{}' is not a texteditor", element_id);
+        return false;
+    }
+
+    return editor->IsModified();
+}
+
 void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
     if (!context_) return;
 

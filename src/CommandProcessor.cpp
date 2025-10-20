@@ -82,6 +82,12 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::SetTextEditorTokens>) {
             document_manager_->SetTextEditorTokens(command.element_id, command.tokens);
         }
+        else if constexpr (std::is_same_v<T, Commands::SetTextEditorEditable>) {
+            document_manager_->SetTextEditorEditable(command.element_id, command.editable);
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetTextEditorModified>) {
+            document_manager_->SetTextEditorModified(command.element_id, command.modified);
+        }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
             data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));
         }
