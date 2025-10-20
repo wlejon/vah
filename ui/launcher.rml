@@ -1,0 +1,80 @@
+<rml>
+<head>
+    <title>Vah Launcher</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="launcher.rcss" />
+    <script>
+        function launch_app(app_id)
+            trigger('launch_app', {app_id = app_id})
+        end
+    </script>
+</head>
+<body>
+    <div class="launcher-container">
+        <h1>vah</h1>
+        <p class="subtitle">Foundation for Manufold - Select an application to start</p>
+
+        <div class="app-grid">
+            <!-- File Editor -->
+            <div class="app-card" onclick="launch_app('file_editor')">
+                <div class="app-icon">[F]</div>
+                <div class="app-name">File Editor</div>
+                <p class="app-description">Browse and edit files with syntax highlighting support</p>
+            </div>
+
+            <!-- Chat -->
+            <div class="app-card" onclick="launch_app('chat')">
+                <div class="app-icon">[C]</div>
+                <div class="app-name">Chat</div>
+                <p class="app-description">AI chat interface with LM Studio integration</p>
+            </div>
+
+            <!-- Workflow Editor -->
+            <div class="app-card" onclick="launch_app('workflow_app')">
+                <div class="app-icon">[W]</div>
+                <div class="app-name">Workflow Editor</div>
+                <p class="app-description">Visual node-based workflow and node type editor</p>
+            </div>
+
+            <!-- Tetris Game -->
+            <div class="app-card" onclick="launch_app('tetris')">
+                <div class="app-icon">[T]</div>
+                <div class="app-name">Tetris</div>
+                <p class="app-description">Classic Tetris game implementation</p>
+            </div>
+
+            <!-- Canvas Test -->
+            <div class="app-card" onclick="launch_app('canvas_test')">
+                <div class="app-icon">[N]</div>
+                <div class="app-name">Canvas Test</div>
+                <p class="app-description">NanoVG custom rendering element demo</p>
+            </div>
+
+            <!-- SQLite Demo -->
+            <div class="app-card" onclick="launch_app('sqlite_demo')">
+                <div class="app-icon">[S]</div>
+                <div class="app-name">SQLite Demo</div>
+                <p class="app-description">Database operations demonstration</p>
+            </div>
+
+            <!-- JSON Viewer -->
+            <div class="app-card" onclick="launch_app('json_demo')">
+                <div class="app-icon">[J]</div>
+                <div class="app-name">JSON Viewer</div>
+                <p class="app-description">Interactive JSON data viewer</p>
+            </div>
+
+            <!-- Data Stream -->
+            <div class="app-card" onclick="launch_app('data_stream')">
+                <div class="app-icon">[D]</div>
+                <div class="app-name">Data Stream</div>
+                <p class="app-description">Streaming data visualization</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            vah - Multi-threaded Lua application framework
+        </div>
+    </div>
+</body>
+</rml>

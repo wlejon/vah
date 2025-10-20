@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>App Navigation</title>
+    <link type="text/rcss" href="ui/reset.rcss"/>
+    <link type="text/rcss" href="ui/internal/app_navigation.rcss" />
+</head>
+<body>
+    <!-- Close Button (top-right corner) -->
+    <div id="app-close-button" data-if="app_nav.has_active_app" onclick="close_current_app()">
+        <span class="close-icon">X</span>
+        <span class="close-label">Close</span>
+    </div>
+</body>
+</rml>

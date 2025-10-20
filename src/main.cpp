@@ -28,6 +28,7 @@
 #include "NotificationFeed.h"
 #include "NotificationBindings.h"
 #include "NotificationPlugin.h"
+#include "AppNavigationPlugin.h"
 #include "EventDispatcher.h"
 #include <efsw/efsw.hpp>
 
@@ -337,6 +338,15 @@ public:
             LOG_INFO("Notification overlay initialized and visible");
         }
 
+        // Initialize app navigation overlay (global, always visible)
+        // Note: The app_nav data model will be created by the launcher thread
+        if (!AppNavigationOverlay::Initialise(rml_context_, nullptr)) {
+            LOG_ERROR("Failed to initialize app navigation overlay");
+        } else {
+            AppNavigationOverlay::SetVisible(true);
+            LOG_INFO("App navigation overlay initialized and visible");
+        }
+
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");
 
@@ -374,7 +384,8 @@ public:
     void Shutdown() {
         LOG_INFO("Shutting down Vah Engine...");
 
-        // Shutdown notification overlay
+        // Shutdown overlays
+        AppNavigationOverlay::Shutdown();
         NotificationOverlay::Shutdown();
 
         // Stop file watcher

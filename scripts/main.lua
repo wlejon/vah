@@ -4,38 +4,8 @@
 function startup()
     print("Main Lua thread started")
 
-    -- Choose which demo to run (comment/uncomment):
-
-    -- File Editor (integrated file browser and text editor)
-    command.spawn_thread("scripts/file_editor.lua")
-
-    -- Chat Application
-    -- command.spawn_thread("scripts/chat.lua")
-
-    -- Unified Workflow Application (combines workflow editor and node type editor)
-    -- command.spawn_thread("scripts/workflow_app.lua")
-
-    -- Tetris Game
-    -- ui.load_document("ui/tetris.rml")
-
-    -- NanoVG Canvas Test (custom RmlUi element with NanoVG rendering)
-    -- ui.load_document("ui/canvas_test.rml")
-
-    -- File browser demo
-    -- command.spawn_thread("scripts/file_browser.lua")
-
-    -- JSON data viewer demo
-    -- command.spawn_thread("scripts/json_demo.lua")
-
-    -- SQLite database demo
-    -- command.spawn_thread("scripts/sqlite_demo.lua")
-
-    -- Streaming data demo
-    -- command.spawn_thread("scripts/data_stream.lua")
-
-    -- HTTP SSE demo (server and client)
-    -- command.spawn_thread("scripts/http_server.lua")
-    -- command.spawn_thread("scripts/http_client.lua")
+    -- Start the launcher (app selection menu)
+    command.spawn_thread("scripts/launcher.lua")
 end
 
 function update(dt)

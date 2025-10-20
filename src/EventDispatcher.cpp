@@ -2,9 +2,10 @@
 #include "Logger.h"
 #include <cassert>
 
-moodycamel::ConcurrentQueue<UIEvent>* EventDispatcher::RegisterThread(int thread_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+// All EventDispatcher methods run on the main thread only - no locking needed
+// The concurrent queues themselves provide lock-free communication to Lua threads
 
+moodycamel::ConcurrentQueue<UIEvent>* EventDispatcher::RegisterThread(int thread_id) {
     auto it = thread_queues_.find(thread_id);
     if (it != thread_queues_.end()) {
         return it->second.get();
@@ -19,8 +20,6 @@ moodycamel::ConcurrentQueue<UIEvent>* EventDispatcher::RegisterThread(int thread
 }
 
 void EventDispatcher::UnregisterThread(int thread_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     thread_queues_.erase(thread_id);
 
     // Clean up any documents owned by this thread
@@ -45,18 +44,14 @@ void EventDispatcher::UnregisterThread(int thread_id) {
 }
 
 void EventDispatcher::RegisterDocument(const std::string& document_id, int thread_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
     document_to_thread_[document_id] = thread_id;
 }
 
 void EventDispatcher::UnregisterDocument(const std::string& document_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
     document_to_thread_.erase(document_id);
 }
 
 void EventDispatcher::RegisterGlobalEvent(const std::string& event_name, int thread_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     auto it = global_events_.find(event_name);
     if (it != global_events_.end()) {
         LOG_ERROR("EventDispatcher: Global event '{}' already registered by thread {}, cannot register for thread {}",
@@ -70,13 +65,10 @@ void EventDispatcher::RegisterGlobalEvent(const std::string& event_name, int thr
 }
 
 void EventDispatcher::UnregisterGlobalEvent(const std::string& event_name) {
-    std::lock_guard<std::mutex> lock(mutex_);
     global_events_.erase(event_name);
 }
 
 void EventDispatcher::DispatchEvent(const std::string& document_id, const std::string& event_name, const PayloadMap& payload) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     // Find which thread owns this document
     auto doc_it = document_to_thread_.find(document_id);
     if (doc_it == document_to_thread_.end()) {
@@ -93,16 +85,31 @@ void EventDispatcher::DispatchEvent(const std::string& document_id, const std::s
         return;
     }
 
-    // Enqueue the event
+    // Enqueue the event (lock-free queue handles thread-safety)
     UIEvent event;
     event.name = event_name;
     event.payload = payload;
     queue_it->second->enqueue(std::move(event));
 }
 
-void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const PayloadMap& payload) {
-    std::lock_guard<std::mutex> lock(mutex_);
+void EventDispatcher::DispatchToThread(int thread_id, const std::string& event_name, const PayloadMap& payload) {
+    // Find the thread's queue
+    auto queue_it = thread_queues_.find(thread_id);
+    if (queue_it == thread_queues_.end()) {
+        LOG_WARN("EventDispatcher: Thread {} not found for event '{}', event dropped", thread_id, event_name);
+        return;
+    }
 
+    // Enqueue the event (lock-free queue handles thread-safety)
+    UIEvent event;
+    event.name = event_name;
+    event.payload = payload;
+    queue_it->second->enqueue(std::move(event));
+
+    LOG_DEBUG("EventDispatcher: Dispatched event '{}' to thread {}", event_name, thread_id);
+}
+
+void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const PayloadMap& payload) {
     // Find which thread handles this global event
     auto it = global_events_.find(event_name);
     if (it == global_events_.end()) {
@@ -119,7 +126,7 @@ void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const P
         return;
     }
 
-    // Enqueue the event
+    // Enqueue the event (lock-free queue handles thread-safety)
     UIEvent event;
     event.name = event_name;
     event.payload = payload;

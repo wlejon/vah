@@ -58,6 +58,7 @@ add_executable(vah
     src/NotificationFeed.cpp
     src/NotificationBindings.cpp
     src/NotificationPlugin.cpp
+    src/AppNavigationPlugin.cpp
     src/DomIntrospection.cpp
     src/TextBuffer.cpp
     src/TextLayout.cpp

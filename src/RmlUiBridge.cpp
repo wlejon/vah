@@ -219,6 +219,19 @@ namespace {
         return 1;  // Return the table
     }
 
+    // Lua callback for close_current_app (app navigation)
+    int lua_close_current_app(lua_State* L) {
+        if (!g_bridge) {
+            return 0;
+        }
+
+        // Trigger the close_app event globally
+        PayloadMap payload;
+        g_bridge->TriggerEvent("close_app", payload, "launcher");
+
+        return 0;
+    }
+
     // Lua callback for toggle_notification_feed
     int lua_toggle_notification_feed(lua_State* L) {
         // The notification overlay is global, so we find it by ID in the context
@@ -380,6 +393,10 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     lua_pushcfunction(L, lua_data_update_row);
     lua_setfield(L, -2, "update_row");
     lua_setglobal(L, "data");
+
+    // Register app navigation event handlers
+    lua_pushcfunction(L, lua_close_current_app);
+    lua_setglobal(L, "close_current_app");
 
     // Register notification event handlers
     lua_pushcfunction(L, lua_toggle_notification_feed);

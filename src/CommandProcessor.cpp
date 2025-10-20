@@ -30,10 +30,19 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
 
         if constexpr (std::is_same_v<T, Commands::SpawnThread>) {
             LOG_INFO("Processing SpawnThread command: {} (parent: {})", command.script_path, command.parent_thread_id);
+            int new_thread_id;
             if (command.parent_thread_id != 0) {
-                thread_manager_->SpawnThread(command.script_path, command.parent_thread_id, command.parent_request_id);
+                new_thread_id = thread_manager_->SpawnThread(command.script_path, command.parent_thread_id, command.parent_request_id);
             } else {
-                thread_manager_->SpawnThread(command.script_path);
+                new_thread_id = thread_manager_->SpawnThread(command.script_path);
+            }
+
+            // Send thread_spawned event back to the requesting thread with the new thread ID
+            if (command.requesting_thread_id >= 0) {
+                PayloadMap payload;
+                payload["thread_id"] = new_thread_id;
+                payload["script_path"] = command.script_path;
+                event_dispatcher_->DispatchToThread(command.requesting_thread_id, "thread_spawned", payload);
             }
         }
         else if constexpr (std::is_same_v<T, Commands::StopThread>) {
