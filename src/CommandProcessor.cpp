@@ -77,7 +77,7 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
             document_manager_->RemoveElementClass(command.element_id, command.class_name);
         }
         else if constexpr (std::is_same_v<T, Commands::SetTextEditorContent>) {
-            document_manager_->SetTextEditorContent(command.element_id, command.content, command.syntax_highlighter);
+            document_manager_->SetTextEditorContent(command.element_id, command.content, command.highlighter_callback);
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
             data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));

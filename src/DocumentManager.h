@@ -3,6 +3,7 @@
 #include <RmlUi/Core.h>
 #include <string>
 #include <unordered_map>
+#include "SyntaxHighlighter.h"
 
 class DocumentManager {
 public:
@@ -21,7 +22,7 @@ public:
     void SetElementStyle(const std::string& element_id, const std::string& property, const std::string& value);
     void AddElementClass(const std::string& element_id, const std::string& class_name);
     void RemoveElementClass(const std::string& element_id, const std::string& class_name);
-    void SetTextEditorContent(const std::string& element_id, const std::string& content, const std::string& syntax_highlighter);
+    void SetTextEditorContent(const std::string& element_id, const std::string& content, SyntaxHighlighter::TokenCallback callback);
 
     // File change handling (for hot reload)
     void HandleRmlFileChanged(const std::string& normalized_path);

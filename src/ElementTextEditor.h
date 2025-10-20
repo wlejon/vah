@@ -47,7 +47,8 @@ public:
     void SetText(const std::string& text);
     std::string GetText() const;
     std::string GetSelectedText() const;
-    void SetSyntaxHighlighter(const std::string& function_name);
+    void SetSyntaxHighlighter(SyntaxHighlighter::TokenCallback callback);
+    void SetReferenceHighlighter(SyntaxHighlighter::ReferenceCallback callback, const std::string& file_path);
 
 protected:
     // Called every frame to update state

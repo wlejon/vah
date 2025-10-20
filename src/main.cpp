@@ -237,19 +237,8 @@ public:
                 });
                 lua_settable(rml_lua_early, -3);
 
-                // Register SetSyntaxHighlighter method
-                lua_pushstring(rml_lua_early, "SetSyntaxHighlighter");
-                lua_pushcfunction(rml_lua_early, [](lua_State* L) -> int {
-                    Rml::Element* elem = Rml::Lua::LuaType<Rml::Element>::check(L, 1);
-                    const char* func_name = luaL_checkstring(L, 2);
-
-                    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(elem);
-                    if (editor) {
-                        editor->SetSyntaxHighlighter(func_name);
-                    }
-                    return 0;
-                });
-                lua_settable(rml_lua_early, -3);
+                // Note: SetSyntaxHighlighter is now handled through the command system
+                // via ui.set_texteditor_content() in LuaThread
             }
             lua_pop(rml_lua_early, 1); // Pop metatable
 

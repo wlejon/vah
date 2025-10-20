@@ -108,8 +108,14 @@ std::string ElementTextEditor::GetSelectedText() const {
     return selection_->ExtractText(*buffer_);
 }
 
-void ElementTextEditor::SetSyntaxHighlighter(const std::string& function_name) {
-    highlighter_->SetHighlightFunction(function_name);
+void ElementTextEditor::SetSyntaxHighlighter(SyntaxHighlighter::TokenCallback callback) {
+    highlighter_->SetTokenHighlighter(callback);
+    text_dirty_ = true;
+    DirtyLayout();
+}
+
+void ElementTextEditor::SetReferenceHighlighter(SyntaxHighlighter::ReferenceCallback callback, const std::string& file_path) {
+    highlighter_->SetReferenceHighlighter(callback, file_path);
     text_dirty_ = true;
     DirtyLayout();
 }
@@ -200,6 +206,9 @@ void ElementTextEditor::GenerateTextGeometry() {
     Rml::String language = "en";
     Rml::TextShapingContext shaping_context{language};
 
+    // Default text color for unhighlighted text
+    Rml::Colourb default_color(200, 200, 200, 255);
+
     float y = 0.0f;
     for (int line_num = 0; line_num < line_count; ++line_num) {
         std::string line = buffer_->GetLine(line_num);
@@ -212,70 +221,69 @@ void ElementTextEditor::GenerateTextGeometry() {
         // Get tokens for this line
         auto tokens_it = token_map.find(line_num);
 
+        // Build colored segments for this line
+        // Each segment is a contiguous range of characters with the same color
+        struct ColoredSegment {
+            int start_col;
+            int end_col;
+            Rml::Colourb color;
+        };
+        std::vector<ColoredSegment> segments;
+
         if (tokens_it != token_map.end() && !tokens_it->second.empty()) {
-            // Line has syntax highlighting tokens - render each token separately
-            const auto& line_tokens = tokens_it->second;
+            // Sort tokens by start column
+            auto line_tokens = tokens_it->second;
+            std::sort(line_tokens.begin(), line_tokens.end(),
+                [](const SyntaxHighlighter::Token& a, const SyntaxHighlighter::Token& b) {
+                    return a.start_col < b.start_col;
+                });
 
+            // Fill in segments, adding default color for gaps
+            int current_col = 0;
             for (const auto& token : line_tokens) {
-                // Extract substring for this token
-                int start_col = token.start_col;
-                int end_col = token.end_col;
+                int start = std::max(0, token.start_col);
+                int end = std::min(token.end_col, static_cast<int>(line.size()));
 
-                if (start_col < 0 || start_col >= static_cast<int>(line.size())) continue;
-                if (end_col <= start_col) continue;
+                // Add default color segment for gap before this token
+                if (current_col < start) {
+                    segments.push_back({current_col, start, default_color});
+                }
 
-                int length = std::min(end_col - start_col, static_cast<int>(line.size()) - start_col);
-                std::string token_text = line.substr(start_col, length);
-
-                if (token_text.empty()) continue;
-
-                // Calculate position for this token
-                float char_width = layout_->GetCharWidth();
-                float x = static_cast<float>(start_col) * char_width;
-
-                Rml::ColourbPremultiplied premult_color = token.color.ToPremultiplied();
-                Rml::TexturedMeshList mesh_list;
-                // Position Y is the baseline, so add ascent to move from line top to baseline
-                Rml::Vector2f position(x, y + baseline_offset);
-                Rml::FontEffectsHandle effects_handle = 0;
-
-                font_engine->GenerateString(
-                    *render_manager,
-                    font_handle,
-                    effects_handle,
-                    token_text,
-                    position,
-                    premult_color,
-                    1.0f,
-                    shaping_context,
-                    mesh_list
-                );
-
-                // Convert to geometry
-                for (auto& textured_mesh : mesh_list) {
-                    if (textured_mesh.mesh) {
-                        TextGeometry text_geom;
-                        text_geom.geometry = render_manager->MakeGeometry(std::move(textured_mesh.mesh));
-                        text_geom.texture = textured_mesh.texture;
-                        text_geometries_.push_back(std::move(text_geom));
-                    }
+                // Add highlighted token segment
+                if (start < end && start < static_cast<int>(line.size())) {
+                    segments.push_back({start, end, token.color});
+                    current_col = end;
                 }
             }
-        } else {
-            // No syntax highlighting - render entire line in white
-            Rml::Colourb color(255, 255, 255, 255);
-            Rml::ColourbPremultiplied premult_color = color.ToPremultiplied();
 
+            // Fill remaining characters with default color
+            if (current_col < static_cast<int>(line.size())) {
+                segments.push_back({current_col, static_cast<int>(line.size()), default_color});
+            }
+        } else {
+            // No tokens - entire line is default color
+            segments.push_back({0, static_cast<int>(line.size()), default_color});
+        }
+
+        // Render each segment
+        float char_width = layout_->GetCharWidth();
+        for (const auto& segment : segments) {
+            if (segment.start_col >= segment.end_col) continue;
+
+            std::string segment_text = line.substr(segment.start_col, segment.end_col - segment.start_col);
+            if (segment_text.empty()) continue;
+
+            float x = static_cast<float>(segment.start_col) * char_width;
+            Rml::ColourbPremultiplied premult_color = segment.color.ToPremultiplied();
             Rml::TexturedMeshList mesh_list;
-            // Position Y is the baseline, so add ascent to move from line top to baseline
-            Rml::Vector2f position(0.0f, y + baseline_offset);
+            Rml::Vector2f position(x, y + baseline_offset);
             Rml::FontEffectsHandle effects_handle = 0;
 
             font_engine->GenerateString(
                 *render_manager,
                 font_handle,
                 effects_handle,
-                line,
+                segment_text,
                 position,
                 premult_color,
                 1.0f,

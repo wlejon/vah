@@ -42,37 +42,23 @@ your current task is in [text editor element plan](text-editor-element-plan.md).
 
 you've take a first pass at it. 
 
-PS D:\projects\vah> git status
-On branch main
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        modified:   CMakeLists.txt
-        modified:   docs/instructions.md
-        modified:   scripts/main.lua
-        modified:   src/CommandProcessor.cpp
-        modified:   src/Commands.h
-        modified:   src/DocumentManager.cpp
-        modified:   src/DocumentManager.h
-        modified:   src/LuaThread.cpp
-        modified:   src/main.cpp
-
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-        scripts/file_editor.lua
-        src/ElementTextEditor.cpp
-        src/ElementTextEditor.h
-        src/ElementTextEditorInstancer.h
-        src/SelectionManager.cpp
-        src/SelectionManager.h
-        src/SyntaxHighlighter.cpp
-        src/SyntaxHighlighter.h
-        src/TextBuffer.cpp
-        src/TextBuffer.h
-        src/TextLayout.cpp
-        src/TextLayout.h
-        ui/file_editor.rml
+here are the new files you made:
+scripts/file_editor.lua
+src/ElementTextEditor.cpp
+src/ElementTextEditor.h
+src/ElementTextEditorInstancer.h
+src/SelectionManager.cpp
+src/SelectionManager.h
+src/SyntaxHighlighter.cpp
+src/SyntaxHighlighter.h
+src/TextBuffer.cpp
+src/TextBuffer.h
+src/TextLayout.cpp
+src/TextLayout.h
+ui/file_editor.rml
 
 review your work against the plan.
 
-you built an intial file editor. it's currently rendering white text. i can select the text to highlight it. it's difficult to know when i can select text and when i cannot - where the barrier is between the views. i'd like the mouse to change to a text cursor when hovering over selectable text. 
+you built an intial file editor. it's currently rendering white text. i can select the text to highlight it. i can copy the selected text. 
+
+i'd like to support modular single line and whole file (with references) syntax highlighting. this will be very useful for code but we will also have comprehensive natural language editor support as well, providing semantic assistance. the text highlighting system needs to be robust and idiomatic to extend.

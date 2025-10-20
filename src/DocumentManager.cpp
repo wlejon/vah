@@ -119,7 +119,7 @@ void DocumentManager::RemoveElementClass(const std::string& element_id, const st
     }
 }
 
-void DocumentManager::SetTextEditorContent(const std::string& element_id, const std::string& content, const std::string& syntax_highlighter) {
+void DocumentManager::SetTextEditorContent(const std::string& element_id, const std::string& content, SyntaxHighlighter::TokenCallback callback) {
     auto element = FindElementById(element_id);
     if (!element) {
         LOG_WARN("SetTextEditorContent: Element '{}' not found", element_id);
@@ -137,8 +137,8 @@ void DocumentManager::SetTextEditorContent(const std::string& element_id, const 
     editor->SetText(content);
 
     // Set syntax highlighter if provided
-    if (!syntax_highlighter.empty()) {
-        editor->SetSyntaxHighlighter(syntax_highlighter);
+    if (callback) {
+        editor->SetSyntaxHighlighter(callback);
     }
 
     LOG_INFO("SetTextEditorContent: Set {} bytes to texteditor '{}'", content.size(), element_id);
