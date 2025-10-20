@@ -518,6 +518,14 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    ui_table["set_texteditor_content"] = [this](const std::string& element_id, const std::string& content, sol::optional<std::string> syntax_highlighter) {
+        Commands::SetTextEditorContent cmd;
+        cmd.element_id = element_id;
+        cmd.content = content;
+        cmd.syntax_highlighter = syntax_highlighter.value_or("");
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
 
     // Bind data model operations

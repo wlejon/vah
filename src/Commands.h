@@ -85,6 +85,12 @@ namespace Commands {
         std::string class_name;
     };
 
+    struct SetTextEditorContent {
+        std::string element_id;
+        std::string content;
+        std::string syntax_highlighter;
+    };
+
     struct UpdateDataModel {
         std::string model_name;
         DynamicTable data;
@@ -122,6 +128,7 @@ using Command = std::variant<
     Commands::SetElementStyle,
     Commands::AddElementClass,
     Commands::RemoveElementClass,
+    Commands::SetTextEditorContent,
     Commands::UpdateDataModel,
     Commands::FileChanged,
     Commands::AddFileWatch,

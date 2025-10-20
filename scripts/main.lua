@@ -6,7 +6,11 @@ function startup()
 
     -- Choose which demo to run (comment/uncomment):
 
-    command.spawn_thread("scripts/chat.lua")
+    -- File Editor (integrated file browser and text editor)
+    command.spawn_thread("scripts/file_editor.lua")
+
+    -- Chat Application
+    -- command.spawn_thread("scripts/chat.lua")
 
     -- Unified Workflow Application (combines workflow editor and node type editor)
     -- command.spawn_thread("scripts/workflow_app.lua")

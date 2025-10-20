@@ -1,4 +1,5 @@
 #include "DocumentManager.h"
+#include "ElementTextEditor.h"
 #include "Logger.h"
 #include <algorithm>
 #include <RmlUi/Lua/Interpreter.h>
@@ -116,6 +117,31 @@ void DocumentManager::RemoveElementClass(const std::string& element_id, const st
     if (element) {
         element->SetClass(class_name.c_str(), false);
     }
+}
+
+void DocumentManager::SetTextEditorContent(const std::string& element_id, const std::string& content, const std::string& syntax_highlighter) {
+    auto element = FindElementById(element_id);
+    if (!element) {
+        LOG_WARN("SetTextEditorContent: Element '{}' not found", element_id);
+        return;
+    }
+
+    // Try to cast to ElementTextEditor
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (!editor) {
+        LOG_WARN("SetTextEditorContent: Element '{}' is not a texteditor", element_id);
+        return;
+    }
+
+    // Set content
+    editor->SetText(content);
+
+    // Set syntax highlighter if provided
+    if (!syntax_highlighter.empty()) {
+        editor->SetSyntaxHighlighter(syntax_highlighter);
+    }
+
+    LOG_INFO("SetTextEditorContent: Set {} bytes to texteditor '{}'", content.size(), element_id);
 }
 
 void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {

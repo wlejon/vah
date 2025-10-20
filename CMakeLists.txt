@@ -58,6 +58,11 @@ add_executable(vah
     src/NotificationBindings.cpp
     src/NotificationPlugin.cpp
     src/DomIntrospection.cpp
+    src/TextBuffer.cpp
+    src/TextLayout.cpp
+    src/SelectionManager.cpp
+    src/SyntaxHighlighter.cpp
+    src/ElementTextEditor.cpp
 )
 
 target_include_directories(vah PRIVATE

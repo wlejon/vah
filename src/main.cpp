@@ -22,6 +22,8 @@
 #include "DataModelManager.h"
 #include "CommandProcessor.h"
 #include "ElementCanvas.h"
+#include "ElementTextEditor.h"
+#include "ElementTextEditorInstancer.h"
 #include "NanoVGBindings.h"
 #include "NotificationFeed.h"
 #include "NotificationBindings.h"
@@ -152,6 +154,9 @@ public:
         if (!Rml::LoadFontFace("ui/fonts/roboto-static/Roboto-Medium.ttf")) {
             LOG_WARN("Failed to load Roboto Medium font");
         }
+        if (!Rml::LoadFontFace("ui/fonts/jetbrains-mono-static/JetBrainsMono-Regular.ttf")) {
+            LOG_WARN("Failed to load JetBrains Mono font");
+        }
 
         // Create RmlUI context
         int width, height;
@@ -172,6 +177,84 @@ public:
         canvas_instancer_ = std::make_unique<Rml::ElementInstancerGeneric<ElementCanvas>>();
         Rml::Factory::RegisterElementInstancer("canvas", canvas_instancer_.get());
         LOG_INFO("Registered custom element: canvas");
+
+        texteditor_instancer_ = std::make_unique<ElementTextEditorInstancer>();
+        Rml::Factory::RegisterElementInstancer("texteditor", texteditor_instancer_.get());
+        LOG_INFO("Registered custom element: texteditor");
+
+        // Setup Lua bindings for TextEditor element
+        // RmlUI Lua will automatically expose elements retrieved via GetElementById
+        // We need to register custom methods for ElementTextEditor
+        lua_State* rml_lua_early = Rml::Lua::Interpreter::GetLuaState();
+        if (rml_lua_early) {
+            // Register custom methods on Element metatable for texteditor elements
+            // This will be accessible when element is retrieved via document:GetElementById()
+
+            // Get the Element metatable
+            luaL_getmetatable(rml_lua_early, "Rml::Element");
+            if (lua_istable(rml_lua_early, -1)) {
+                // Register SetText method
+                lua_pushstring(rml_lua_early, "SetText");
+                lua_pushcfunction(rml_lua_early, [](lua_State* L) -> int {
+                    Rml::Element* elem = Rml::Lua::LuaType<Rml::Element>::check(L, 1);
+                    const char* text = luaL_checkstring(L, 2);
+
+                    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(elem);
+                    if (editor) {
+                        editor->SetText(text);
+                    }
+                    return 0;
+                });
+                lua_settable(rml_lua_early, -3);
+
+                // Register GetText method
+                lua_pushstring(rml_lua_early, "GetText");
+                lua_pushcfunction(rml_lua_early, [](lua_State* L) -> int {
+                    Rml::Element* elem = Rml::Lua::LuaType<Rml::Element>::check(L, 1);
+
+                    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(elem);
+                    if (editor) {
+                        std::string text = editor->GetText();
+                        lua_pushstring(L, text.c_str());
+                        return 1;
+                    }
+                    return 0;
+                });
+                lua_settable(rml_lua_early, -3);
+
+                // Register GetSelectedText method
+                lua_pushstring(rml_lua_early, "GetSelectedText");
+                lua_pushcfunction(rml_lua_early, [](lua_State* L) -> int {
+                    Rml::Element* elem = Rml::Lua::LuaType<Rml::Element>::check(L, 1);
+
+                    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(elem);
+                    if (editor) {
+                        std::string text = editor->GetSelectedText();
+                        lua_pushstring(L, text.c_str());
+                        return 1;
+                    }
+                    return 0;
+                });
+                lua_settable(rml_lua_early, -3);
+
+                // Register SetSyntaxHighlighter method
+                lua_pushstring(rml_lua_early, "SetSyntaxHighlighter");
+                lua_pushcfunction(rml_lua_early, [](lua_State* L) -> int {
+                    Rml::Element* elem = Rml::Lua::LuaType<Rml::Element>::check(L, 1);
+                    const char* func_name = luaL_checkstring(L, 2);
+
+                    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(elem);
+                    if (editor) {
+                        editor->SetSyntaxHighlighter(func_name);
+                    }
+                    return 0;
+                });
+                lua_settable(rml_lua_early, -3);
+            }
+            lua_pop(rml_lua_early, 1); // Pop metatable
+
+            LOG_INFO("Registered Lua bindings for ElementTextEditor");
+        }
 
         // Initialize our systems
         command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
@@ -660,6 +743,7 @@ private:
 
     // Custom element instancers (must outlive RmlUi context)
     std::unique_ptr<Rml::ElementInstancerGeneric<ElementCanvas>> canvas_instancer_;
+    std::unique_ptr<ElementTextEditorInstancer> texteditor_instancer_;
 
     std::unique_ptr<moodycamel::ConcurrentQueue<Command>> command_queue_;
     std::unique_ptr<moodycamel::ConcurrentQueue<UIEvent>> ui_event_queue_;
