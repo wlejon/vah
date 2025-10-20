@@ -6,7 +6,6 @@
 #include <sol/sol.hpp>
 #include "InputState.h"
 #include "DataStore.h"
-#include "SyntaxHighlighter.h"
 
 // Command types that lua threads can send to the main thread
 namespace Commands {
@@ -89,7 +88,6 @@ namespace Commands {
     struct SetTextEditorContent {
         std::string element_id;
         std::string content;
-        SyntaxHighlighter::TokenCallback highlighter_callback;
     };
 
     struct UpdateDataModel {

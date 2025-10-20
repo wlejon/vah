@@ -8,12 +8,12 @@
 #include <SDL2/SDL.h>
 #include <map>
 
-ElementTextEditor::ElementTextEditor(const Rml::String& tag)
+ElementTextEditor::ElementTextEditor(const Rml::String& tag, DataStore* data_store)
     : Rml::Element(tag)
     , buffer_(std::make_unique<TextBuffer>())
     , layout_(std::make_unique<TextLayout>())
     , selection_(std::make_unique<SelectionManager>())
-    , highlighter_(std::make_unique<SyntaxHighlighter>())
+    , data_store_(data_store)
     , selection_dirty_(false)
     , font_ready_(false)
     , mouse_dragging_(false)
@@ -95,7 +95,6 @@ void ElementTextEditor::ProcessEvent(Rml::Event& event) {
 
 void ElementTextEditor::SetText(const std::string& text) {
     buffer_->SetText(text);
-    highlighter_->InvalidateCache();
     DirtyLayout();
 }
 
@@ -105,16 +104,6 @@ std::string ElementTextEditor::GetText() const {
 
 std::string ElementTextEditor::GetSelectedText() const {
     return selection_->ExtractText(*buffer_);
-}
-
-void ElementTextEditor::SetSyntaxHighlighter(SyntaxHighlighter::TokenCallback callback) {
-    highlighter_->SetTokenHighlighter(callback);
-    DirtyLayout();
-}
-
-void ElementTextEditor::SetReferenceHighlighter(SyntaxHighlighter::ReferenceCallback callback, const std::string& file_path) {
-    highlighter_->SetReferenceHighlighter(callback, file_path);
-    DirtyLayout();
 }
 
 void ElementTextEditor::OnUpdate() {
@@ -128,6 +117,8 @@ void ElementTextEditor::OnUpdate() {
         }
     }
 
+    // Always regenerate text geometry every frame to prevent garbled rendering
+    // This is needed due to timing issues with the RmlUi font system
     GenerateGeometry();
 }
 
@@ -149,6 +140,7 @@ void ElementTextEditor::OnRender() {
 }
 
 void ElementTextEditor::GenerateGeometry() {
+    // Always regenerate text geometry to prevent garbled rendering
     GenerateTextGeometry();
 
     if (selection_dirty_) {
@@ -194,12 +186,53 @@ void ElementTextEditor::GenerateTextGeometry() {
         return;
     }
 
-    // Get syntax highlighting tokens
-    std::string text = buffer_->GetText();
-    std::vector<SyntaxHighlighter::Token> tokens = highlighter_->GetTokens(text);
+    // Get syntax highlighting tokens from DataStore
+    // Token model name format: "editor_tokens_<element_id>"
+    std::string token_model_name = "editor_tokens_" + GetId();
+
+    struct Token {
+        int line;
+        int start_col;
+        int end_col;
+        Rml::Colourb color;
+    };
+    std::vector<Token> tokens;
+
+    // Read tokens from DataStore if available
+    if (data_store_ && data_store_->HasModel(token_model_name)) {
+        auto token_table = data_store_->GetModel(token_model_name);
+        if (token_table) {
+            for (const auto& row : *token_table) {
+                Token token;
+
+                // Extract token fields from DynamicRow
+                auto get_int = [&](const std::string& key, int default_val) -> int {
+                    auto it = row.find(key);
+                    if (it != row.end()) {
+                        if (std::holds_alternative<int64_t>(it->second)) {
+                            return static_cast<int>(std::get<int64_t>(it->second));
+                        }
+                    }
+                    return default_val;
+                };
+
+                token.line = get_int("line", 0);
+                token.start_col = get_int("start_col", 0);
+                token.end_col = get_int("end_col", 0);
+
+                int r = get_int("r", 255);
+                int g = get_int("g", 255);
+                int b = get_int("b", 255);
+                int a = get_int("a", 255);
+                token.color = Rml::Colourb(r, g, b, a);
+
+                tokens.push_back(token);
+            }
+        }
+    }
 
     // Build token map for quick lookup: map[line] -> list of tokens on that line
-    std::map<int, std::vector<SyntaxHighlighter::Token>> token_map;
+    std::map<int, std::vector<Token>> token_map;
     for (const auto& token : tokens) {
         token_map[token.line].push_back(token);
     }
@@ -241,7 +274,7 @@ void ElementTextEditor::GenerateTextGeometry() {
             // Sort tokens by start column
             auto line_tokens = tokens_it->second;
             std::sort(line_tokens.begin(), line_tokens.end(),
-                [](const SyntaxHighlighter::Token& a, const SyntaxHighlighter::Token& b) {
+                [](const Token& a, const Token& b) {
                     return a.start_col < b.start_col;
                 });
 

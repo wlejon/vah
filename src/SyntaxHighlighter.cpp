@@ -6,7 +6,19 @@ SyntaxHighlighter::SyntaxHighlighter()
 {
 }
 
-SyntaxHighlighter::~SyntaxHighlighter() = default;
+SyntaxHighlighter::~SyntaxHighlighter() {
+    // Clear callbacks before destruction to prevent Lua reference cleanup issues
+    // This is important because callbacks may hold sol::protected_function objects
+    // Note: This should already be done by ClearAllTextEditorCallbacks() during shutdown,
+    // but we do it here as a safety measure
+    try {
+        token_callback_ = nullptr;
+        reference_callback_ = nullptr;
+    } catch (...) {
+        // Ignore any exceptions during destruction
+        // This can happen if Lua state is already destroyed
+    }
+}
 
 void SyntaxHighlighter::SetTokenHighlighter(TokenCallback callback) {
     token_callback_ = callback;

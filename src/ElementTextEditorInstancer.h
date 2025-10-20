@@ -2,13 +2,14 @@
 
 #include <RmlUi/Core/ElementInstancer.h>
 #include "ElementTextEditor.h"
+#include "DataStore.h"
 
 /**
  * ElementTextEditorInstancer - Factory for creating ElementTextEditor instances.
  */
 class ElementTextEditorInstancer : public Rml::ElementInstancer {
 public:
-    ElementTextEditorInstancer() = default;
+    ElementTextEditorInstancer(DataStore* data_store) : data_store_(data_store) {}
     virtual ~ElementTextEditorInstancer() = default;
 
     // Create an instance of ElementTextEditor
@@ -17,7 +18,7 @@ public:
         const Rml::String& tag,
         const Rml::XMLAttributes& attributes) override
     {
-        return Rml::ElementPtr(new ElementTextEditor(tag));
+        return Rml::ElementPtr(new ElementTextEditor(tag, data_store_));
     }
 
     // Release an element instance
@@ -25,4 +26,7 @@ public:
     {
         delete element;
     }
+
+private:
+    DataStore* data_store_;
 };

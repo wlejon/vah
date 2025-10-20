@@ -38,27 +38,3 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-your current task is in [text editor element plan](text-editor-element-plan.md). 
-
-you've take a first pass at it. 
-
-here are the new files you made:
-scripts/file_editor.lua
-src/ElementTextEditor.cpp
-src/ElementTextEditor.h
-src/ElementTextEditorInstancer.h
-src/SelectionManager.cpp
-src/SelectionManager.h
-src/SyntaxHighlighter.cpp
-src/SyntaxHighlighter.h
-src/TextBuffer.cpp
-src/TextBuffer.h
-src/TextLayout.cpp
-src/TextLayout.h
-ui/file_editor.rml
-
-review your work against the plan.
-
-you built an intial file editor. it's currently rendering white text. i can select the text to highlight it. i can copy the selected text. 
-
-i'd like to support modular single line and whole file (with references) syntax highlighting. this will be very useful for code but we will also have comprehensive natural language editor support as well, providing semantic assistance. the text highlighting system needs to be robust and idiomatic to extend.

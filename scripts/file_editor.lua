@@ -130,27 +130,50 @@ function open_file(file_path)
     editor_data.file_info = format_size(size) .. " · " .. count_lines(content) .. " lines"
     data.bind("editor_info", {editor_data})
 
-    -- Determine file type and get highlighter
+    -- Set text in editor first (renders immediately with no highlighting)
+    ui.set_texteditor_content("code_editor", content)
+    print("Loaded file: " .. file_path .. " (" .. size .. " bytes)")
+
+    -- Determine file type and compute syntax highlighting
     local ext = file_path:match("%.([^%.]+)$")
-    local highlighter = nil
 
     -- Skip syntax highlighting for large files (> 1MB) or binary files
     local max_size = 1024 * 1024  -- 1MB
     local is_binary = content:find('\0') ~= nil
 
     if size <= max_size and not is_binary then
-        highlighter = get_highlighter_for_extension(ext)
+        compute_and_bind_tokens(ext, content)
     else
         if is_binary then
             print("Skipping syntax highlighting: Binary file detected")
         else
             print("Skipping syntax highlighting: File too large (" .. format_size(size) .. ")")
         end
+        -- Clear any existing tokens
+        data.bind("editor_tokens_code_editor", {})
+    end
+end
+
+-- Compute syntax tokens and bind them to the data model
+function compute_and_bind_tokens(ext, content)
+    local highlighter = get_highlighter_for_extension(ext)
+    if not highlighter then
+        -- No highlighter available, clear tokens
+        data.bind("editor_tokens_code_editor", {})
+        return
     end
 
-    -- Set text in editor using UI command
-    ui.set_texteditor_content("code_editor", content, highlighter)
-    print("Loaded file: " .. file_path .. " (" .. size .. " bytes)")
+    -- Call the highlighter function
+    local tokens = highlighter(content)
+    if tokens and #tokens > 0 then
+        -- Bind the tokens to the data model
+        -- ElementTextEditor will read from "editor_tokens_code_editor"
+        data.bind("editor_tokens_code_editor", tokens)
+        print("Applied syntax highlighting: " .. #tokens .. " tokens")
+    else
+        -- No tokens, clear
+        data.bind("editor_tokens_code_editor", {})
+    end
 end
 
 function count_lines(text)

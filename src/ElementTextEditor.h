@@ -7,7 +7,7 @@
 #include "TextBuffer.h"
 #include "TextLayout.h"
 #include "SelectionManager.h"
-#include "SyntaxHighlighter.h"
+#include "DataStore.h"
 #include <memory>
 #include <vector>
 
@@ -16,7 +16,7 @@
  *
  * Features:
  * - Character-level text selection
- * - Syntax highlighting via Lua callback
+ * - Syntax highlighting via data binding
  * - Mouse drag selection
  * - Ctrl+C to copy
  *
@@ -24,14 +24,14 @@
  *   <texteditor id="my-editor" style="width: 800px; height: 600px;" />
  *
  * Lua interface:
- *   editor:SetText(text)
- *   editor:GetText() -> text
- *   editor:GetSelectedText() -> text
- *   editor:SetSyntaxHighlighter(function_name)
+ *   ui.set_texteditor_content("my-editor", text)
+ *
+ * Syntax highlighting (from Lua thread):
+ *   data.bind("editor_tokens_my-editor", token_array)
  */
 class ElementTextEditor : public Rml::Element, public Rml::EventListener {
 public:
-    ElementTextEditor(const Rml::String& tag);
+    ElementTextEditor(const Rml::String& tag, DataStore* data_store);
     virtual ~ElementTextEditor();
 
     // Called when element is added to the document tree
@@ -43,12 +43,10 @@ public:
     // Handle mouse and keyboard events
     void ProcessEvent(Rml::Event& event) override;
 
-    // Lua interface
+    // Interface for commands
     void SetText(const std::string& text);
     std::string GetText() const;
     std::string GetSelectedText() const;
-    void SetSyntaxHighlighter(SyntaxHighlighter::TokenCallback callback);
-    void SetReferenceHighlighter(SyntaxHighlighter::ReferenceCallback callback, const std::string& file_path);
 
 protected:
     // Called every frame to update state
@@ -79,7 +77,7 @@ private:
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
     std::unique_ptr<SelectionManager> selection_;
-    std::unique_ptr<SyntaxHighlighter> highlighter_;
+    DataStore* data_store_;  // Not owned
 
     // Rendering
     struct TextGeometry {
