@@ -130,6 +130,33 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::UnregisterGlobalEvent>) {
             event_dispatcher_->UnregisterGlobalEvent(command.event_name);
         }
+        else if constexpr (std::is_same_v<T, Commands::AddNotification>) {
+            if (notification_feed_) {
+                Notification notif;
+                notif.id = NotificationFeed::GenerateId();
+                notif.type = command.type;
+                notif.title = command.title;
+                notif.message = command.message;
+                notif.thread_name = command.thread_name;
+                notif.timestamp = NotificationFeed::GetCurrentTime();
+                notif.dismissible = command.dismissible;
+                notif.expandable = command.expandable;
+                notif.expanded_content = command.expanded_content;
+                notif.metadata = command.metadata;
+                notif.ttl_seconds = command.ttl_seconds;
+                notification_feed_->AddNotification(std::move(notif));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::ClearNotifications>) {
+            if (notification_feed_) {
+                notification_feed_->Clear();
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::DismissNotification>) {
+            if (notification_feed_) {
+                notification_feed_->Dismiss(command.notification_id);
+            }
+        }
 
     }, cmd);
 }

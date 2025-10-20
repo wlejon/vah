@@ -1,30 +1,29 @@
 #include "NotificationBindings.h"
 #include "NotificationFeed.h"
+#include "Commands.h"
 #include "Logger.h"
 
 namespace NotificationBindings {
 
-void SetupBindings(sol::state& lua, NotificationFeed* feed) {
-    if (!feed) {
-        LOG_ERROR("NotificationBindings: feed is null");
+void SetupBindings(sol::state& lua, moodycamel::ConcurrentQueue<Command>* command_queue) {
+    if (!command_queue) {
+        LOG_ERROR("NotificationBindings: command_queue is null");
         return;
     }
 
     auto notif_table = lua.create_table();
 
     // Add notification from Lua thread
-    notif_table["add"] = [feed](sol::table notification_data) {
-        Notification notif;
-        notif.id = NotificationFeed::GenerateId();
-        notif.type = notification_data.get_or("type", 0);
-        notif.title = notification_data.get_or<std::string>("title", "");
-        notif.message = notification_data.get_or<std::string>("message", "");
-        notif.thread_name = notification_data.get_or<std::string>("thread", "Agent");
-        notif.timestamp = NotificationFeed::GetCurrentTime();
-        notif.dismissible = notification_data.get_or("dismissible", true);
-        notif.expandable = notification_data.get_or("expandable", false);
-        notif.expanded_content = notification_data.get_or<std::string>("expanded_content", "");
-        notif.ttl_seconds = notification_data.get_or("ttl", 5.0);
+    notif_table["add"] = [command_queue](sol::table notification_data) {
+        Commands::AddNotification cmd;
+        cmd.type = notification_data.get_or("type", 0);
+        cmd.title = notification_data.get_or<std::string>("title", "");
+        cmd.message = notification_data.get_or<std::string>("message", "");
+        cmd.thread_name = notification_data.get_or<std::string>("thread", "Agent");
+        cmd.dismissible = notification_data.get_or("dismissible", true);
+        cmd.expandable = notification_data.get_or("expandable", false);
+        cmd.expanded_content = notification_data.get_or<std::string>("expanded_content", "");
+        cmd.ttl_seconds = notification_data.get_or("ttl", 5.0);
 
         // Extract metadata if provided
         sol::optional<sol::table> metadata_opt = notification_data.get<sol::optional<sol::table>>("metadata");
@@ -35,93 +34,88 @@ void SetupBindings(sol::state& lua, NotificationFeed* feed) {
                     std::string key_str = key.as<std::string>();
 
                     if (value.is<bool>()) {
-                        notif.metadata[key_str] = value.as<bool>();
+                        cmd.metadata[key_str] = value.as<bool>();
                     } else if (value.is<int>()) {
-                        notif.metadata[key_str] = value.as<int>();
+                        cmd.metadata[key_str] = static_cast<int64_t>(value.as<int>());
                     } else if (value.is<double>()) {
-                        notif.metadata[key_str] = value.as<double>();
+                        cmd.metadata[key_str] = value.as<double>();
                     } else if (value.is<std::string>()) {
-                        notif.metadata[key_str] = value.as<std::string>();
+                        cmd.metadata[key_str] = value.as<std::string>();
                     }
                 }
             }
         }
 
-        feed->AddNotification(std::move(notif));
+        command_queue->enqueue(cmd);
     };
 
     // Show progress notification
-    notif_table["progress"] = [feed](std::string title, int current, int total) {
-        Notification notif;
-        notif.id = NotificationFeed::GenerateId();
-        notif.type = static_cast<int>(NotificationType::Progress);
-        notif.title = title;
-        notif.message = std::to_string(current) + " / " + std::to_string(total);
-        notif.thread_name = "Worker";
-        notif.timestamp = NotificationFeed::GetCurrentTime();
-        notif.dismissible = false;
-        notif.expandable = false;
-        notif.ttl_seconds = 0.0;  // Progress notifications persist until dismissed
+    notif_table["progress"] = [command_queue](std::string title, int current, int total) {
+        Commands::AddNotification cmd;
+        cmd.type = static_cast<int>(NotificationType::Progress);
+        cmd.title = title;
+        cmd.message = std::to_string(current) + " / " + std::to_string(total);
+        cmd.thread_name = "Worker";
+        cmd.dismissible = false;
+        cmd.expandable = false;
+        cmd.ttl_seconds = 0.0;  // Progress notifications persist until dismissed
 
-        feed->AddNotification(std::move(notif));
+        command_queue->enqueue(cmd);
     };
 
     // Show success notification
-    notif_table["success"] = [feed](std::string title, sol::optional<std::string> message) {
-        Notification notif;
-        notif.id = NotificationFeed::GenerateId();
-        notif.type = static_cast<int>(NotificationType::Success);
-        notif.title = title;
-        notif.message = message.value_or("");
-        notif.thread_name = "System";
-        notif.timestamp = NotificationFeed::GetCurrentTime();
-        notif.dismissible = true;
-        notif.expandable = false;
-        notif.ttl_seconds = 5.0;  // Default TTL
+    notif_table["success"] = [command_queue](std::string title, sol::optional<std::string> message) {
+        Commands::AddNotification cmd;
+        cmd.type = static_cast<int>(NotificationType::Success);
+        cmd.title = title;
+        cmd.message = message.value_or("");
+        cmd.thread_name = "System";
+        cmd.dismissible = true;
+        cmd.expandable = false;
+        cmd.ttl_seconds = 5.0;  // Default TTL
 
-        feed->AddNotification(std::move(notif));
+        command_queue->enqueue(cmd);
     };
 
     // Show error notification
-    notif_table["error"] = [feed](std::string title, sol::optional<std::string> message) {
-        Notification notif;
-        notif.id = NotificationFeed::GenerateId();
-        notif.type = static_cast<int>(NotificationType::Error);
-        notif.title = title;
-        notif.message = message.value_or("");
-        notif.thread_name = "System";
-        notif.timestamp = NotificationFeed::GetCurrentTime();
-        notif.dismissible = true;
-        notif.expandable = false;
-        notif.ttl_seconds = 0.0;  // Errors persist until dismissed
+    notif_table["error"] = [command_queue](std::string title, sol::optional<std::string> message) {
+        Commands::AddNotification cmd;
+        cmd.type = static_cast<int>(NotificationType::Error);
+        cmd.title = title;
+        cmd.message = message.value_or("");
+        cmd.thread_name = "System";
+        cmd.dismissible = true;
+        cmd.expandable = false;
+        cmd.ttl_seconds = 0.0;  // Errors persist until dismissed
 
-        feed->AddNotification(std::move(notif));
+        command_queue->enqueue(cmd);
     };
 
     // Show info notification
-    notif_table["info"] = [feed](std::string title, sol::optional<std::string> message) {
-        Notification notif;
-        notif.id = NotificationFeed::GenerateId();
-        notif.type = static_cast<int>(NotificationType::Info);
-        notif.title = title;
-        notif.message = message.value_or("");
-        notif.thread_name = "System";
-        notif.timestamp = NotificationFeed::GetCurrentTime();
-        notif.dismissible = true;
-        notif.expandable = false;
-        notif.ttl_seconds = 5.0;  // Default TTL
+    notif_table["info"] = [command_queue](std::string title, sol::optional<std::string> message) {
+        Commands::AddNotification cmd;
+        cmd.type = static_cast<int>(NotificationType::Info);
+        cmd.title = title;
+        cmd.message = message.value_or("");
+        cmd.thread_name = "System";
+        cmd.dismissible = true;
+        cmd.expandable = false;
+        cmd.ttl_seconds = 5.0;  // Default TTL
 
-        feed->AddNotification(std::move(notif));
+        command_queue->enqueue(cmd);
     };
 
     // Clear all notifications
-    notif_table["clear"] = [feed]() {
-        feed->Clear();
+    notif_table["clear"] = [command_queue]() {
+        Commands::ClearNotifications cmd;
+        command_queue->enqueue(cmd);
     };
 
     // Dismiss specific notification
-    notif_table["dismiss"] = [feed](std::string notification_id) {
-        feed->Dismiss(notification_id);
+    notif_table["dismiss"] = [command_queue](std::string notification_id) {
+        Commands::DismissNotification cmd;
+        cmd.notification_id = notification_id;
+        command_queue->enqueue(cmd);
     };
 
     lua["notifications"] = notif_table;

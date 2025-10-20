@@ -425,7 +425,7 @@ void LuaThread::SetupLuaBindings() {
     FileIngestionBindings::SetupBindings(*lua_);
 
     // Setup notification bindings
-    NotificationBindings::SetupBindings(*lua_, notification_feed_);
+    NotificationBindings::SetupBindings(*lua_, command_queue_);
 
     // Bind event registration system
     auto event_table = lua_->create_table();

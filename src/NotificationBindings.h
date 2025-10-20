@@ -1,11 +1,10 @@
 #pragma once
 
 #include <sol/sol.hpp>
-
-// Forward declaration
-class NotificationFeed;
+#include "Commands.h"
+#include <moodycamel/concurrentqueue.h>
 
 namespace NotificationBindings {
     // Setup notification bindings in lua state
-    void SetupBindings(sol::state& lua, NotificationFeed* feed);
+    void SetupBindings(sol::state& lua, moodycamel::ConcurrentQueue<Command>* command_queue);
 }

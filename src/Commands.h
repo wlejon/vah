@@ -145,6 +145,25 @@ namespace Commands {
     struct UnregisterGlobalEvent {
         std::string event_name;
     };
+
+    struct AddNotification {
+        int type;
+        std::string title;
+        std::string message;
+        std::string thread_name;
+        bool dismissible;
+        bool expandable;
+        std::string expanded_content;
+        PayloadMap metadata;
+        double ttl_seconds;
+    };
+
+    struct ClearNotifications {
+    };
+
+    struct DismissNotification {
+        std::string notification_id;
+    };
 }
 
 // Variant holding all possible command types
@@ -175,7 +194,10 @@ using Command = std::variant<
     Commands::AddFileWatch,
     Commands::RemoveFileWatch,
     Commands::RegisterGlobalEvent,
-    Commands::UnregisterGlobalEvent
+    Commands::UnregisterGlobalEvent,
+    Commands::AddNotification,
+    Commands::ClearNotifications,
+    Commands::DismissNotification
 >;
 
 // Response sent from main thread to lua thread
