@@ -131,6 +131,8 @@
             font-size: 14px;
             cursor: text;
             drag: drag;
+            focus: auto;
+            tab-index: auto;
         }
 
         .no-file-message {

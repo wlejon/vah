@@ -436,37 +436,166 @@ private:
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
+            if (!rml_context_) {
+                running_ = false;
+                break;
+            }
+
             switch (event.type) {
                 case SDL_QUIT:
                     running_ = false;
                     break;
-
-                case SDL_KEYDOWN:
-                    if (event.key.keysym.sym == SDLK_ESCAPE) {
-                        running_ = false;
-                    }
-                    // Handle Ctrl+V for clipboard paste
-                    else if (event.key.keysym.sym == SDLK_v && (event.key.keysym.mod & KMOD_CTRL)) {
-                        if (SDL_HasClipboardText()) {
-                            char* clipboard_text = SDL_GetClipboardText();
-                            if (clipboard_text) {
-                                std::string text(clipboard_text);
-                                SDL_free(clipboard_text);
-
-                                LOG_INFO("Clipboard paste detected ({} bytes)", text.size());
-                                // Trigger UI event with clipboard text
-                                PayloadMap payload;
-                                payload["text"] = text;
-                                ui_event_queue_->enqueue(UIEvent{"clipboard_paste", payload});
-                            }
+                case SDL_MOUSEBUTTONDOWN:
+                    rml_context_->ProcessMouseButtonDown(event.button.button - 1, 0);
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    rml_context_->ProcessMouseButtonUp(event.button.button - 1, 0);
+                    break;
+                case SDL_MOUSEMOTION:
+                    rml_context_->ProcessMouseMove(event.motion.x, event.motion.y, 0);
+                    break;
+                case SDL_MOUSEWHEEL:
+                    rml_context_->ProcessMouseWheel(static_cast<float>(-event.wheel.y), 0);
+                    break;
+                case SDL_TEXTINPUT:
+                    for (char* c = event.text.text; *c; c++) {
+                        if ((*c & 0x80) == 0) {
+                            rml_context_->ProcessTextInput(static_cast<Rml::Character>(*c));
                         }
                     }
                     break;
+                case SDL_KEYDOWN:
+                case SDL_KEYUP: {
+                    // Convert SDL key to RmlUI KeyIdentifier
+                    Rml::Input::KeyIdentifier key_id = Rml::Input::KI_UNKNOWN;
+                    int key_modifier = 0;
 
-                case SDL_KEYUP:
-                    // Keyboard events are handled below with RmlUI processing
+                    // Map common keys
+                    switch (event.key.keysym.sym) {
+                        // Arrow keys
+                        case SDLK_LEFT:     key_id = Rml::Input::KI_LEFT; break;
+                        case SDLK_RIGHT:    key_id = Rml::Input::KI_RIGHT; break;
+                        case SDLK_UP:       key_id = Rml::Input::KI_UP; break;
+                        case SDLK_DOWN:     key_id = Rml::Input::KI_DOWN; break;
+
+                        // Special keys
+                        case SDLK_SPACE:    key_id = Rml::Input::KI_SPACE; break;
+                        case SDLK_RETURN:   key_id = Rml::Input::KI_RETURN; break;
+                        case SDLK_ESCAPE:   key_id = Rml::Input::KI_ESCAPE; break;
+                        case SDLK_BACKSPACE: key_id = Rml::Input::KI_BACK; break;
+                        case SDLK_TAB:      key_id = Rml::Input::KI_TAB; break;
+                        case SDLK_DELETE:   key_id = Rml::Input::KI_DELETE; break;
+                        case SDLK_INSERT:   key_id = Rml::Input::KI_INSERT; break;
+                        case SDLK_HOME:     key_id = Rml::Input::KI_HOME; break;
+                        case SDLK_END:      key_id = Rml::Input::KI_END; break;
+                        case SDLK_PAGEUP:   key_id = Rml::Input::KI_PRIOR; break;
+                        case SDLK_PAGEDOWN: key_id = Rml::Input::KI_NEXT; break;
+
+                        // Letters A-Z
+                        case SDLK_a:        key_id = Rml::Input::KI_A; break;
+                        case SDLK_b:        key_id = Rml::Input::KI_B; break;
+                        case SDLK_c:        key_id = Rml::Input::KI_C; break;
+                        case SDLK_d:        key_id = Rml::Input::KI_D; break;
+                        case SDLK_e:        key_id = Rml::Input::KI_E; break;
+                        case SDLK_f:        key_id = Rml::Input::KI_F; break;
+                        case SDLK_g:        key_id = Rml::Input::KI_G; break;
+                        case SDLK_h:        key_id = Rml::Input::KI_H; break;
+                        case SDLK_i:        key_id = Rml::Input::KI_I; break;
+                        case SDLK_j:        key_id = Rml::Input::KI_J; break;
+                        case SDLK_k:        key_id = Rml::Input::KI_K; break;
+                        case SDLK_l:        key_id = Rml::Input::KI_L; break;
+                        case SDLK_m:        key_id = Rml::Input::KI_M; break;
+                        case SDLK_n:        key_id = Rml::Input::KI_N; break;
+                        case SDLK_o:        key_id = Rml::Input::KI_O; break;
+                        case SDLK_p:        key_id = Rml::Input::KI_P; break;
+                        case SDLK_q:        key_id = Rml::Input::KI_Q; break;
+                        case SDLK_r:        key_id = Rml::Input::KI_R; break;
+                        case SDLK_s:        key_id = Rml::Input::KI_S; break;
+                        case SDLK_t:        key_id = Rml::Input::KI_T; break;
+                        case SDLK_u:        key_id = Rml::Input::KI_U; break;
+                        case SDLK_v:        key_id = Rml::Input::KI_V; break;
+                        case SDLK_w:        key_id = Rml::Input::KI_W; break;
+                        case SDLK_x:        key_id = Rml::Input::KI_X; break;
+                        case SDLK_y:        key_id = Rml::Input::KI_Y; break;
+                        case SDLK_z:        key_id = Rml::Input::KI_Z; break;
+
+                        // Numbers 0-9
+                        case SDLK_0:        key_id = Rml::Input::KI_0; break;
+                        case SDLK_1:        key_id = Rml::Input::KI_1; break;
+                        case SDLK_2:        key_id = Rml::Input::KI_2; break;
+                        case SDLK_3:        key_id = Rml::Input::KI_3; break;
+                        case SDLK_4:        key_id = Rml::Input::KI_4; break;
+                        case SDLK_5:        key_id = Rml::Input::KI_5; break;
+                        case SDLK_6:        key_id = Rml::Input::KI_6; break;
+                        case SDLK_7:        key_id = Rml::Input::KI_7; break;
+                        case SDLK_8:        key_id = Rml::Input::KI_8; break;
+                        case SDLK_9:        key_id = Rml::Input::KI_9; break;
+
+                        // Numpad
+                        case SDLK_KP_0:     key_id = Rml::Input::KI_NUMPAD0; break;
+                        case SDLK_KP_1:     key_id = Rml::Input::KI_NUMPAD1; break;
+                        case SDLK_KP_2:     key_id = Rml::Input::KI_NUMPAD2; break;
+                        case SDLK_KP_3:     key_id = Rml::Input::KI_NUMPAD3; break;
+                        case SDLK_KP_4:     key_id = Rml::Input::KI_NUMPAD4; break;
+                        case SDLK_KP_5:     key_id = Rml::Input::KI_NUMPAD5; break;
+                        case SDLK_KP_6:     key_id = Rml::Input::KI_NUMPAD6; break;
+                        case SDLK_KP_7:     key_id = Rml::Input::KI_NUMPAD7; break;
+                        case SDLK_KP_8:     key_id = Rml::Input::KI_NUMPAD8; break;
+                        case SDLK_KP_9:     key_id = Rml::Input::KI_NUMPAD9; break;
+                        case SDLK_KP_ENTER: key_id = Rml::Input::KI_NUMPADENTER; break;
+                        case SDLK_KP_MULTIPLY: key_id = Rml::Input::KI_MULTIPLY; break;
+                        case SDLK_KP_PLUS:  key_id = Rml::Input::KI_ADD; break;
+                        case SDLK_KP_MINUS: key_id = Rml::Input::KI_SUBTRACT; break;
+                        case SDLK_KP_PERIOD: key_id = Rml::Input::KI_DECIMAL; break;
+                        case SDLK_KP_DIVIDE: key_id = Rml::Input::KI_DIVIDE; break;
+
+                        // Function keys
+                        case SDLK_F1:       key_id = Rml::Input::KI_F1; break;
+                        case SDLK_F2:       key_id = Rml::Input::KI_F2; break;
+                        case SDLK_F3:       key_id = Rml::Input::KI_F3; break;
+                        case SDLK_F4:       key_id = Rml::Input::KI_F4; break;
+                        case SDLK_F5:       key_id = Rml::Input::KI_F5; break;
+                        case SDLK_F6:       key_id = Rml::Input::KI_F6; break;
+                        case SDLK_F7:       key_id = Rml::Input::KI_F7; break;
+                        case SDLK_F8:       key_id = Rml::Input::KI_F8; break;
+                        case SDLK_F9:       key_id = Rml::Input::KI_F9; break;
+                        case SDLK_F10:      key_id = Rml::Input::KI_F10; break;
+                        case SDLK_F11:      key_id = Rml::Input::KI_F11; break;
+                        case SDLK_F12:      key_id = Rml::Input::KI_F12; break;
+
+                        // Punctuation
+                        case SDLK_SEMICOLON: key_id = Rml::Input::KI_OEM_1; break;
+                        case SDLK_PLUS:     key_id = Rml::Input::KI_OEM_PLUS; break;
+                        case SDLK_COMMA:    key_id = Rml::Input::KI_OEM_COMMA; break;
+                        case SDLK_MINUS:    key_id = Rml::Input::KI_OEM_MINUS; break;
+                        case SDLK_PERIOD:   key_id = Rml::Input::KI_OEM_PERIOD; break;
+                        case SDLK_SLASH:    key_id = Rml::Input::KI_OEM_2; break;
+                        case SDLK_BACKQUOTE: key_id = Rml::Input::KI_OEM_3; break;
+                        case SDLK_LEFTBRACKET: key_id = Rml::Input::KI_OEM_4; break;
+                        case SDLK_BACKSLASH: key_id = Rml::Input::KI_OEM_5; break;
+                        case SDLK_RIGHTBRACKET: key_id = Rml::Input::KI_OEM_6; break;
+                        case SDLK_QUOTE:    key_id = Rml::Input::KI_OEM_7; break;
+
+                        default: break;
+                    }
+
+                    // Map modifiers (check for both left and right modifier keys)
+                    if (event.key.keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
+                        key_modifier |= Rml::Input::KM_SHIFT;
+                    if (event.key.keysym.mod & (KMOD_LCTRL | KMOD_RCTRL))
+                        key_modifier |= Rml::Input::KM_CTRL;
+                    if (event.key.keysym.mod & (KMOD_LALT | KMOD_RALT))
+                        key_modifier |= Rml::Input::KM_ALT;
+
+                    if (key_id != Rml::Input::KI_UNKNOWN) {
+                        if (event.type == SDL_KEYDOWN) {
+                            rml_context_->ProcessKeyDown(key_id, key_modifier);
+                        } else {
+                            rml_context_->ProcessKeyUp(key_id, key_modifier);
+                        }
+                    }
                     break;
-
+                }
                 case SDL_DROPFILE:
                     // Handle file/folder drag and drop
                     if (event.drop.file) {
@@ -495,7 +624,6 @@ private:
                         ui_event_queue_->enqueue(UIEvent{"file_drop", payload});
                     }
                     break;
-
                 case SDL_WINDOWEVENT:
                     if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
                         int width = event.window.data1;
@@ -506,162 +634,6 @@ private:
                         }
                     }
                     break;
-            }
-
-            if (rml_context_) {
-                switch (event.type) {
-                    case SDL_MOUSEBUTTONDOWN:
-                        rml_context_->ProcessMouseButtonDown(event.button.button - 1, 0);
-                        break;
-                    case SDL_MOUSEBUTTONUP:
-                        rml_context_->ProcessMouseButtonUp(event.button.button - 1, 0);
-                        break;
-                    case SDL_MOUSEMOTION:
-                        rml_context_->ProcessMouseMove(event.motion.x, event.motion.y, 0);
-                        break;
-                    case SDL_MOUSEWHEEL:
-                        rml_context_->ProcessMouseWheel(static_cast<float>(-event.wheel.y), 0);
-                        break;
-                    case SDL_TEXTINPUT:
-                        for (char* c = event.text.text; *c; c++) {
-                            if ((*c & 0x80) == 0) {
-                                rml_context_->ProcessTextInput(static_cast<Rml::Character>(*c));
-                            }
-                        }
-                        break;
-                    case SDL_KEYDOWN:
-                    case SDL_KEYUP: {
-                        // Convert SDL key to RmlUI KeyIdentifier
-                        Rml::Input::KeyIdentifier key_id = Rml::Input::KI_UNKNOWN;
-                        int key_modifier = 0;
-
-                        // Map common keys
-                        switch (event.key.keysym.sym) {
-                            // Arrow keys
-                            case SDLK_LEFT:     key_id = Rml::Input::KI_LEFT; break;
-                            case SDLK_RIGHT:    key_id = Rml::Input::KI_RIGHT; break;
-                            case SDLK_UP:       key_id = Rml::Input::KI_UP; break;
-                            case SDLK_DOWN:     key_id = Rml::Input::KI_DOWN; break;
-
-                            // Special keys
-                            case SDLK_SPACE:    key_id = Rml::Input::KI_SPACE; break;
-                            case SDLK_RETURN:   key_id = Rml::Input::KI_RETURN; break;
-                            case SDLK_ESCAPE:   key_id = Rml::Input::KI_ESCAPE; break;
-                            case SDLK_BACKSPACE: key_id = Rml::Input::KI_BACK; break;
-                            case SDLK_TAB:      key_id = Rml::Input::KI_TAB; break;
-                            case SDLK_DELETE:   key_id = Rml::Input::KI_DELETE; break;
-                            case SDLK_INSERT:   key_id = Rml::Input::KI_INSERT; break;
-                            case SDLK_HOME:     key_id = Rml::Input::KI_HOME; break;
-                            case SDLK_END:      key_id = Rml::Input::KI_END; break;
-                            case SDLK_PAGEUP:   key_id = Rml::Input::KI_PRIOR; break;
-                            case SDLK_PAGEDOWN: key_id = Rml::Input::KI_NEXT; break;
-
-                            // Letters A-Z
-                            case SDLK_a:        key_id = Rml::Input::KI_A; break;
-                            case SDLK_b:        key_id = Rml::Input::KI_B; break;
-                            case SDLK_c:        key_id = Rml::Input::KI_C; break;
-                            case SDLK_d:        key_id = Rml::Input::KI_D; break;
-                            case SDLK_e:        key_id = Rml::Input::KI_E; break;
-                            case SDLK_f:        key_id = Rml::Input::KI_F; break;
-                            case SDLK_g:        key_id = Rml::Input::KI_G; break;
-                            case SDLK_h:        key_id = Rml::Input::KI_H; break;
-                            case SDLK_i:        key_id = Rml::Input::KI_I; break;
-                            case SDLK_j:        key_id = Rml::Input::KI_J; break;
-                            case SDLK_k:        key_id = Rml::Input::KI_K; break;
-                            case SDLK_l:        key_id = Rml::Input::KI_L; break;
-                            case SDLK_m:        key_id = Rml::Input::KI_M; break;
-                            case SDLK_n:        key_id = Rml::Input::KI_N; break;
-                            case SDLK_o:        key_id = Rml::Input::KI_O; break;
-                            case SDLK_p:        key_id = Rml::Input::KI_P; break;
-                            case SDLK_q:        key_id = Rml::Input::KI_Q; break;
-                            case SDLK_r:        key_id = Rml::Input::KI_R; break;
-                            case SDLK_s:        key_id = Rml::Input::KI_S; break;
-                            case SDLK_t:        key_id = Rml::Input::KI_T; break;
-                            case SDLK_u:        key_id = Rml::Input::KI_U; break;
-                            case SDLK_v:        key_id = Rml::Input::KI_V; break;
-                            case SDLK_w:        key_id = Rml::Input::KI_W; break;
-                            case SDLK_x:        key_id = Rml::Input::KI_X; break;
-                            case SDLK_y:        key_id = Rml::Input::KI_Y; break;
-                            case SDLK_z:        key_id = Rml::Input::KI_Z; break;
-
-                            // Numbers 0-9
-                            case SDLK_0:        key_id = Rml::Input::KI_0; break;
-                            case SDLK_1:        key_id = Rml::Input::KI_1; break;
-                            case SDLK_2:        key_id = Rml::Input::KI_2; break;
-                            case SDLK_3:        key_id = Rml::Input::KI_3; break;
-                            case SDLK_4:        key_id = Rml::Input::KI_4; break;
-                            case SDLK_5:        key_id = Rml::Input::KI_5; break;
-                            case SDLK_6:        key_id = Rml::Input::KI_6; break;
-                            case SDLK_7:        key_id = Rml::Input::KI_7; break;
-                            case SDLK_8:        key_id = Rml::Input::KI_8; break;
-                            case SDLK_9:        key_id = Rml::Input::KI_9; break;
-
-                            // Numpad
-                            case SDLK_KP_0:     key_id = Rml::Input::KI_NUMPAD0; break;
-                            case SDLK_KP_1:     key_id = Rml::Input::KI_NUMPAD1; break;
-                            case SDLK_KP_2:     key_id = Rml::Input::KI_NUMPAD2; break;
-                            case SDLK_KP_3:     key_id = Rml::Input::KI_NUMPAD3; break;
-                            case SDLK_KP_4:     key_id = Rml::Input::KI_NUMPAD4; break;
-                            case SDLK_KP_5:     key_id = Rml::Input::KI_NUMPAD5; break;
-                            case SDLK_KP_6:     key_id = Rml::Input::KI_NUMPAD6; break;
-                            case SDLK_KP_7:     key_id = Rml::Input::KI_NUMPAD7; break;
-                            case SDLK_KP_8:     key_id = Rml::Input::KI_NUMPAD8; break;
-                            case SDLK_KP_9:     key_id = Rml::Input::KI_NUMPAD9; break;
-                            case SDLK_KP_ENTER: key_id = Rml::Input::KI_NUMPADENTER; break;
-                            case SDLK_KP_MULTIPLY: key_id = Rml::Input::KI_MULTIPLY; break;
-                            case SDLK_KP_PLUS:  key_id = Rml::Input::KI_ADD; break;
-                            case SDLK_KP_MINUS: key_id = Rml::Input::KI_SUBTRACT; break;
-                            case SDLK_KP_PERIOD: key_id = Rml::Input::KI_DECIMAL; break;
-                            case SDLK_KP_DIVIDE: key_id = Rml::Input::KI_DIVIDE; break;
-
-                            // Function keys
-                            case SDLK_F1:       key_id = Rml::Input::KI_F1; break;
-                            case SDLK_F2:       key_id = Rml::Input::KI_F2; break;
-                            case SDLK_F3:       key_id = Rml::Input::KI_F3; break;
-                            case SDLK_F4:       key_id = Rml::Input::KI_F4; break;
-                            case SDLK_F5:       key_id = Rml::Input::KI_F5; break;
-                            case SDLK_F6:       key_id = Rml::Input::KI_F6; break;
-                            case SDLK_F7:       key_id = Rml::Input::KI_F7; break;
-                            case SDLK_F8:       key_id = Rml::Input::KI_F8; break;
-                            case SDLK_F9:       key_id = Rml::Input::KI_F9; break;
-                            case SDLK_F10:      key_id = Rml::Input::KI_F10; break;
-                            case SDLK_F11:      key_id = Rml::Input::KI_F11; break;
-                            case SDLK_F12:      key_id = Rml::Input::KI_F12; break;
-
-                            // Punctuation
-                            case SDLK_SEMICOLON: key_id = Rml::Input::KI_OEM_1; break;
-                            case SDLK_PLUS:     key_id = Rml::Input::KI_OEM_PLUS; break;
-                            case SDLK_COMMA:    key_id = Rml::Input::KI_OEM_COMMA; break;
-                            case SDLK_MINUS:    key_id = Rml::Input::KI_OEM_MINUS; break;
-                            case SDLK_PERIOD:   key_id = Rml::Input::KI_OEM_PERIOD; break;
-                            case SDLK_SLASH:    key_id = Rml::Input::KI_OEM_2; break;
-                            case SDLK_BACKQUOTE: key_id = Rml::Input::KI_OEM_3; break;
-                            case SDLK_LEFTBRACKET: key_id = Rml::Input::KI_OEM_4; break;
-                            case SDLK_BACKSLASH: key_id = Rml::Input::KI_OEM_5; break;
-                            case SDLK_RIGHTBRACKET: key_id = Rml::Input::KI_OEM_6; break;
-                            case SDLK_QUOTE:    key_id = Rml::Input::KI_OEM_7; break;
-
-                            default: break;
-                        }
-
-                        // Map modifiers
-                        if (event.key.keysym.mod & KMOD_SHIFT)
-                            key_modifier |= Rml::Input::KM_SHIFT;
-                        if (event.key.keysym.mod & KMOD_CTRL)
-                            key_modifier |= Rml::Input::KM_CTRL;
-                        if (event.key.keysym.mod & KMOD_ALT)
-                            key_modifier |= Rml::Input::KM_ALT;
-
-                        if (key_id != Rml::Input::KI_UNKNOWN) {
-                            if (event.type == SDL_KEYDOWN) {
-                                rml_context_->ProcessKeyDown(key_id, key_modifier);
-                            } else {
-                                rml_context_->ProcessKeyUp(key_id, key_modifier);
-                            }
-                        }
-                        break;
-                    }
-                }
             }
         }
     }

@@ -79,7 +79,16 @@ void ElementTextEditor::ProcessEvent(Rml::Event& event) {
     else if (event == Rml::EventId::Keydown) {
         Rml::Input::KeyIdentifier key = static_cast<Rml::Input::KeyIdentifier>(
             event.GetParameter<int>("key_identifier", 0));
-        int modifiers = event.GetParameter<int>("key_modifiers", 0);
+
+        // RmlUi passes modifiers as separate boolean parameters, not a combined int
+        int modifiers = 0;
+        if (event.GetParameter<bool>("ctrl_key", false))
+            modifiers |= Rml::Input::KM_CTRL;
+        if (event.GetParameter<bool>("shift_key", false))
+            modifiers |= Rml::Input::KM_SHIFT;
+        if (event.GetParameter<bool>("alt_key", false))
+            modifiers |= Rml::Input::KM_ALT;
+
         OnKeyDown(key, modifiers);
     }
 }
@@ -428,6 +437,9 @@ TextBuffer::Position ElementTextEditor::ScreenToText(float screen_x, float scree
 }
 
 void ElementTextEditor::OnMouseDown(float mouse_x, float mouse_y) {
+    // Give focus to this element so it can receive keyboard events
+    Focus();
+
     TextBuffer::Position pos = ScreenToText(mouse_x, mouse_y);
 
     selection_->SetAnchor(pos);
