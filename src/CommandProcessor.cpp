@@ -181,17 +181,8 @@ void CommandProcessor::InterceptForNotification(const Command& cmd) {
             notification_feed_->AddNotification(std::move(notif));
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
-            Notification notif;
-            notif.id = NotificationFeed::GenerateId();
-            notif.type = static_cast<int>(NotificationType::Progress);
-            notif.title = "Updating data model";
-            notif.message = command.model_name + " (" + std::to_string(command.data.size()) + " rows)";
-            notif.thread_name = "System";
-            notif.timestamp = NotificationFeed::GetCurrentTime();
-            notif.dismissible = false;
-            notif.expandable = false;
-            notif.ttl_seconds = 5.0;
-            notification_feed_->AddNotification(std::move(notif));
+            // Don't create notifications for data model updates - too noisy for real-time data
+            // (This was causing 50+ notifications to pile up during streaming)
         }
         else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
             Notification notif;

@@ -1,10 +1,10 @@
 #include "DataStore.h"
 #include "Logger.h"
 
-void DataStore::SetModel(const std::string& name, const DynamicTable& data) {
+void DataStore::SetModel(const std::string& name, DynamicTable&& data) {
     // Create a new shared_ptr with the data
-    // This copies the data once, then readers share the immutable copy
-    auto new_data = std::make_shared<DynamicTable>(data);
+    // Move instead of copy to avoid redundant deep copy (data already moved from command)
+    auto new_data = std::make_shared<DynamicTable>(std::move(data));
 
     // Store or replace the shared_ptr
     models_[name] = new_data;

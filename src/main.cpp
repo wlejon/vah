@@ -672,8 +672,31 @@ private:
             commands.push_back(std::move(cmd));
         }
 
-        // Process each command
-        for (const auto& cmd : commands) {
+        // Coalesce UpdateDataModel commands - only keep the latest for each model
+        // EXCEPTION: First-time model registration must happen immediately (before LoadUIDocument)
+        std::unordered_map<std::string, Commands::UpdateDataModel> latest_data_updates;
+        std::vector<Command> non_data_commands;
+
+        for (auto& cmd : commands) {
+            if (std::holds_alternative<Commands::UpdateDataModel>(cmd)) {
+                auto& update_cmd = std::get<Commands::UpdateDataModel>(cmd);
+
+                // Check if this is the first time we're seeing this model
+                // If so, we need to process it immediately to register it in RmlUi
+                if (!data_model_manager_->IsModelRegistered(update_cmd.model_name)) {
+                    // First time - process immediately to create the model
+                    non_data_commands.push_back(std::move(cmd));
+                } else {
+                    // Model exists - can be coalesced
+                    latest_data_updates[update_cmd.model_name] = std::move(update_cmd);
+                }
+            } else {
+                non_data_commands.push_back(std::move(cmd));
+            }
+        }
+
+        // Process non-data commands first
+        for (const auto& cmd : non_data_commands) {
             // Handle FileChanged specially (needs custom path processing logic)
             if (std::holds_alternative<Commands::FileChanged>(cmd)) {
                 const auto& command = std::get<Commands::FileChanged>(cmd);
@@ -700,6 +723,11 @@ private:
                 // Delegate all other commands to CommandProcessor
                 command_processor_->ProcessCommand(cmd);
             }
+        }
+
+        // Process coalesced data model updates (only latest per model)
+        for (auto& [model_name, update_cmd] : latest_data_updates) {
+            command_processor_->ProcessCommand(update_cmd);
         }
     }
 

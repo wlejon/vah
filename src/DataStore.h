@@ -37,7 +37,7 @@ public:
     DataStore() = default;
     ~DataStore() = default;
 
-    void SetModel(const std::string& name, const DynamicTable& data);
+    void SetModel(const std::string& name, DynamicTable&& data);
 
     // Returns a shared_ptr to avoid copying large tables
     std::shared_ptr<const DynamicTable> GetModel(const std::string& name) const;

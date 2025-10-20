@@ -123,8 +123,8 @@ namespace {
             lua_pop(L, 1);  // Remove value, keep key for next iteration
         }
 
-        // Write back to DataStore
-        g_data_store->SetModel(model_name, mutable_data);
+        // Write back to DataStore (move to avoid copy)
+        g_data_store->SetModel(model_name, std::move(mutable_data));
 
         // Dirty the model in RmlUi to trigger re-render
         if (g_bridge && g_bridge->GetContext()) {

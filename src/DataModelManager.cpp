@@ -27,7 +27,8 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
     }
 
     // Update the data in DataStore (main thread only - no races)
-    data_store_->SetModel(model_name, data);
+    // Data is moved into DataStore, avoiding unnecessary deep copy
+    data_store_->SetModel(model_name, std::move(data));
 
     // Check if we need to create the RmlUi model or just dirty it
     auto it = data_model_handles_.find(model_name);
@@ -184,8 +185,8 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                             mutable_data[context_row][key] = value;
                         }
 
-                        // Write back to DataStore
-                        data_store_->SetModel(context_model, mutable_data);
+                        // Write back to DataStore (move to avoid copy)
+                        data_store_->SetModel(context_model, std::move(mutable_data));
 
                         // Dirty the model to trigger re-render
                         auto it_handle = data_model_handles_.find(context_model);
@@ -221,15 +222,20 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
             Rml::DataModelHandle model_handle = constructor.GetModelHandle();
             data_model_handles_[model_name] = model_handle;
 
-            // Mark as dirty to trigger initial render
+            // Mark as dirty to trigger initial render (always dirty on first creation)
             model_handle.DirtyVariable(model_name);
         } else {
             LOG_WARN("Failed to create data model '{}'", model_name);
         }
     } else {
-        // Model already exists - just mark it dirty to trigger re-render
+        // Model already exists - mark it dirty to trigger re-render
+        // TODO: Implement smarter change detection to avoid unnecessary re-renders
         it->second.DirtyVariable(model_name);
     }
+}
+
+bool DataModelManager::IsModelRegistered(const std::string& model_name) const {
+    return data_model_handles_.find(model_name) != data_model_handles_.end();
 }
 
 void DataModelManager::ClearAllModels() {

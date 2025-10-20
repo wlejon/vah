@@ -18,6 +18,9 @@ public:
     // Update or create a data model
     void UpdateModel(const std::string& model_name, DynamicTable&& data);
 
+    // Check if a model has been registered in RmlUi
+    bool IsModelRegistered(const std::string& model_name) const;
+
     // Clear all models (called during shutdown)
     void ClearAllModels();
 
