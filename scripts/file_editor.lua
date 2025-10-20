@@ -327,7 +327,7 @@ function startup()
     data.bind("editor_info", {editor_data})
 
     -- Load UI
-    ui.load_document("ui/file_editor.rml")
+    ui.load_document("ui/file_editor.rml", true, "file_editor")
 end
 
 function update(dt)

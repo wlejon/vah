@@ -7,11 +7,12 @@
 #include "DataStore.h"
 #include "DataBindings.h"
 #include "Commands.h"
-#include <moodycamel/concurrentqueue.h>
+
+class EventDispatcher;  // Forward declaration
 
 class DataModelManager {
 public:
-    DataModelManager(Rml::Context* context, DataStore* data_store, moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue);
+    DataModelManager(Rml::Context* context, DataStore* data_store, EventDispatcher* event_dispatcher);
     ~DataModelManager();
 
     // Update or create a data model
@@ -23,7 +24,7 @@ public:
 private:
     Rml::Context* context_;
     DataStore* data_store_;
-    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
+    EventDispatcher* event_dispatcher_;
 
     // Track data models and their definitions
     std::unordered_map<std::string, std::unique_ptr<DynamicTableDef>> data_model_defs_;

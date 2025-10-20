@@ -183,7 +183,7 @@ function startup()
     data.bind("stream", {stream_data})
 
     -- Load UI (data model must exist first)
-    ui.load_document("ui/streaming.rml")
+    ui.load_document("ui/streaming.rml", true, "data_stream")
 
     print("Stream data initialized - events: " .. #stream_data.events .. ", data_stream: " .. #stream_data.data_stream)
 end

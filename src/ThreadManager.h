@@ -10,11 +10,12 @@
 
 class DataStore;
 class NotificationFeed;
+class EventDispatcher;
 
 class ThreadManager {
 public:
     ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
-                  moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
+                  EventDispatcher* event_dispatcher,
                   DataStore* data_store,
                   NotificationFeed* notification_feed);
     ~ThreadManager();
@@ -51,7 +52,7 @@ private:
     LuaThread* GetThread(int thread_id) const;
 
     moodycamel::ConcurrentQueue<Command>* command_queue_;
-    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
+    EventDispatcher* event_dispatcher_;
     DataStore* data_store_;
     NotificationFeed* notification_feed_;
 

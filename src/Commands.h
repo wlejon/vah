@@ -41,6 +41,7 @@ namespace Commands {
     };
 
     struct LoadUIDocument {
+        int thread_id;  // Which thread loaded this document
         std::string document_path;
         bool show = true;
         std::string document_id;  // Optional ID to reference this document later
@@ -135,6 +136,15 @@ namespace Commands {
     struct RemoveFileWatch {
         std::string path;
     };
+
+    struct RegisterGlobalEvent {
+        std::string event_name;
+        int thread_id;
+    };
+
+    struct UnregisterGlobalEvent {
+        std::string event_name;
+    };
 }
 
 // Variant holding all possible command types
@@ -163,7 +173,9 @@ using Command = std::variant<
     Commands::TriggerTextEditorModified,
     Commands::FileChanged,
     Commands::AddFileWatch,
-    Commands::RemoveFileWatch
+    Commands::RemoveFileWatch,
+    Commands::RegisterGlobalEvent,
+    Commands::UnregisterGlobalEvent
 >;
 
 // Response sent from main thread to lua thread

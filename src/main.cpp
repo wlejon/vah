@@ -28,6 +28,7 @@
 #include "NotificationFeed.h"
 #include "NotificationBindings.h"
 #include "NotificationPlugin.h"
+#include "EventDispatcher.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -247,22 +248,23 @@ public:
 
         // Initialize our systems
         command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
-        ui_event_queue_ = std::make_unique<moodycamel::ConcurrentQueue<UIEvent>>();
+        event_dispatcher_ = std::make_unique<EventDispatcher>();
         data_store_ = std::make_unique<DataStore>();
         notification_feed_ = std::make_unique<NotificationFeed>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), ui_event_queue_.get(), data_store_.get(), notification_feed_.get());
-        rmlui_bridge_ = std::make_unique<RmlUiBridge>(ui_event_queue_.get());
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), event_dispatcher_.get(), data_store_.get(), notification_feed_.get());
+        rmlui_bridge_ = std::make_unique<RmlUiBridge>(event_dispatcher_.get());
 
         // Initialize managers
-        document_manager_ = std::make_unique<DocumentManager>(rml_context_);
-        data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), ui_event_queue_.get());
+        document_manager_ = std::make_unique<DocumentManager>(rml_context_, rmlui_bridge_.get());
+        data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), event_dispatcher_.get());
 
         // Initialize command processor (needs all managers)
         command_processor_ = std::make_unique<CommandProcessor>(
             thread_manager_.get(),
             document_manager_.get(),
             data_model_manager_.get(),
-            notification_feed_.get()
+            notification_feed_.get(),
+            event_dispatcher_.get()
         );
 
         // Setup RmlUI lua bindings - pass context so we can create data models
@@ -389,7 +391,7 @@ public:
         document_manager_.reset();
 
         data_store_.reset();
-        ui_event_queue_.reset();
+        event_dispatcher_.reset();
         command_queue_.reset();
 
         if (rml_context_) {
@@ -434,12 +436,34 @@ private:
                 case SDL_QUIT:
                     running_ = false;
                     break;
-                case SDL_MOUSEBUTTONDOWN:
+                case SDL_MOUSEBUTTONDOWN: {
+                    auto hover_elem = rml_context_->GetHoverElement();
+                    if (hover_elem) {
+                        auto class_attr = hover_elem->GetAttribute("class");
+                        auto click_attr = hover_elem->GetAttribute("data-event-click");
+                        std::string classes = class_attr ? class_attr->Get<Rml::String>() : "";
+                        std::string click_handler = click_attr ? click_attr->Get<Rml::String>() : "";
+                        LOG_INFO("Click: tag={}, id='{}', class='{}', click='{}'",
+                            hover_elem->GetTagName().c_str(),
+                            hover_elem->GetId().c_str(),
+                            classes.c_str(),
+                            click_handler.c_str());
+                    } else {
+                        LOG_WARN("Click: NO hover element!");
+                    }
                     rml_context_->ProcessMouseButtonDown(event.button.button - 1, 0);
                     break;
-                case SDL_MOUSEBUTTONUP:
+                }
+                case SDL_MOUSEBUTTONUP: {
+                    auto hover_elem = rml_context_->GetHoverElement();
+                    if (hover_elem) {
+                        auto class_attr = hover_elem->GetAttribute("class");
+                        std::string classes = class_attr ? class_attr->Get<Rml::String>() : "";
+                        LOG_INFO("MouseUp: tag={}, class='{}'", hover_elem->GetTagName().c_str(), classes.c_str());
+                    }
                     rml_context_->ProcessMouseButtonUp(event.button.button - 1, 0);
                     break;
+                }
                 case SDL_MOUSEMOTION:
                     rml_context_->ProcessMouseMove(event.motion.x, event.motion.y, 0);
                     break;
@@ -610,7 +634,9 @@ private:
                             payload["is_directory"] = false;
                         }
 
-                        ui_event_queue_->enqueue(UIEvent{"file_drop", payload});
+                        // Dispatch file_drop as a global event
+                        // Note: A Lua thread must register for this global event to receive it
+                        event_dispatcher_->DispatchGlobalEvent("file_drop", payload);
                     }
                     break;
                 case SDL_WINDOWEVENT:
@@ -707,7 +733,7 @@ private:
     std::unique_ptr<ElementTextEditorInstancer> texteditor_instancer_;
 
     std::unique_ptr<moodycamel::ConcurrentQueue<Command>> command_queue_;
-    std::unique_ptr<moodycamel::ConcurrentQueue<UIEvent>> ui_event_queue_;
+    std::unique_ptr<EventDispatcher> event_dispatcher_;
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;

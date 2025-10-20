@@ -46,6 +46,7 @@ add_executable(vah
     src/DocumentManager.cpp
     src/DataModelManager.cpp
     src/CommandProcessor.cpp
+    src/EventDispatcher.cpp
     src/ElementCanvas.cpp
     src/NanoVGBindings.cpp
     src/NanoVGPaint.cpp

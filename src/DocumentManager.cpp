@@ -1,17 +1,26 @@
 #include "DocumentManager.h"
 #include "ElementTextEditor.h"
+#include "RmlUiBridge.h"
 #include "Logger.h"
 #include <algorithm>
 #include <RmlUi/Lua/Interpreter.h>
+#include <SDL2/SDL.h>
 
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 }
 
-DocumentManager::DocumentManager(Rml::Context* context)
+DocumentManager::DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge)
     : context_(context)
+    , rmlui_bridge_(rmlui_bridge)
 {
+}
+
+bool DocumentManager::GetAndClearDocumentChangedFlag() {
+    bool changed = document_changed_this_frame_;
+    document_changed_this_frame_ = false;
+    return changed;
 }
 
 void DocumentManager::LoadDocument(const std::string& document_path, bool show, const std::string& document_id) {
@@ -22,10 +31,16 @@ void DocumentManager::LoadDocument(const std::string& document_path, bool show, 
 
     auto doc = context_->LoadDocument(document_path.c_str());
     if (doc) {
-        // Store document if ID provided
+        // Set the document's ID if provided
         if (!document_id.empty()) {
+            doc->SetId(document_id.c_str());
             loaded_documents_[document_id] = doc;
             LOG_INFO("Stored document with ID: {}", document_id);
+
+            // Set this as the current document in RmlUiBridge
+            if (rmlui_bridge_) {
+                rmlui_bridge_->SetCurrentDocument(document_id);
+            }
         }
 
         if (show) {
@@ -33,6 +48,16 @@ void DocumentManager::LoadDocument(const std::string& document_path, bool show, 
         } else {
             doc->Hide();
         }
+
+        // Force context update AND render to fully rebuild layout and stacking
+        context_->Update();
+        context_->Render();
+
+        // Get current mouse position and force hover recalculation
+        int mouse_x, mouse_y;
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        context_->ProcessMouseMove(mouse_x, mouse_y, 0);
+
         LOG_INFO("Loaded UI document: {}", document_path);
     } else {
         LOG_WARN("Failed to load UI document: {}", document_path);
@@ -43,6 +68,13 @@ void DocumentManager::ShowDocument(const std::string& document_id) {
     auto it = loaded_documents_.find(document_id);
     if (it != loaded_documents_.end()) {
         it->second->Show();
+        context_->Update();
+
+        // Set this as the current document in RmlUiBridge
+        if (rmlui_bridge_) {
+            rmlui_bridge_->SetCurrentDocument(document_id);
+        }
+
         LOG_INFO("Showing document: {}", document_id);
     } else {
         LOG_WARN("Document not found: {}", document_id);
@@ -53,6 +85,7 @@ void DocumentManager::HideDocument(const std::string& document_id) {
     auto it = loaded_documents_.find(document_id);
     if (it != loaded_documents_.end()) {
         it->second->Hide();
+        context_->Update();
         LOG_INFO("Hiding document: {}", document_id);
     } else {
         LOG_WARN("Document not found: {}", document_id);

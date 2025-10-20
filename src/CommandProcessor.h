@@ -8,6 +8,7 @@ class ThreadManager;
 class DocumentManager;
 class DataModelManager;
 class NotificationFeed;
+class EventDispatcher;
 
 class CommandProcessor {
 public:
@@ -15,7 +16,8 @@ public:
         ThreadManager* thread_manager,
         DocumentManager* document_manager,
         DataModelManager* data_model_manager,
-        NotificationFeed* notification_feed
+        NotificationFeed* notification_feed,
+        EventDispatcher* event_dispatcher
     );
     ~CommandProcessor() = default;
 
@@ -30,4 +32,5 @@ private:
     DocumentManager* document_manager_;
     DataModelManager* data_model_manager_;
     NotificationFeed* notification_feed_;
+    EventDispatcher* event_dispatcher_;
 };

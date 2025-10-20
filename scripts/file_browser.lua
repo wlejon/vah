@@ -137,7 +137,7 @@ function startup()
     update_file_list()
 
     -- Load UI
-    ui.load_document("ui/file_browser.rml")
+    ui.load_document("ui/file_browser.rml", true, "file_browser")
 end
 
 function update(dt)

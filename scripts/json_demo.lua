@@ -45,7 +45,7 @@ function startup()
     end
 
     -- Load UI (will automatically bind to data model)
-    ui.load_document("ui/json_demo.rml")
+    ui.load_document("ui/json_demo.rml", true, "json_demo")
 end
 
 function update(dt)

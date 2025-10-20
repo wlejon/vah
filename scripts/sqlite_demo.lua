@@ -217,7 +217,7 @@ function startup()
     load_contacts()
 
     -- Load UI AFTER data is bound
-    ui.load_document("ui/sqlite_demo.rml")
+    ui.load_document("ui/sqlite_demo.rml", true, "sqlite_demo")
 end
 
 function update(dt)

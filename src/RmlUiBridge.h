@@ -3,23 +3,26 @@
 #include <RmlUi/Core.h>
 #include <RmlUi/Lua.h>
 #include <string>
-#include <moodycamel/concurrentqueue.h>
 #include "InputState.h"
 #include "DomIntrospection.h"
 
 class DataStore;  // Forward declaration
+class EventDispatcher;  // Forward declaration
 
 class RmlUiBridge {
 public:
-    RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue);
+    RmlUiBridge(EventDispatcher* event_dispatcher);
     ~RmlUiBridge() = default;
 
     void SetupLuaBindings(lua_State* L, Rml::Context* context, DataStore* data_store);
-    void TriggerEvent(const std::string& event_name, const PayloadMap& payload);
+    void TriggerEvent(const std::string& event_name, const PayloadMap& payload, const std::string& document_id);
+    void SetCurrentDocument(const std::string& document_id) { current_document_id_ = document_id; }
+    std::string GetCurrentDocument() const { return current_document_id_; }
     Rml::Context* GetContext() const { return context_; }
 
 private:
-    moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue_;
+    EventDispatcher* event_dispatcher_;
     Rml::Context* context_;
     DataStore* data_store_;
+    std::string current_document_id_;
 };

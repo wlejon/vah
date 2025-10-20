@@ -3,16 +3,17 @@
 #include "DataStore.h"
 #include "NotificationFeed.h"
 #include "NotificationPlugin.h"
+#include "EventDispatcher.h"
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
 
-// Global references for lua callbacks (accessible from main.cpp)
+// Global references for lua callbacks (accessible from main.cpp and other modules)
 NotificationFeed* g_notification_feed = nullptr;
+RmlUiBridge* g_bridge = nullptr;
 
 namespace {
-    // Global reference to the bridge for lua callback
-    RmlUiBridge* g_bridge = nullptr;
+    // Global reference to the data store for lua callbacks
     DataStore* g_data_store = nullptr;
 
     // Lua callback for trigger function
@@ -51,8 +52,11 @@ namespace {
             }
         }
 
-        // Trigger the event
-        g_bridge->TriggerEvent(event_name, payload);
+        // Get the current document ID tracked by the bridge
+        std::string document_id = g_bridge->GetCurrentDocument();
+
+        // Trigger the event with document context
+        g_bridge->TriggerEvent(event_name, payload, document_id);
 
         return 0;  // No return values
     }
@@ -269,9 +273,6 @@ namespace {
 
         if (g_notification_feed) {
             g_notification_feed->Dismiss(notif_id);
-            // Note: We don't call NotificationOverlay::Update() here
-            // The update will happen on the next frame automatically
-            // This avoids RmlUi array out of bounds issues during event handling
         }
 
         // Stop event propagation so it doesn't trigger parent onclick
@@ -354,8 +355,8 @@ namespace {
 
 }
 
-RmlUiBridge::RmlUiBridge(moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
-    : ui_event_queue_(ui_event_queue)
+RmlUiBridge::RmlUiBridge(EventDispatcher* event_dispatcher)
+    : event_dispatcher_(event_dispatcher)
     , context_(nullptr)
     , data_store_(nullptr)
 {
@@ -407,13 +408,12 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     LOG_INFO("RmlUiBridge: Registered trigger(), data, notification, and DOM introspection functions in RmlUI lua state");
 }
 
-void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload) {
-    UIEvent event;
-    event.name = event_name;
-    event.payload = payload;
+void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload, const std::string& document_id) {
+    if (document_id.empty()) {
+        LOG_WARN("RmlUiBridge: Cannot trigger event '{}' - no document_id provided", event_name);
+        return;
+    }
 
-    // Simple enqueue
-    ui_event_queue_->enqueue(std::move(event));
-
-    LOG_DEBUG("RmlUiBridge: Triggered event '{}' with {} payload items", event_name, payload.size());
+    // Dispatch event through EventDispatcher to the appropriate thread
+    event_dispatcher_->DispatchEvent(document_id, event_name, payload);
 }

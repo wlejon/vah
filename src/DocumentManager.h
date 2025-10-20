@@ -5,9 +5,11 @@
 #include <unordered_map>
 #include "DataStore.h"  // For DynamicTable and DynamicValue types
 
+class RmlUiBridge;  // Forward declaration
+
 class DocumentManager {
 public:
-    DocumentManager(Rml::Context* context);
+    DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge = nullptr);
     ~DocumentManager() = default;
 
     // Document lifecycle
@@ -41,9 +43,16 @@ public:
     // Access tracked document (for hot reload update)
     void UpdateTrackedDocument(Rml::ElementDocument* old_doc, Rml::ElementDocument* new_doc);
 
+    // Check and reset the document changed flag
+    bool GetAndClearDocumentChangedFlag();
+
 private:
     Rml::Context* context_;
+    RmlUiBridge* rmlui_bridge_;
     std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
+
+    // Flag to track if documents changed this frame
+    bool document_changed_this_frame_ = false;
 
     // Helper to find element by ID across all documents
     Rml::Element* FindElementById(const std::string& element_id);

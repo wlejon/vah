@@ -434,6 +434,27 @@ void LuaThread::SetupLuaBindings() {
         event_handlers_[event_name] = handler;
     };
 
+    event_table["register_global"] = [this](const std::string& event_name, sol::function handler) {
+        // Register handler locally
+        event_handlers_[event_name] = handler;
+
+        // Send command to main thread to register this thread for global event
+        Commands::RegisterGlobalEvent cmd;
+        cmd.event_name = event_name;
+        cmd.thread_id = id_;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    event_table["unregister_global"] = [this](const std::string& event_name) {
+        // Remove handler locally
+        event_handlers_.erase(event_name);
+
+        // Send command to main thread to unregister global event
+        Commands::UnregisterGlobalEvent cmd;
+        cmd.event_name = event_name;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["event"] = event_table;
 
     // Bind command queue interface
@@ -463,6 +484,7 @@ void LuaThread::SetupLuaBindings() {
 
     ui_table["load_document"] = [this](const std::string& path, sol::optional<bool> show, sol::optional<std::string> doc_id) {
         Commands::LoadUIDocument cmd;
+        cmd.thread_id = id_;
         cmd.document_path = path;
         cmd.show = show.value_or(true);
         cmd.document_id = doc_id.value_or("");

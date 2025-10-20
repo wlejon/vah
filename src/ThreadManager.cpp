@@ -1,5 +1,6 @@
 #include "ThreadManager.h"
 #include "Logger.h"
+#include "EventDispatcher.h"
 #include <fstream>
 #include <sstream>
 
@@ -122,11 +123,11 @@ namespace {
 }
 
 ThreadManager::ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
-                             moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue,
+                             EventDispatcher* event_dispatcher,
                              DataStore* data_store,
                              NotificationFeed* notification_feed)
     : command_queue_(command_queue)
-    , ui_event_queue_(ui_event_queue)
+    , event_dispatcher_(event_dispatcher)
     , data_store_(data_store)
     , notification_feed_(notification_feed)
 {
@@ -146,7 +147,10 @@ LuaThread* ThreadManager::GetThread(int thread_id) const {
 int ThreadManager::SpawnThread(const std::string& script_path) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_, notification_feed_);
+    // Register thread with EventDispatcher and get its dedicated queue
+    auto* ui_event_queue = event_dispatcher_->RegisterThread(thread_id);
+
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_, notification_feed_);
     thread->Start();
 
     threads_.push_back(std::move(thread));
@@ -158,7 +162,10 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
 int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread_id, int parent_request_id) {
     int thread_id = static_cast<int>(threads_.size());
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue_, data_store_, notification_feed_);
+    // Register thread with EventDispatcher and get its dedicated queue
+    auto* ui_event_queue = event_dispatcher_->RegisterThread(thread_id);
+
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_, notification_feed_);
 
     if (parent_thread_id != 0) {
         thread->SetParent(parent_thread_id, parent_request_id);
@@ -179,6 +186,10 @@ void ThreadManager::StopThread(int thread_id) {
         thread->Stop();
         thread->Join();
         threads_[thread_id].reset();  // Set to nullptr
+
+        // Unregister from EventDispatcher
+        event_dispatcher_->UnregisterThread(thread_id);
+
         LOG_INFO("ThreadManager: Stopped thread {}", thread_id);
     }
 }
@@ -197,10 +208,13 @@ void ThreadManager::StopAll() {
     LOG_INFO("ThreadManager: Stopping all {} threads", thread_count);
 
     // Second pass: join and delete all threads
-    for (auto& thread : threads_) {
-        if (thread != nullptr) {
-            thread->Join();
-            thread.reset();
+    for (size_t i = 0; i < threads_.size(); ++i) {
+        if (threads_[i] != nullptr) {
+            threads_[i]->Join();
+            threads_[i].reset();
+
+            // Unregister from EventDispatcher
+            event_dispatcher_->UnregisterThread(static_cast<int>(i));
         }
     }
 }

@@ -24,7 +24,6 @@ void NotificationFeed::Dismiss(const std::string& notification_id) {
     for (auto it = notifications_.begin(); it != notifications_.end(); ++it) {
         if (it->id == notification_id) {
             notifications_.erase(it);
-            LOG_INFO("Dismissed notification: {}", notification_id);
             TriggerChange();
             return;
         }
@@ -37,7 +36,6 @@ void NotificationFeed::Clear() {
     }
 
     notifications_.clear();
-    LOG_INFO("Cleared all notifications");
     TriggerChange();
 }
 

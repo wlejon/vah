@@ -38,4 +38,6 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-you've implemented a text editor as a custom rmlui element. please make the editing cursor blink faster. the editor needs to handle spaces vs tabs gracefully. tab should create four spaces and it should be configurable if tabs instead place tabs. the ElementTextEditor is getting too large however. i also want additions so we should break down this file into reasonable logical files. please review what's there and tell me what you think the breakdown should look like.
+you are continuing your efforts to refactor our [event dispatcher system.](event_dispatcher_design.md)
+
+it's going to require a lot of changes to the application. please perform the changes sysematically.

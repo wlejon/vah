@@ -1,13 +1,18 @@
 #include "DataModelManager.h"
 #include "Logger.h"
+#include "EventDispatcher.h"
+#include "RmlUiBridge.h"
 #include <RmlUi/Lua/Interpreter.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <lua.hpp>
 
-DataModelManager::DataModelManager(Rml::Context* context, DataStore* data_store, moodycamel::ConcurrentQueue<UIEvent>* ui_event_queue)
+// External reference to RmlUiBridge
+extern RmlUiBridge* g_bridge;
+
+DataModelManager::DataModelManager(Rml::Context* context, DataStore* data_store, EventDispatcher* event_dispatcher)
     : context_(context)
     , data_store_(data_store)
-    , ui_event_queue_(ui_event_queue)
+    , event_dispatcher_(event_dispatcher)
 {
 }
 
@@ -190,9 +195,23 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                     }
                 }
 
-                // Enqueue to UIEvent queue for Lua threads to consume
-                UIEvent ui_event{event_name, payload};
-                ui_event_queue_->enqueue(std::move(ui_event));
+                // Get the document ID from the event
+                std::string document_id;
+                if (auto* doc = event.GetTargetElement()->GetOwnerDocument()) {
+                    document_id = doc->GetId();
+
+                    // Update current document in RmlUiBridge so nested triggers work
+                    if (g_bridge) {
+                        g_bridge->SetCurrentDocument(document_id);
+                    }
+                }
+
+                // Dispatch event to the appropriate thread via EventDispatcher
+                if (!document_id.empty()) {
+                    event_dispatcher_->DispatchEvent(document_id, event_name, payload);
+                } else {
+                    LOG_WARN("DataModelManager: Event '{}' triggered but no document ID found", event_name);
+                }
             });
 
             // Store the definition so it stays alive

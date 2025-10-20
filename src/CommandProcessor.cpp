@@ -3,18 +3,21 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "NotificationFeed.h"
+#include "EventDispatcher.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
     ThreadManager* thread_manager,
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
-    NotificationFeed* notification_feed
+    NotificationFeed* notification_feed,
+    EventDispatcher* event_dispatcher
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
     , notification_feed_(notification_feed)
+    , event_dispatcher_(event_dispatcher)
 {
 }
 
@@ -54,6 +57,11 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
             LOG_INFO("Processing LoadUIDocument command: {}", command.document_path);
             document_manager_->LoadDocument(command.document_path, command.show, command.document_id);
+
+            // Register document ownership with event dispatcher
+            if (!command.document_id.empty()) {
+                event_dispatcher_->RegisterDocument(command.document_id, command.thread_id);
+            }
         }
         else if constexpr (std::is_same_v<T, Commands::ShowUIDocument>) {
             document_manager_->ShowDocument(command.document_id);
@@ -106,6 +114,12 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         }
         else if constexpr (std::is_same_v<T, Commands::RemoveFileWatch>) {
             // File watcher commands handled elsewhere
+        }
+        else if constexpr (std::is_same_v<T, Commands::RegisterGlobalEvent>) {
+            event_dispatcher_->RegisterGlobalEvent(command.event_name, command.thread_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::UnregisterGlobalEvent>) {
+            event_dispatcher_->UnregisterGlobalEvent(command.event_name);
         }
 
     }, cmd);
