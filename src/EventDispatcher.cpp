@@ -47,7 +47,6 @@ void EventDispatcher::UnregisterThread(int thread_id) {
 void EventDispatcher::RegisterDocument(const std::string& document_id, int thread_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     document_to_thread_[document_id] = thread_id;
-    LOG_DEBUG("EventDispatcher: Document '{}' owned by thread {}", document_id, thread_id);
 }
 
 void EventDispatcher::UnregisterDocument(const std::string& document_id) {
@@ -99,8 +98,6 @@ void EventDispatcher::DispatchEvent(const std::string& document_id, const std::s
     event.name = event_name;
     event.payload = payload;
     queue_it->second->enqueue(std::move(event));
-
-    LOG_DEBUG("EventDispatcher: Dispatched event '{}' from document '{}' to thread {}", event_name, document_id, thread_id);
 }
 
 void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const PayloadMap& payload) {
