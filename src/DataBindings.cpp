@@ -159,7 +159,6 @@ const DynamicValue* DynamicTableDef::GetValueAtPath(const DataPath* path)
 
         auto it = current_row->find(field);
         if (it == current_row->end()) {
-            LOG_WARN("DataBindings: Field '{}' not found in row", field);
             return nullptr;
         }
 
@@ -211,7 +210,6 @@ bool DynamicTableDef::ConvertToVariant(const DynamicValue& value, Rml::Variant& 
         else if constexpr (std::is_same_v<T, std::shared_ptr<DynamicMap>>) {
             // Nested objects can't be directly converted to variants
             // They should be accessed via Child()
-            LOG_WARN("DataBindings: Attempted to get nested object as variant");
             return false;
         }
         else {

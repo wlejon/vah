@@ -2,9 +2,12 @@
 -- Agent-assisted workflow for transforming unstructured data into structured knowledge environments
 
 local LMStudioClient = require("lm_studio_client")
+local HarmonyAdapter = require("harmony_adapter")
+local tool_definitions = require("tool_definitions")
 
--- Create LM Studio client
+-- Create LM Studio client and model adapter
 local client = LMStudioClient.new("http://127.0.0.1:1234", "openai/gpt-oss-20b")
+local adapter = HarmonyAdapter.new()
 
 -- Workflow states
 local WORKFLOW_STATES = {
@@ -62,112 +65,14 @@ local agent_state = {
     has_scripts = false,
 }
 
--- Tool definitions in Harmony format
-local TOOLS_DESCRIPTION = [[
-# Tools
-
-## functions.list_files
-Lists all files that have been ingested into the current session.
-
-Returns: JSON array of file objects with name, path, size, and type fields.
-
-## functions.read_file
-Reads the complete contents of a specific file.
-
-Parameters:
-- path (string, required): Full path to the file to read
-
-Returns: File contents as a string.
-
-## functions.create_comprehension_doc
-Creates a comprehension document describing what the data represents.
-
-Parameters:
-- content (string, required): Markdown-formatted comprehension document
-
-Returns: Confirmation message.
-
-## functions.propose_schema
-Proposes a database schema for the ingested data.
-
-Parameters:
-- schema (object, required): Schema definition with tables array, each containing name and columns
-
-Returns: Confirmation message.
-
-## functions.generate_parser
-Generates a parsing script for a specific file type.
-
-Parameters:
-- file_type (string, required): File extension (csv, json, txt, etc)
-- script_content (string, required): Lua script code for parsing the file type
-
-Returns: Confirmation message.
-]]
-
--- System prompt for the agent
+-- System prompt generation using adapter
 local function get_system_prompt(workflow_state)
-    local base_prompt = [[You are an expert data analyst and database designer assisting users in transforming unstructured data into structured, queryable knowledge environments.
-Knowledge cutoff: 2024-06
-Current date: 2025-10-20
-Reasoning: high
-
-]] .. TOOLS_DESCRIPTION .. [[
-
-Your goal is to help users create a "leaf" - a self-contained data environment tailored to their specific domain and practice.]]
-
-    local state_prompts = {
-        [WORKFLOW_STATES.EXPLORATION] = [[
-
-CURRENT PHASE: Data Exploration
-
-Your task is to systematically examine the ingested data:
-1. Read file contents and metadata
-2. Identify patterns, relationships, and hierarchies
-3. Recognize domain-specific terminology and concepts
-4. Detect data types, formats, and structural conventions
-5. Note any anomalies, gaps, or ambiguities
-
-Ask clarifying questions if needed. When ready, create a comprehension document.]],
-
-        [WORKFLOW_STATES.VALIDATION] = [[
-
-CURRENT PHASE: Understanding Validation
-
-A comprehension document has been created. The user will provide feedback.
-If the understanding is incomplete or incorrect, refine your analysis.
-When the user confirms understanding is correct, we'll proceed to schema design.]],
-
-        [WORKFLOW_STATES.MODEL_DESIGN] = [[
-
-CURRENT PHASE: Data Model Design
-
-Based on the validated understanding, design a database schema that:
-1. Reflects the natural structure of the domain
-2. Normalizes where appropriate while preserving semantic relationships
-3. Accommodates the specific patterns found in the user's data
-4. Supports queries and views the community will need
-
-Present the schema with clear explanations.]],
-
-        [WORKFLOW_STATES.TRANSFORMATION] = [[
-
-CURRENT PHASE: Data Transformation
-
-Generate parsing scripts for each file type encountered.
-Scripts should:
-1. Handle format conversions and data cleaning
-2. Map source data to the target schema
-3. Include error handling and validation
-4. Report progress and issues]]
-    }
-
-    return base_prompt .. (state_prompts[workflow_state] or "")
+    return adapter:generate_system_prompt(tool_definitions, workflow_state)
 end
 
 -- Execute a tool call
 local function execute_tool(tool_name, arguments)
-    print("Executing tool: " .. tool_name)
+    print("Executing tool: " .. tool_name .. " with args: " .. json.encode(arguments))
 
     if tool_name == "list_files" then
         return {
@@ -181,11 +86,14 @@ local function execute_tool(tool_name, arguments)
             return {success = false, error = "Missing path parameter"}
         end
 
+        print("Reading file: " .. path)
         local content, error = fs.read_file(path)
-        if error then
+        if error and error ~= "" then
+            print("Read error: " .. tostring(error))
             return {success = false, error = error}
         end
 
+        print("Read " .. (content and #content or 0) .. " bytes")
         return {success = true, result = content}
 
     elseif tool_name == "create_comprehension_doc" then
@@ -196,6 +104,11 @@ local function execute_tool(tool_name, arguments)
         return {success = true, result = "Comprehension document created"}
 
     elseif tool_name == "propose_schema" then
+        if not arguments or not arguments.schema then
+            print("ERROR: propose_schema called with null or missing schema")
+            return {success = false, error = "Missing schema parameter"}
+        end
+
         agent_state.proposed_schema = arguments.schema
         -- Convert to JSON for display
         agent_state.schema_json = json.encode(arguments.schema, true) or "{}"
@@ -217,105 +130,10 @@ local function execute_tool(tool_name, arguments)
     end
 end
 
--- Simple lexer for Harmony format tokens
-local function tokenize_harmony(content)
-    local tokens = {}
-    local i = 1
-    local len = #content
-
-    while i <= len do
-        -- Look for special tokens starting with <|
-        if content:sub(i, i+1) == "<|" then
-            local token_end = content:find("|>", i + 2, true)
-            if token_end then
-                local token = content:sub(i + 2, token_end - 1)
-                table.insert(tokens, {type = "token", value = token})
-                i = token_end + 2
-            else
-                i = i + 1
-            end
-        else
-            -- Collect text until next token
-            local next_token = content:find("<|", i, true)
-            if next_token then
-                local text = content:sub(i, next_token - 1)
-                if #text > 0 then
-                    table.insert(tokens, {type = "text", value = text})
-                end
-                i = next_token
-            else
-                -- Rest of content is text
-                local text = content:sub(i)
-                if #text > 0 then
-                    table.insert(tokens, {type = "text", value = text})
-                end
-                break
-            end
-        end
-    end
-
-    return tokens
-end
-
--- Parse tool calls from Harmony format tokens
+-- Parse tool calls using adapter
 local function parse_tool_calls(content)
-    local tool_calls = {}
-    local tokens = tokenize_harmony(content)
-
-    local i = 1
-    while i <= #tokens do
-        local tok = tokens[i]
-
-        -- Look for: <|channel|> text <|message|> json
-        if tok.type == "token" and tok.value == "channel" then
-            -- Next should be text with channel info
-            if i + 1 <= #tokens and tokens[i + 1].type == "text" then
-                local channel_text = tokens[i + 1].value
-
-                -- Check if it's a commentary channel with a recipient
-                local recipient = channel_text:match("commentary%s+to=([^%s]+)")
-
-                if recipient then
-                    print("Found channel commentary to: " .. recipient)
-
-                    -- Look for <|message|> token
-                    local msg_idx = i + 2
-                    while msg_idx <= #tokens do
-                        if tokens[msg_idx].type == "token" and tokens[msg_idx].value == "message" then
-                            -- Next token should be the message content
-                            if msg_idx + 1 <= #tokens and tokens[msg_idx + 1].type == "text" then
-                                local args_json = tokens[msg_idx + 1].value:match("^%s*(.-)%s*$")
-
-                                -- Extract function name (including underscores)
-                                local tool_name = recipient:match("functions%.([%w_]+)")
-                                if tool_name then
-                                    print("Tool: " .. tool_name .. ", Args: " .. args_json)
-
-                                    local success, args = pcall(json.decode, args_json)
-                                    if not success then
-                                        print("JSON parse failed, using empty object")
-                                        args = {}
-                                    end
-
-                                    table.insert(tool_calls, {
-                                        name = tool_name,
-                                        arguments = args
-                                    })
-                                    print("Detected Harmony tool call: " .. tool_name)
-                                end
-                            end
-                            break
-                        end
-                        msg_idx = msg_idx + 1
-                    end
-                end
-            end
-        end
-
-        i = i + 1
-    end
-
-    return tool_calls
+    local tokens = adapter:tokenize(content)
+    return adapter:parse_tool_calls(tokens)
 end
 
 -- Send a message to the agent
@@ -391,19 +209,18 @@ local function send_to_agent(user_message)
                 tool = call.name,
                 result = result
             })
-        end
 
-        -- Format tool results as message to send back to agent
-        local results_text = "Tool Results:\n"
-        for _, tr in ipairs(tool_results) do
-            if tr.result.success then
-                results_text = results_text .. string.format("- %s: %s\n", tr.tool, json.encode(tr.result.result))
+            -- Log result
+            if result.success then
+                local result_str = type(result.result) == "string" and result.result:sub(1, 100) or json.encode(result.result):sub(1, 100)
+                print("Tool result: " .. result_str .. (result_str:len() >= 100 and "..." or ""))
             else
-                results_text = results_text .. string.format("- %s: ERROR - %s\n", tr.tool, tr.result.error)
+                print("Tool error: " .. (result.error or "Unknown error"))
             end
         end
 
-        -- Send tool results back to agent
+        -- Format tool results using adapter and send back to agent
+        local results_text = adapter:format_tool_results(tool_results)
         send_to_agent(results_text)
     else
         agent_state.current_response = content
@@ -435,24 +252,6 @@ function update_ui()
     agent_state.has_scripts = #agent_state.generated_scripts > 0
 
     data.bind("manufold", {agent_state})
-
-    -- Update texteditor content for messages
-    for i, msg in ipairs(agent_state.conversation_history) do
-        local editor_id = "msg_" .. (i - 1)  -- 0-indexed
-        ui.set_texteditor_content(editor_id, msg.content)
-        ui.set_texteditor_editable(editor_id, false)
-
-        -- Also for model design conversation
-        local design_id = "msg_design_" .. (i - 1)
-        ui.set_texteditor_content(design_id, msg.content)
-        ui.set_texteditor_editable(design_id, false)
-    end
-
-    -- Update current response
-    if agent_state.current_response ~= "" then
-        ui.set_texteditor_content("current_response", agent_state.current_response)
-        ui.set_texteditor_editable("current_response", false)
-    end
 end
 
 -- Event handlers
@@ -490,10 +289,15 @@ local function on_files_dropped(payload)
         end)
     else
         -- Single file
+        local file_size = 0
+        if stat_result and stat_result.size then
+            file_size = stat_result.size
+        end
+
         table.insert(agent_state.ingested_files, {
             path = path,
             name = fs.basename(path),
-            size = 0,
+            size = file_size,
             type = fs.extension(path) or "unknown"
         })
     end

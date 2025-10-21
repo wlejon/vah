@@ -54,8 +54,6 @@ void TextLayout::CalculateFontMetrics() {
     }
 
     char_width_ = static_cast<float>(advance);
-
-    LOG_INFO("TextLayout: Font metrics - char_width={}, line_height={}", char_width_, line_height_);
 }
 
 TextBuffer::Position TextLayout::ScreenToTextPosition(float screen_x, float screen_y) const {

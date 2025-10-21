@@ -168,8 +168,6 @@ void DocumentManager::SetTextEditorContent(const std::string& element_id, const 
 
     // Set content
     editor->SetText(content);
-
-    LOG_INFO("SetTextEditorContent: Set {} bytes to texteditor '{}'", content.size(), element_id);
 }
 
 void DocumentManager::SetTextEditorTokens(const std::string& element_id, const DynamicTable& tokens) {
@@ -206,7 +204,6 @@ void DocumentManager::SetTextEditorEditable(const std::string& element_id, bool 
 
     // Set editable state
     editor->SetEditable(editable);
-    LOG_INFO("SetTextEditorEditable: Set texteditor '{}' to {}", element_id, editable ? "editable" : "read-only");
 }
 
 void DocumentManager::SetTextEditorModified(const std::string& element_id, bool modified) {

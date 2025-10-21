@@ -27,7 +27,6 @@ TextEditorRenderer::~TextEditorRenderer() {
 
 void TextEditorRenderer::SetTokens(const DynamicTable& tokens) {
     tokens_ = tokens;
-    LOG_INFO("TextEditorRenderer: Received {} syntax tokens", tokens.size());
 }
 
 void TextEditorRenderer::GenerateGeometry(Rml::RenderManager* render_manager, bool editable, bool cursor_visible) {
@@ -41,7 +40,6 @@ void TextEditorRenderer::GenerateGeometry(Rml::RenderManager* render_manager, bo
         // Check if it succeeded by seeing if we have valid metrics
         if (layout_.GetCharWidth() > 0.0f && layout_.GetLineHeight() > 0.0f) {
             font_ready_ = true;
-            LOG_INFO("TextEditorRenderer: Font ready");
         }
     }
 

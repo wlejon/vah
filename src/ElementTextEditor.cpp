@@ -22,12 +22,9 @@ ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     input_->SetDirtyCallback([this]() { OnDirty(); });
     input_->SetContentChangeCallback([this]() { OnContentChange(); });
     input_->SetSaveCallback([this]() { OnSave(); });
-
-    LOG_INFO("ElementTextEditor created");
 }
 
 ElementTextEditor::~ElementTextEditor() {
-    LOG_INFO("ElementTextEditor destroyed");
 }
 
 void ElementTextEditor::OnChildAdd(Rml::Element* element) {
@@ -59,8 +56,6 @@ void ElementTextEditor::OnChildRemove(Rml::Element* element) {
         RemoveEventListener(Rml::EventId::Keydown, this);
         RemoveEventListener(Rml::EventId::Dragend, this);
         RemoveEventListener(Rml::EventId::Textinput, this);
-
-        LOG_INFO("ElementTextEditor removed from document tree");
     }
 }
 
@@ -182,6 +177,19 @@ void ElementTextEditor::SetModified(bool modified) {
 }
 
 void ElementTextEditor::OnUpdate() {
+    // Check if value attribute has changed (for data binding support)
+    auto value_variant = GetAttribute("value");
+    if (value_variant) {
+        Rml::String value_str;
+        value_variant->GetInto(value_str);
+        std::string new_value(value_str.c_str());
+
+        // Only update if different from current content
+        if (new_value != buffer_->GetText()) {
+            SetText(new_value);
+        }
+    }
+
     // Update cursor blink animation
     if (editable_) {
         auto now = std::chrono::steady_clock::now();

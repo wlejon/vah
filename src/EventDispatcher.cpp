@@ -105,8 +105,6 @@ void EventDispatcher::DispatchToThread(int thread_id, const std::string& event_n
     event.name = event_name;
     event.payload = payload;
     queue_it->second->enqueue(std::move(event));
-
-    LOG_DEBUG("EventDispatcher: Dispatched event '{}' to thread {}", event_name, thread_id);
 }
 
 void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const PayloadMap& payload) {
@@ -131,6 +129,4 @@ void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const P
     event.name = event_name;
     event.payload = payload;
     queue_it->second->enqueue(std::move(event));
-
-    LOG_DEBUG("EventDispatcher: Dispatched global event '{}' to thread {}", event_name, thread_id);
 }

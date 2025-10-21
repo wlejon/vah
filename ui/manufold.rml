@@ -100,12 +100,12 @@
                     <div data-for="msg, i : m.conversation_history">
                         <div class="message" data-attr-class="'message ' + msg.role">
                             <div class="message-role">{{msg.role}}</div>
-                            <texteditor class="message-content" data-attr-id="'msg_' + i" />
+                            <texteditor class="message-content" data-attr-value="msg.content" />
                         </div>
                     </div>
                     <div data-if="m.current_response != ''" class="message assistant">
                         <div class="message-role">assistant</div>
-                        <texteditor class="message-content" id="current_response" />
+                        <texteditor class="message-content" data-attr-value="m.current_response" />
                     </div>
                 </div>
 
@@ -137,7 +137,7 @@
                 </div>
 
                 <!-- Conversation continues -->
-                <div data-if="m.conversation_history.1" class="conversation">
+                <div data-if="m.has_conversation" class="conversation">
                     <div data-for="msg : m.conversation_history">
                         <div class="message" data-attr-class="'message ' + msg.role">
                             <div class="message-role">{{msg.role}}</div>
@@ -167,7 +167,7 @@
                     <div data-for="msg, i : m.conversation_history">
                         <div class="message" data-attr-class="'message ' + msg.role">
                             <div class="message-role">{{msg.role}}</div>
-                            <texteditor class="message-content" data-attr-id="'msg_design_' + i" />
+                            <texteditor class="message-content" data-attr-value="msg.content" />
                         </div>
                     </div>
                 </div>
