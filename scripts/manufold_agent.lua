@@ -63,6 +63,7 @@ local agent_state = {
     -- Helper booleans for UI conditionals
     has_conversation = false,
     has_scripts = false,
+    has_schema = false,
 }
 
 -- System prompt generation using adapter
@@ -99,6 +100,8 @@ local function execute_tool(tool_name, arguments)
     elseif tool_name == "create_comprehension_doc" then
         agent_state.comprehension_doc = arguments.content or ""
         agent_state.show_feedback_input = true
+        agent_state.current_state = WORKFLOW_STATES.VALIDATION
+        agent_state.status_message = get_status_for_state()
         update_ui()
 
         return {success = true, result = "Comprehension document created"}
@@ -112,6 +115,8 @@ local function execute_tool(tool_name, arguments)
         agent_state.proposed_schema = arguments.schema
         -- Convert to JSON for display
         agent_state.schema_json = json.encode(arguments.schema, true) or "{}"
+        agent_state.current_state = WORKFLOW_STATES.MODEL_DESIGN
+        agent_state.status_message = get_status_for_state()
         update_ui()
 
         return {success = true, result = "Schema proposed"}
@@ -204,7 +209,19 @@ local function send_to_agent(user_message)
         local tool_results = {}
 
         for _, call in ipairs(tool_calls) do
-            local result = execute_tool(call.name, call.arguments)
+            local result
+
+            -- Check if there was a parse error
+            if call.parse_error then
+                result = {
+                    success = false,
+                    error = "JSON Parse Error: " .. call.parse_error.message .. "\n\nError occurred here:\n" .. call.parse_error.context .. "\n\nPlease fix the JSON syntax and try again."
+                }
+                print("Tool parse error for " .. call.name .. ": " .. call.parse_error.message)
+            else
+                result = execute_tool(call.name, call.arguments)
+            end
+
             table.insert(tool_results, {
                 tool = call.name,
                 result = result
@@ -250,6 +267,7 @@ function update_ui()
     -- Update helper booleans
     agent_state.has_conversation = #agent_state.conversation_history > 0
     agent_state.has_scripts = #agent_state.generated_scripts > 0
+    agent_state.has_schema = agent_state.proposed_schema ~= false
 
     data.bind("manufold", {agent_state})
 end
@@ -368,8 +386,9 @@ local function on_approve_understanding(payload)
     agent_state.status_message = get_status_for_state()
     update_ui()
 
-    -- Ask agent to propose schema
-    send_to_agent("The understanding is correct. Please propose a database schema for this data.")
+    -- Trigger schema design with minimal message
+    -- The system prompt for model_design phase will force the tool call
+    send_to_agent("APPROVED")
 end
 
 local function on_approve_schema(payload)
@@ -380,8 +399,9 @@ local function on_approve_schema(payload)
     agent_state.status_message = get_status_for_state()
     update_ui()
 
-    -- Ask agent to generate parsers
-    send_to_agent("The schema is approved. Please generate parsing scripts for the data transformation.")
+    -- Trigger parser generation with minimal message
+    -- The system prompt for transformation phase will force the tool calls
+    send_to_agent("APPROVED")
 end
 
 local function on_start_import(payload)

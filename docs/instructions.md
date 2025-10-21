@@ -38,6 +38,5 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-you are working on building the [model-adapter-system](model-adapter-system.md) and provide the first adapter for the [harmony format](harmony-format-specification.md)
 
-you've started some work in manufold_agent and manufold_rml. 
+

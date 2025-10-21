@@ -152,12 +152,12 @@
                 <h2>Data Model Design</h2>
                 <p>The agent is proposing a database schema for your data.</p>
 
-                <div data-if="m.proposed_schema" class="schema-display">
+                <div data-if="m.has_schema" class="schema-display">
                     <h3>Proposed Schema</h3>
                     <pre>{{m.schema_json}}</pre>
                 </div>
 
-                <div data-if="m.proposed_schema && !m.schema_approved" class="action-panel">
+                <div data-if="m.has_schema && !m.schema_approved" class="action-panel">
                     <button class="primary" onclick="trigger('approve_schema')">Approve Schema</button>
                     <button onclick="trigger('send_message', {message = 'Please revise the schema'})">Request Changes</button>
                 </div>
