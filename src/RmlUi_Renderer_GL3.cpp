@@ -2086,7 +2086,10 @@ Rml::LayerHandle RenderInterface_GL3::RenderLayerStack::PushLayer()
 
 void RenderInterface_GL3::RenderLayerStack::PopLayer()
 {
-	RMLUI_ASSERT(layers_size > 0);
+	if (layers_size == 0) {
+		// Defensive: Don't pop if there are no layers
+		return;
+	}
 	layers_size -= 1;
 }
 
@@ -2098,12 +2101,21 @@ const Gfx::FramebufferData& RenderInterface_GL3::RenderLayerStack::GetLayer(Rml:
 
 const Gfx::FramebufferData& RenderInterface_GL3::RenderLayerStack::GetTopLayer() const
 {
+	if (layers_size == 0) {
+		// Return a dummy framebuffer when there are no layers
+		// This can happen when a document has no renderable content (e.g., all data-if conditions fail)
+		static Gfx::FramebufferData empty_fb{};
+		return empty_fb;
+	}
 	return GetLayer(GetTopLayerHandle());
 }
 
 Rml::LayerHandle RenderInterface_GL3::RenderLayerStack::GetTopLayerHandle() const
 {
-	RMLUI_ASSERT(layers_size > 0);
+	if (layers_size == 0) {
+		// Return 0 when there are no layers to avoid assert
+		return 0;
+	}
 	return static_cast<Rml::LayerHandle>(layers_size - 1);
 }
 
