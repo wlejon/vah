@@ -1,0 +1,236 @@
+<rml>
+<head>
+    <title>Manufold</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="manufold.rcss"/>
+    <script>
+        function send_agent_message(document)
+            local input = document:GetElementById('agent_input')
+            if input then
+                local value = input:GetAttribute('value')
+                if value and value ~= '' then
+                    trigger('send_message', {message = value})
+                    input:SetAttribute('value', '')
+                end
+            end
+        end
+
+        function submit_feedback(document)
+            local input = document:GetElementById('feedback_input')
+            if input then
+                local value = input:GetAttribute('value')
+                if value and value ~= '' then
+                    trigger('submit_feedback', {feedback = value})
+                    input:SetAttribute('value', '')
+                end
+            end
+        end
+    </script>
+</head>
+<body>
+    <!-- Main container -->
+    <div class="manufold-container" data-model="manufold">
+        <div data-for="m : manufold">
+
+            <!-- Header -->
+            <div class="header">
+                <h1>Manufold</h1>
+                <p class="subtitle">Transform unstructured data into structured knowledge</p>
+                <div class="status-bar">
+                    <span class="status">{{m.status_message}}</span>
+                    <span class="state-indicator">Step: {{m.current_state}}</span>
+                </div>
+            </div>
+
+            <!-- Welcome state -->
+            <div data-if="m.current_state == 'welcome'" class="welcome-panel">
+                <h2>Welcome to Manufold</h2>
+                <p>Create a new data environment by dragging and dropping your files or folders here.</p>
+                <div class="drop-zone">
+                    <p>Drop files or folders here</p>
+                </div>
+                <div class="instructions">
+                    <h3>What happens next:</h3>
+                    <ol>
+                        <li>Agent explores your data</li>
+                        <li>Creates a comprehension document</li>
+                        <li>You validate the understanding</li>
+                        <li>Agent proposes a database schema</li>
+                        <li>Data is transformed and imported</li>
+                        <li>Overview interface is generated</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Ingestion state -->
+            <div data-if="m.current_state == 'ingestion'" class="ingestion-panel">
+                <h2>Ingesting Files</h2>
+                <p>{{m.ingestion_status}}</p>
+                <p>Found {{m.file_count}} files</p>
+            </div>
+
+            <!-- Exploration state -->
+            <div data-if="m.current_state == 'exploration'" class="exploration-panel">
+                <h2>Data Exploration</h2>
+                <p>The agent will now examine your data to understand its structure and meaning.</p>
+
+                <div class="file-list">
+                    <h3>Ingested Files ({{m.file_count}})</h3>
+                    <div class="files">
+                        <div data-for="file : m.ingested_files">
+                            <div class="file-item">
+                                <span class="file-name">{{file.name}}</span>
+                                <span class="file-type">{{file.type}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div data-if="m.can_proceed && !m.is_thinking" class="action-panel">
+                    <button onclick="trigger('start_exploration')">Start Exploration</button>
+                </div>
+
+                <div data-if="m.is_thinking" class="thinking-indicator">
+                    <p>Agent is analyzing your data...</p>
+                </div>
+
+                <!-- Conversation history -->
+                <div data-if="m.has_conversation" class="conversation">
+                    <h3>Agent Conversation</h3>
+                    <div data-for="msg, i : m.conversation_history">
+                        <div class="message" data-attr-class="'message ' + msg.role">
+                            <div class="message-role">{{msg.role}}</div>
+                            <texteditor class="message-content" data-attr-id="'msg_' + i" />
+                        </div>
+                    </div>
+                    <div data-if="m.current_response != ''" class="message assistant">
+                        <div class="message-role">assistant</div>
+                        <texteditor class="message-content" id="current_response" />
+                    </div>
+                </div>
+
+                <!-- Agent input -->
+                <div data-if="m.has_conversation && !m.is_thinking" class="input-area">
+                    <input type="text" id="agent_input" placeholder="Send a message to the agent..." />
+                    <button onclick="send_agent_message(document)">Send</button>
+                </div>
+            </div>
+
+            <!-- Validation state -->
+            <div data-if="m.current_state == 'validation'" class="validation-panel">
+                <h2>Understanding Validation</h2>
+                <p>Please review the agent's comprehension of your data.</p>
+
+                <div class="comprehension-doc">
+                    <h3>Comprehension Document</h3>
+                    <div class="doc-content">{{m.comprehension_doc}}</div>
+                </div>
+
+                <div data-if="m.show_feedback_input" class="feedback-area">
+                    <h3>Provide Feedback</h3>
+                    <p>Is this understanding correct? If not, please provide feedback:</p>
+                    <textarea id="feedback_input" placeholder="Enter feedback or corrections..."></textarea>
+                    <div class="button-group">
+                        <button onclick="submit_feedback(document)">Submit Feedback</button>
+                        <button class="primary" onclick="trigger('approve_understanding')">Approve Understanding</button>
+                    </div>
+                </div>
+
+                <!-- Conversation continues -->
+                <div data-if="m.conversation_history.1" class="conversation">
+                    <div data-for="msg : m.conversation_history">
+                        <div class="message" data-attr-class="'message ' + msg.role">
+                            <div class="message-role">{{msg.role}}</div>
+                            <div class="message-content">{{msg.content}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Design state -->
+            <div data-if="m.current_state == 'model_design'" class="model-design-panel">
+                <h2>Data Model Design</h2>
+                <p>The agent is proposing a database schema for your data.</p>
+
+                <div data-if="m.proposed_schema" class="schema-display">
+                    <h3>Proposed Schema</h3>
+                    <pre>{{m.schema_json}}</pre>
+                </div>
+
+                <div data-if="m.proposed_schema && !m.schema_approved" class="action-panel">
+                    <button class="primary" onclick="trigger('approve_schema')">Approve Schema</button>
+                    <button onclick="trigger('send_message', {message = 'Please revise the schema'})">Request Changes</button>
+                </div>
+
+                <!-- Conversation -->
+                <div data-if="m.has_conversation" class="conversation">
+                    <div data-for="msg, i : m.conversation_history">
+                        <div class="message" data-attr-class="'message ' + msg.role">
+                            <div class="message-role">{{msg.role}}</div>
+                            <texteditor class="message-content" data-attr-id="'msg_design_' + i" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transformation state -->
+            <div data-if="m.current_state == 'transformation'" class="transformation-panel">
+                <h2>Data Transformation</h2>
+                <p>Generating parser scripts and importing data...</p>
+
+                <div data-if="m.has_scripts" class="scripts-display">
+                    <h3>Generated Scripts</h3>
+                    <div data-for="script : m.generated_scripts">
+                        <div class="script-item">
+                            <h4>{{script.file_type}} Parser</h4>
+                            <pre>{{script.script}}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" data-style-width="m.import_progress + '%'"></div>
+                    <span class="progress-text">{{m.import_status}}</span>
+                </div>
+
+                <div data-if="m.has_scripts && m.import_progress == 0" class="action-panel">
+                    <button class="primary" onclick="trigger('start_import')">Start Import</button>
+                </div>
+            </div>
+
+            <!-- View Generation state -->
+            <div data-if="m.current_state == 'view_generation'" class="view-generation-panel">
+                <h2>View Generation</h2>
+                <p>Creating an overview interface for your data...</p>
+
+                <div data-if="m.is_thinking" class="thinking-indicator">
+                    <p>Agent is generating views...</p>
+                </div>
+
+                <div data-if="m.current_response != ''" class="response-display">
+                    <h3>Generated View</h3>
+                    <div>{{m.current_response}}</div>
+                </div>
+            </div>
+
+            <!-- Complete state -->
+            <div data-if="m.current_state == 'complete'" class="complete-panel">
+                <h2>Environment Created Successfully!</h2>
+                <p>Your data has been transformed into a structured environment.</p>
+                <p>Database: {{m.db_path}}</p>
+
+                <div class="action-panel">
+                    <button class="primary">Open Environment</button>
+                    <button onclick="trigger('reset_session')">Create Another</button>
+                </div>
+            </div>
+
+            <!-- Global actions -->
+            <div class="global-actions">
+                <button class="secondary" onclick="trigger('reset_session')">Reset Session</button>
+            </div>
+
+        </div>
+    </div>
+</body>
+</rml>

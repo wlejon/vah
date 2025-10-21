@@ -9,6 +9,11 @@ local active_app = {
 
 -- App registry with metadata
 local apps = {
+    manufold = {
+        name = "Manufold",
+        script = "scripts/manufold_agent.lua",
+        document_id = "manufold"
+    },
     file_editor = {
         name = "File Editor",
         script = "scripts/file_editor.lua",

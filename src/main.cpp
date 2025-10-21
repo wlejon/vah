@@ -448,30 +448,10 @@ private:
                     running_ = false;
                     break;
                 case SDL_MOUSEBUTTONDOWN: {
-                    auto hover_elem = rml_context_->GetHoverElement();
-                    if (hover_elem) {
-                        auto class_attr = hover_elem->GetAttribute("class");
-                        auto click_attr = hover_elem->GetAttribute("data-event-click");
-                        std::string classes = class_attr ? class_attr->Get<Rml::String>() : "";
-                        std::string click_handler = click_attr ? click_attr->Get<Rml::String>() : "";
-                        LOG_INFO("Click: tag={}, id='{}', class='{}', click='{}'",
-                            hover_elem->GetTagName().c_str(),
-                            hover_elem->GetId().c_str(),
-                            classes.c_str(),
-                            click_handler.c_str());
-                    } else {
-                        LOG_WARN("Click: NO hover element!");
-                    }
                     rml_context_->ProcessMouseButtonDown(event.button.button - 1, 0);
                     break;
                 }
                 case SDL_MOUSEBUTTONUP: {
-                    auto hover_elem = rml_context_->GetHoverElement();
-                    if (hover_elem) {
-                        auto class_attr = hover_elem->GetAttribute("class");
-                        std::string classes = class_attr ? class_attr->Get<Rml::String>() : "";
-                        LOG_INFO("MouseUp: tag={}, class='{}'", hover_elem->GetTagName().c_str(), classes.c_str());
-                    }
                     rml_context_->ProcessMouseButtonUp(event.button.button - 1, 0);
                     break;
                 }

@@ -15,6 +15,13 @@
         <p class="subtitle">Foundation for Manufold - Select an application to start</p>
 
         <div class="app-grid">
+            <!-- Manufold -->
+            <div class="app-card primary" onclick="launch_app('manufold')">
+                <div class="app-icon">[M]</div>
+                <div class="app-name">Manufold</div>
+                <p class="app-description">Transform unstructured data into structured knowledge environments</p>
+            </div>
+
             <!-- File Editor -->
             <div class="app-card" onclick="launch_app('file_editor')">
                 <div class="app-icon">[F]</div>
