@@ -4,6 +4,9 @@
 function startup()
     print("Main Lua thread started")
 
+    -- Start core systems
+    command.spawn_thread("scripts/notifications.lua")
+
     -- Start the launcher (app selection menu)
     command.spawn_thread("scripts/launcher.lua")
 end

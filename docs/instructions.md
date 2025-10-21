@@ -38,4 +38,26 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-please delete the cpp app nav system and references in the code. 
+we previously had a navigation system in cpp that we've removed. the purpose was to give a central place of well defined interaction points for user interactions from the lua threads. give a way for an agent running in an isolated place to ineract with the user with a simple api. we created it in cpp and it was somewhat working but it had a lot of issues and inconsistencies. i'd like to build it in lua to avoid having to work through the complexities. so we're building the first vah native lua plugin. the second one will be app navigation (file menu, for example). these will be available for us to build on top of for our specific use cases. 
+
+your goal is to create a robust notification system in lua understanding that you're also laying the foundation for future lua plugins we need for vah. this will mean we might need to add some c++ support systems for them to function well and have idiomatic use.
+
+the notification system should be a wrapper around a sql table storing the information. the display of the information on the front end should be through data binding. the front end should display the data in the most user friendly way for the given type of notification. 
+
+our system is designed in this way:
+
+### main thread
+
+the main thread runs the renderer. we're rendering rmlui here. rmlui has a lua state. we've added a couple of custom elements in the ElementCanvas and ElementTextEditor. rmlui exposes the "document" (DOM) in "on" callbacks in lua (like onmousedown). the main thread lua code is the only place to modify the rml. 
+
+### lua threads
+
+every entry point for applications launches in its own isolated thread. this thread has some standard callbacks like startup, update(dt), and shutdown(). update is called about 30hz. here you can use the lua bindings to open an rml document. in the update, you'd do any realtime processesing that needs to be done. in these lua threads, you can call out to sql, load up filtered rows, and bind them to variables for the RML files to render. 
+
+### command queue
+
+we communicate between threads using a command queue. the lua threads all use the command queue for interacting with other parts of the application. the application uses a lock-free implementation and does not use mutexes. it's threadsafe by never crossing the thread barrier.
+
+## expected output
+
+explain what i'm after so that i know i've given you enough information and you were able to find the rest by reading the codebase. you will have enough context to build the notification system i'm after but only if you truly understand it.
