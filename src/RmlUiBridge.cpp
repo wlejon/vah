@@ -366,6 +366,51 @@ namespace {
         return 0;
     }
 
+    // Lua callback for handling notification action clicks
+    int lua_handle_notification_action(lua_State* L) {
+        if (!g_bridge) {
+            return 0;
+        }
+
+        // Get the event and extract the current element
+        Rml::Event* event = Rml::Lua::LuaType<Rml::Event>::check(L, 1);
+        if (!event) {
+            return luaL_error(L, "handle_notification_action requires event");
+        }
+
+        Rml::Element* element = event->GetCurrentElement();
+        if (!element) {
+            return 0;
+        }
+
+        // Get notification ID, action ID, and thread ID from element attributes
+        std::string notif_id = element->GetAttribute<std::string>("notif-id", "");
+        std::string action_id = element->GetAttribute<std::string>("action-id", "");
+        int thread_id = element->GetAttribute<int>("thread-id", -1);
+
+        if (notif_id.empty() || action_id.empty() || thread_id < 0) {
+            return 0;
+        }
+
+        // Dismiss the notification
+        if (g_notification_feed) {
+            g_notification_feed->Dismiss(notif_id);
+        }
+
+        // Emit event to the thread that created the notification
+        PayloadMap payload;
+        payload["notification_id"] = notif_id;
+        payload["action_id"] = action_id;
+
+        if (g_bridge->GetEventDispatcher()) {
+            g_bridge->GetEventDispatcher()->DispatchToThread(thread_id, "notification_response", payload);
+        }
+
+        // Stop event propagation
+        event->StopPropagation();
+        return 0;
+    }
+
 }
 
 RmlUiBridge::RmlUiBridge(EventDispatcher* event_dispatcher)
@@ -413,6 +458,9 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
 
     lua_pushcfunction(L, lua_close_expansion_modal);
     lua_setglobal(L, "close_expansion_modal");
+
+    lua_pushcfunction(L, lua_handle_notification_action);
+    lua_setglobal(L, "handle_notification_action");
 
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly

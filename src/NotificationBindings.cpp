@@ -14,7 +14,9 @@ void SetupBindings(sol::state& lua, moodycamel::ConcurrentQueue<Command>* comman
     auto notif_table = lua.create_table();
 
     // Add notification from Lua thread
-    notif_table["add"] = [command_queue](sol::table notification_data) {
+    notif_table["add"] = [command_queue](sol::table notification_data, sol::this_state s) {
+        sol::state_view lua(s);
+
         Commands::AddNotification cmd;
         cmd.type = notification_data.get_or("type", 0);
         cmd.title = notification_data.get_or<std::string>("title", "");
@@ -24,6 +26,24 @@ void SetupBindings(sol::state& lua, moodycamel::ConcurrentQueue<Command>* comman
         cmd.expandable = notification_data.get_or("expandable", false);
         cmd.expanded_content = notification_data.get_or<std::string>("expanded_content", "");
         cmd.ttl_seconds = notification_data.get_or("ttl", 5.0);
+        cmd.thread_id = lua["thread_id"].get_or(-1);
+
+        // Extract actions if provided
+        sol::optional<sol::table> actions_opt = notification_data.get<sol::optional<sol::table>>("actions");
+        if (actions_opt) {
+            sol::table actions_table = actions_opt.value();
+            for (const auto& [key, value] : actions_table) {
+                if (value.is<sol::table>()) {
+                    sol::table action_table = value.as<sol::table>();
+                    Commands::NotificationActionData action;
+                    action.id = action_table.get_or<std::string>("id", "");
+                    action.label = action_table.get_or<std::string>("label", "");
+                    if (!action.id.empty() && !action.label.empty()) {
+                        cmd.actions.push_back(std::move(action));
+                    }
+                }
+            }
+        }
 
         // Extract metadata if provided
         sol::optional<sol::table> metadata_opt = notification_data.get<sol::optional<sol::table>>("metadata");

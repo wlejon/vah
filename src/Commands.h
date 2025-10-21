@@ -146,6 +146,11 @@ namespace Commands {
         std::string event_name;
     };
 
+    struct NotificationActionData {
+        std::string id;
+        std::string label;
+    };
+
     struct AddNotification {
         int type;
         std::string title;
@@ -154,8 +159,10 @@ namespace Commands {
         bool dismissible;
         bool expandable;
         std::string expanded_content;
+        std::vector<NotificationActionData> actions;
         PayloadMap metadata;
         double ttl_seconds;
+        int thread_id = -1;
     };
 
     struct ClearNotifications {

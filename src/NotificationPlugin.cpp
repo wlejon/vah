@@ -128,9 +128,11 @@ void NotificationPlugin::CleanupExpired() {
         return;
     }
 
-    // Cleanup expired notifications based on TTL
-    // This will trigger the change callback if any are removed
+    // Mark expired notifications for removal
     notification_feed_->CleanupExpired();
+
+    // Process all pending removals (deferred cleanup)
+    notification_feed_->ProcessPendingRemovals();
 }
 
 void NotificationPlugin::OnContextDestroy(Rml::Context* context) {

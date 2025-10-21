@@ -18,6 +18,11 @@ enum class NotificationType {
     FileOperation = 7   // File create/modify/delete (orange)
 };
 
+struct NotificationAction {
+    std::string id;                      // Action identifier
+    std::string label;                   // Button text
+};
+
 struct Notification {
     std::string id;                      // Unique ID (timestamp-based)
     int type;                            // NotificationType as int for data binding
@@ -28,8 +33,11 @@ struct Notification {
     bool dismissible;                    // Can user dismiss?
     bool expandable;                     // Has detailed view?
     std::string expanded_content;        // RML content for expanded view
+    std::vector<NotificationAction> actions;  // Interactive action buttons
     PayloadMap metadata;                 // Command-specific data
     double ttl_seconds = 5.0;            // Time to live in seconds (0 = persist forever)
+    int thread_id = -1;                  // Thread that created this notification
+    bool pending_removal = false;        // Marked for removal (deferred cleanup)
 };
 
 class NotificationFeed {
@@ -60,6 +68,9 @@ public:
 
     // Remove expired notifications based on TTL (triggers onChange callback if any removed)
     void CleanupExpired();
+
+    // Remove all notifications marked for removal (deferred cleanup)
+    void ProcessPendingRemovals();
 
     // Set callback for when notifications change
     void SetOnChangeCallback(OnChangeCallback callback) { on_change_callback_ = callback; }

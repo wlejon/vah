@@ -516,6 +516,27 @@ function startup()
     database_initialized = true
     print("Workflow database initialized successfully")
 
+    -- Test interactive notification (agent question)
+    local user_response = nil
+    event.register("notification_response", function(payload)
+        print("Received notification response:", payload.action_id)
+        user_response = payload.action_id
+    end)
+
+    notifications.add({
+        type = 5,  -- AgentQuestion
+        title = "Welcome to Workflow App",
+        message = "Would you like a quick tutorial on creating workflows?",
+        thread = "Workflow App",
+        dismissible = false,
+        ttl = 0,  -- Persists until user responds
+        actions = {
+            { id = "yes", label = "Yes, show tutorial" },
+            { id = "no", label = "No, skip tutorial" },
+            { id = "later", label = "Remind me later" }
+        }
+    })
+
     -- Test expandable notification
     notifications.add({
         type = 0,  -- Info
@@ -597,7 +618,17 @@ Version: 1.0.0</pre>
 end
 
 function update(dt)
-    -- No update logic needed - changes are automatically persisted to database
+    -- Check if user responded to tutorial question
+    if user_response then
+        if user_response == "yes" then
+            notifications.info("Tutorial Mode", "Tutorial feature coming soon!")
+        elseif user_response == "no" then
+            notifications.info("Tutorial Skipped", "You can access help anytime from the menu.")
+        elseif user_response == "later" then
+            notifications.info("Reminder Set", "We'll ask again next time.")
+        end
+        user_response = nil  -- Clear response
+    end
 end
 
 function shutdown()

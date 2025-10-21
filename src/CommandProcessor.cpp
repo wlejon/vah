@@ -144,6 +144,16 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
                 notif.expanded_content = command.expanded_content;
                 notif.metadata = command.metadata;
                 notif.ttl_seconds = command.ttl_seconds;
+                notif.thread_id = command.thread_id;
+
+                // Convert action data
+                for (const auto& action_data : command.actions) {
+                    NotificationAction action;
+                    action.id = action_data.id;
+                    action.label = action_data.label;
+                    notif.actions.push_back(std::move(action));
+                }
+
                 notification_feed_->AddNotification(std::move(notif));
             }
         }

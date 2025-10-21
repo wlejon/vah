@@ -17,6 +17,7 @@
 
         <div class="notification-items" data-model="notifications">
             <div class="notification-item" data-for="notif : notifications"
+                 data-if="!notif.pending_removal"
                  data-class-info="notif.type == 0"
                  data-class-progress="notif.type == 1"
                  data-class-success="notif.type == 2"
@@ -51,6 +52,15 @@
                     </div>
                     <p class="notif-message" data-if="notif.message">{{ notif.message }}</p>
                     <div class="expand-indicator" data-if="notif.expandable">Click for details...</div>
+
+                    <!-- Action buttons -->
+                    <div class="notif-actions">
+                        <button class="action-btn" data-for="action : notif.actions"
+                                data-attr-notif-id="notif.id"
+                                data-attr-action-id="action.id"
+                                data-attr-thread-id="notif.thread_id"
+                                onclick="handle_notification_action(event)">{{ action.label }}</button>
+                    </div>
                 </div>
 
                 <button class="dismiss-btn"

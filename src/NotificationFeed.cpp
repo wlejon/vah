@@ -21,10 +21,10 @@ void NotificationFeed::AddNotification(Notification&& notification) {
 
 
 void NotificationFeed::Dismiss(const std::string& notification_id) {
-    for (auto it = notifications_.begin(); it != notifications_.end(); ++it) {
-        if (it->id == notification_id) {
-            notifications_.erase(it);
-            TriggerChange();
+    // Mark for removal instead of immediate erase to avoid array index issues during RmlUi rendering
+    for (auto& notif : notifications_) {
+        if (notif.id == notification_id) {
+            notif.pending_removal = true;
             return;
         }
     }
@@ -51,20 +51,29 @@ const Notification* NotificationFeed::Get(const std::string& notification_id) co
 void NotificationFeed::CleanupExpired() {
     double current_time = GetCurrentTime();
 
-    bool any_removed = false;
-
-    // Remove notifications that have expired (TTL > 0 and time exceeded)
-    auto it = notifications_.begin();
-    while (it != notifications_.end()) {
-        if (it->ttl_seconds > 0.0) {
-            double elapsed = current_time - it->timestamp;
-            if (elapsed >= it->ttl_seconds) {
-                it = notifications_.erase(it);
-                any_removed = true;
-                continue;
+    // Mark expired notifications for removal instead of immediate erase
+    for (auto& notif : notifications_) {
+        if (notif.ttl_seconds > 0.0) {
+            double elapsed = current_time - notif.timestamp;
+            if (elapsed >= notif.ttl_seconds) {
+                notif.pending_removal = true;
             }
         }
-        ++it;
+    }
+}
+
+void NotificationFeed::ProcessPendingRemovals() {
+    // Remove all notifications marked for removal
+    auto it = notifications_.begin();
+    bool any_removed = false;
+
+    while (it != notifications_.end()) {
+        if (it->pending_removal) {
+            it = notifications_.erase(it);
+            any_removed = true;
+        } else {
+            ++it;
+        }
     }
 
     // Only trigger change if we actually removed something

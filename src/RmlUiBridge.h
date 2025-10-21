@@ -19,6 +19,7 @@ public:
     void SetCurrentDocument(const std::string& document_id) { current_document_id_ = document_id; }
     std::string GetCurrentDocument() const { return current_document_id_; }
     Rml::Context* GetContext() const { return context_; }
+    EventDispatcher* GetEventDispatcher() const { return event_dispatcher_; }
 
 private:
     EventDispatcher* event_dispatcher_;
