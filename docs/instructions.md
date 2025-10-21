@@ -38,5 +38,4 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 this task fits within your context, there's no need to use subagents.
 
-
-please delete the cpp notification system. delete the files and remove references to them from other code. 
+please delete the cpp app nav system and references in the code. 

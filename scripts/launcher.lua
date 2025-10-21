@@ -58,12 +58,6 @@ local apps = {
     }
 }
 
--- Update app navigation state
-local function update_nav_state()
-    local has_active = active_app.thread_id ~= nil or active_app.document_id ~= nil
-    data.bind("app_nav", {{has_active_app = has_active}})
-end
-
 -- Launch an app
 local function launch_app(payload)
     local app_id = payload.app_id
@@ -97,9 +91,6 @@ local function launch_app(payload)
         ui.load_document(app.ui_path, true, app.document_id)
         active_app.document_id = app.document_id
     end
-
-    -- Update navigation state to show close button
-    update_nav_state()
 end
 
 -- Close the current app and return to launcher
@@ -121,9 +112,6 @@ local function close_current_app(payload)
     active_app.thread_id = nil
     active_app.document_id = nil
     active_app.script_path = nil
-
-    -- Update navigation state
-    update_nav_state()
 
     -- Show launcher
     ui.show_document("launcher")
@@ -151,9 +139,6 @@ function startup()
     event.register("launch_app", launch_app)
     event.register("close_app", close_current_app)
     event.register("thread_spawned", on_thread_spawned)
-
-    -- Initialize navigation state
-    update_nav_state()
 
     -- Load launcher UI
     ui.load_document("ui/launcher.rml", true, "launcher")
