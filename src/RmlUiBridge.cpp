@@ -1,15 +1,12 @@
 #include "RmlUiBridge.h"
 #include "Logger.h"
 #include "DataStore.h"
-#include "NotificationFeed.h"
-#include "NotificationPlugin.h"
 #include "EventDispatcher.h"
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
 
 // Global references for lua callbacks (accessible from main.cpp and other modules)
-NotificationFeed* g_notification_feed = nullptr;
 RmlUiBridge* g_bridge = nullptr;
 
 namespace {
@@ -232,185 +229,6 @@ namespace {
         return 0;
     }
 
-    // Lua callback for toggle_notification_feed
-    int lua_toggle_notification_feed(lua_State* L) {
-        // The notification overlay is global, so we find it by ID in the context
-        // First argument is the calling document (we don't actually need it)
-
-        // We need to find the vah-notification-overlay document in the context
-        // For now, just toggle the stream class directly via the global context
-        if (g_bridge && g_bridge->GetContext()) {
-            Rml::ElementDocument* overlay_doc = g_bridge->GetContext()->GetDocument("vah-notification-overlay");
-            if (overlay_doc) {
-                Rml::Element* stream = overlay_doc->GetElementById("notification-stream");
-                if (stream) {
-                    bool is_active = stream->IsClassSet("active");
-                    stream->SetClass("active", !is_active);
-                    // No need to manually update - data binding is always current
-                }
-            }
-        }
-        return 0;
-    }
-
-    // Lua callback for clear_notifications
-    int lua_clear_notifications(lua_State* L) {
-        if (g_notification_feed) {
-            g_notification_feed->Clear();
-            // Note: We don't call NotificationOverlay::Update() here
-            // The update will happen on the next frame automatically
-            // This avoids RmlUi array out of bounds issues during event handling
-        }
-        return 0;
-    }
-
-    // Lua callback for dismiss_notification (from element attributes)
-    int lua_dismiss_notification_from_element(lua_State* L) {
-        // Arguments: event
-        // Get the event and extract the current element
-        Rml::Event* event = Rml::Lua::LuaType<Rml::Event>::check(L, 1);
-        if (!event) {
-            return luaL_error(L, "dismiss_notification_from_element requires event");
-        }
-
-        Rml::Element* element = event->GetCurrentElement();
-        if (!element) {
-            return 0;
-        }
-
-        // Get notification ID from element attribute
-        std::string notif_id = element->GetAttribute<std::string>("notif-id", "");
-        if (notif_id.empty()) {
-            return 0;
-        }
-
-        if (g_notification_feed) {
-            g_notification_feed->Dismiss(notif_id);
-        }
-
-        // Stop event propagation so it doesn't trigger parent onclick
-        event->StopPropagation();
-        return 0;
-    }
-
-    // Lua callback for expand_notification (from element attributes)
-    int lua_expand_notification_from_element(lua_State* L) {
-        // Arguments: event
-        // Get the event and extract the current element
-        Rml::Event* event = Rml::Lua::LuaType<Rml::Event>::check(L, 1);
-        if (!event) {
-            return luaL_error(L, "expand_notification_from_element requires event");
-        }
-
-        Rml::Element* element = event->GetCurrentElement();
-        if (!element) {
-            return 0;
-        }
-
-        // Check if notification is expandable
-        bool expandable = element->GetAttribute<bool>("notif-expandable", false);
-        if (!expandable) {
-            return 0;
-        }
-
-        // Get notification data from element attributes
-        std::string notif_id = element->GetAttribute<std::string>("notif-id", "");
-        std::string title = element->GetAttribute<std::string>("notif-title", "");
-        std::string message = element->GetAttribute<std::string>("notif-message", "");
-        std::string thread_name = element->GetAttribute<std::string>("notif-thread", "");
-        std::string expanded_content = element->GetAttribute<std::string>("notif-expanded", "");
-
-        if (g_bridge && g_bridge->GetContext()) {
-            Rml::ElementDocument* overlay_doc = g_bridge->GetContext()->GetDocument("vah-notification-overlay");
-            if (overlay_doc) {
-                // Find modal and populate with content
-                Rml::Element* modal = overlay_doc->GetElementById("notification-expansion-modal");
-                Rml::Element* title_elem = overlay_doc->GetElementById("expansion-title");
-                Rml::Element* meta_elem = overlay_doc->GetElementById("expansion-meta");
-                Rml::Element* body_elem = overlay_doc->GetElementById("expansion-body");
-
-                if (modal && title_elem && meta_elem && body_elem) {
-                    // Set content
-                    title_elem->SetInnerRML(title);
-                    meta_elem->SetInnerRML("Thread: " + thread_name);
-
-                    // Build body content
-                    std::string body_content;
-                    if (!message.empty()) {
-                        body_content += "<p>" + message + "</p>";
-                    }
-                    if (!expanded_content.empty()) {
-                        body_content += expanded_content;
-                    }
-                    body_elem->SetInnerRML(body_content);
-
-                    // Show modal
-                    modal->SetClass("active", true);
-                }
-            }
-        }
-        return 0;
-    }
-
-    // Lua callback for close_expansion_modal
-    int lua_close_expansion_modal(lua_State* L) {
-        if (g_bridge && g_bridge->GetContext()) {
-            Rml::ElementDocument* overlay_doc = g_bridge->GetContext()->GetDocument("vah-notification-overlay");
-            if (overlay_doc) {
-                Rml::Element* modal = overlay_doc->GetElementById("notification-expansion-modal");
-                if (modal) {
-                    modal->SetClass("active", false);
-                }
-            }
-        }
-        return 0;
-    }
-
-    // Lua callback for handling notification action clicks
-    int lua_handle_notification_action(lua_State* L) {
-        if (!g_bridge) {
-            return 0;
-        }
-
-        // Get the event and extract the current element
-        Rml::Event* event = Rml::Lua::LuaType<Rml::Event>::check(L, 1);
-        if (!event) {
-            return luaL_error(L, "handle_notification_action requires event");
-        }
-
-        Rml::Element* element = event->GetCurrentElement();
-        if (!element) {
-            return 0;
-        }
-
-        // Get notification ID, action ID, and thread ID from element attributes
-        std::string notif_id = element->GetAttribute<std::string>("notif-id", "");
-        std::string action_id = element->GetAttribute<std::string>("action-id", "");
-        int thread_id = element->GetAttribute<int>("thread-id", -1);
-
-        if (notif_id.empty() || action_id.empty() || thread_id < 0) {
-            return 0;
-        }
-
-        // Dismiss the notification
-        if (g_notification_feed) {
-            g_notification_feed->Dismiss(notif_id);
-        }
-
-        // Emit event to the thread that created the notification
-        PayloadMap payload;
-        payload["notification_id"] = notif_id;
-        payload["action_id"] = action_id;
-
-        if (g_bridge->GetEventDispatcher()) {
-            g_bridge->GetEventDispatcher()->DispatchToThread(thread_id, "notification_response", payload);
-        }
-
-        // Stop event propagation
-        event->StopPropagation();
-        return 0;
-    }
-
 }
 
 RmlUiBridge::RmlUiBridge(EventDispatcher* event_dispatcher)
@@ -443,25 +261,6 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     lua_pushcfunction(L, lua_close_current_app);
     lua_setglobal(L, "close_current_app");
 
-    // Register notification event handlers
-    lua_pushcfunction(L, lua_toggle_notification_feed);
-    lua_setglobal(L, "toggle_notification_feed");
-
-    lua_pushcfunction(L, lua_clear_notifications);
-    lua_setglobal(L, "clear_notifications");
-
-    lua_pushcfunction(L, lua_dismiss_notification_from_element);
-    lua_setglobal(L, "dismiss_notification_from_element");
-
-    lua_pushcfunction(L, lua_expand_notification_from_element);
-    lua_setglobal(L, "expand_notification_from_element");
-
-    lua_pushcfunction(L, lua_close_expansion_modal);
-    lua_setglobal(L, "close_expansion_modal");
-
-    lua_pushcfunction(L, lua_handle_notification_action);
-    lua_setglobal(L, "handle_notification_action");
-
     // Expose the context as a global for RML inline scripts to use
     // Use RmlUI's Lua type system to push it properly
     Rml::Lua::LuaType<Rml::Context>::push(L, context, false);
@@ -470,7 +269,7 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     // Register DOM introspection API
     DomIntrospection::RegisterLuaBindings(L);
 
-    LOG_INFO("RmlUiBridge: Registered trigger(), data, notification, and DOM introspection functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered trigger(), data, and DOM introspection functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload, const std::string& document_id) {

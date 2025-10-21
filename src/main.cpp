@@ -25,9 +25,6 @@
 #include "ElementTextEditor.h"
 #include "ElementTextEditorInstancer.h"
 #include "NanoVGBindings.h"
-#include "NotificationFeed.h"
-#include "NotificationBindings.h"
-#include "NotificationPlugin.h"
 #include "AppNavigationPlugin.h"
 #include "EventDispatcher.h"
 #include <efsw/efsw.hpp>
@@ -251,8 +248,7 @@ public:
         command_queue_ = std::make_unique<moodycamel::ConcurrentQueue<Command>>();
         event_dispatcher_ = std::make_unique<EventDispatcher>();
         data_store_ = std::make_unique<DataStore>();
-        notification_feed_ = std::make_unique<NotificationFeed>();
-        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), event_dispatcher_.get(), data_store_.get(), notification_feed_.get());
+        thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), event_dispatcher_.get(), data_store_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(event_dispatcher_.get());
 
         // Initialize managers
@@ -264,7 +260,6 @@ public:
             thread_manager_.get(),
             document_manager_.get(),
             data_model_manager_.get(),
-            notification_feed_.get(),
             event_dispatcher_.get()
         );
 
@@ -289,66 +284,6 @@ public:
         NanoVGBindings::SetupBindings(rml_lua);
 
         rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_, data_store_.get());
-
-        // Setup global notification feed reference for Lua callbacks
-        extern NotificationFeed* g_notification_feed;
-        g_notification_feed = notification_feed_.get();
-
-        // Register notification data model with RmlUi
-        Rml::DataModelConstructor notif_constructor = rml_context_->CreateDataModel("notifications");
-
-        // Register NotificationAction struct
-        if (auto action_handle = notif_constructor.RegisterStruct<NotificationAction>()) {
-            action_handle.RegisterMember("id", &NotificationAction::id);
-            action_handle.RegisterMember("label", &NotificationAction::label);
-        }
-        notif_constructor.RegisterArray<std::vector<NotificationAction>>();
-
-        // Register Notification struct
-        if (auto notif_handle = notif_constructor.RegisterStruct<Notification>()) {
-            notif_handle.RegisterMember("id", &Notification::id);
-            notif_handle.RegisterMember("type", &Notification::type);
-            notif_handle.RegisterMember("title", &Notification::title);
-            notif_handle.RegisterMember("message", &Notification::message);
-            notif_handle.RegisterMember("thread_name", &Notification::thread_name);
-            notif_handle.RegisterMember("timestamp", &Notification::timestamp);
-            notif_handle.RegisterMember("dismissible", &Notification::dismissible);
-            notif_handle.RegisterMember("expandable", &Notification::expandable);
-            notif_handle.RegisterMember("expanded_content", &Notification::expanded_content);
-            notif_handle.RegisterMember("actions", &Notification::actions);
-            notif_handle.RegisterMember("ttl_seconds", &Notification::ttl_seconds);
-            notif_handle.RegisterMember("thread_id", &Notification::thread_id);
-            notif_handle.RegisterMember("pending_removal", &Notification::pending_removal);
-        }
-        notif_constructor.RegisterArray<std::vector<Notification>>();
-
-        // Bind directly to NotificationFeed's internal vector (no cache!)
-        notif_constructor.Bind("notifications", &notification_feed_->GetNotifications());
-        notif_constructor.Bind("count", &notification_count_);
-
-        notif_model_handle_ = notif_constructor.GetModelHandle();
-
-        // Setup callback to mark dirty when notifications change
-        notification_feed_->SetOnChangeCallback([this]() {
-            // Update count
-            notification_count_ = notification_feed_->GetCount();
-
-            // Mark dirty so RmlUi knows to re-render
-            if (notif_model_handle_) {
-                notif_model_handle_.DirtyVariable("notifications");
-                notif_model_handle_.DirtyVariable("count");
-            }
-        });
-
-        // Initialize notification overlay (global, always visible)
-        if (!NotificationOverlay::Initialise(rml_context_, notification_feed_.get(),
-                                            &notif_model_handle_)) {
-            LOG_ERROR("Failed to initialize notification overlay");
-        } else {
-            // Show the notification overlay
-            NotificationOverlay::SetVisible(true);
-            LOG_INFO("Notification overlay initialized and visible");
-        }
 
         // Initialize app navigation overlay (global, always visible)
         // Note: The app_nav data model will be created by the launcher thread
@@ -398,7 +333,6 @@ public:
 
         // Shutdown overlays
         AppNavigationOverlay::Shutdown();
-        NotificationOverlay::Shutdown();
 
         // Stop file watcher
         ui_file_watch_listener_.reset();
@@ -727,10 +661,6 @@ private:
         if (rml_context_) {
             rml_context_->Update();
         }
-
-        // Cleanup expired notifications AFTER RmlUi update
-        // This prevents array out of bounds warnings during rendering
-        NotificationOverlay::CleanupExpired();
     }
 
     void Render() {
@@ -774,9 +704,6 @@ private:
     std::unique_ptr<DocumentManager> document_manager_;
     std::unique_ptr<DataModelManager> data_model_manager_;
     std::unique_ptr<CommandProcessor> command_processor_;
-    std::unique_ptr<NotificationFeed> notification_feed_;
-    Rml::DataModelHandle notif_model_handle_;
-    int notification_count_ = 0;  // Count for data binding
 
     // File watcher for RML/RCSS hot reload
     std::unique_ptr<efsw::FileWatcher> ui_file_watcher_;

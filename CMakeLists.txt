@@ -55,9 +55,6 @@ add_executable(vah
     src/NanoVGUtils.cpp
     src/FileIngestion.cpp
     src/FileIngestionBindings.cpp
-    src/NotificationFeed.cpp
-    src/NotificationBindings.cpp
-    src/NotificationPlugin.cpp
     src/AppNavigationPlugin.cpp
     src/DomIntrospection.cpp
     src/TextBuffer.cpp

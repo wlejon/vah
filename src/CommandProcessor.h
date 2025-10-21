@@ -7,7 +7,6 @@
 class ThreadManager;
 class DocumentManager;
 class DataModelManager;
-class NotificationFeed;
 class EventDispatcher;
 
 class CommandProcessor {
@@ -16,7 +15,6 @@ public:
         ThreadManager* thread_manager,
         DocumentManager* document_manager,
         DataModelManager* data_model_manager,
-        NotificationFeed* notification_feed,
         EventDispatcher* event_dispatcher
     );
     ~CommandProcessor() = default;
@@ -25,12 +23,8 @@ public:
     void ProcessCommand(const Command& cmd);
 
 private:
-    // Intercept command and create notification
-    void InterceptForNotification(const Command& cmd);
-
     ThreadManager* thread_manager_;
     DocumentManager* document_manager_;
     DataModelManager* data_model_manager_;
-    NotificationFeed* notification_feed_;
     EventDispatcher* event_dispatcher_;
 };

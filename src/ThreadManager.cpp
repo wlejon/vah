@@ -124,12 +124,10 @@ namespace {
 
 ThreadManager::ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
                              EventDispatcher* event_dispatcher,
-                             DataStore* data_store,
-                             NotificationFeed* notification_feed)
+                             DataStore* data_store)
     : command_queue_(command_queue)
     , event_dispatcher_(event_dispatcher)
     , data_store_(data_store)
-    , notification_feed_(notification_feed)
 {
 }
 
@@ -150,7 +148,7 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
     // Register thread with EventDispatcher and get its dedicated queue
     auto* ui_event_queue = event_dispatcher_->RegisterThread(thread_id);
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_, notification_feed_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_);
     thread->Start();
 
     threads_.push_back(std::move(thread));
@@ -165,7 +163,7 @@ int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread
     // Register thread with EventDispatcher and get its dedicated queue
     auto* ui_event_queue = event_dispatcher_->RegisterThread(thread_id);
 
-    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_, notification_feed_);
+    auto thread = std::make_unique<LuaThread>(thread_id, script_path, command_queue_, ui_event_queue, data_store_);
 
     if (parent_thread_id != 0) {
         thread->SetParent(parent_thread_id, parent_request_id);

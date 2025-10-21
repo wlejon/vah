@@ -2,7 +2,6 @@
 #include "ThreadManager.h"
 #include "DocumentManager.h"
 #include "DataModelManager.h"
-#include "NotificationFeed.h"
 #include "EventDispatcher.h"
 #include "Logger.h"
 
@@ -10,21 +9,16 @@ CommandProcessor::CommandProcessor(
     ThreadManager* thread_manager,
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
-    NotificationFeed* notification_feed,
     EventDispatcher* event_dispatcher
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
-    , notification_feed_(notification_feed)
     , event_dispatcher_(event_dispatcher)
 {
 }
 
 void CommandProcessor::ProcessCommand(const Command& cmd) {
-    // Intercept and notify BEFORE processing
-    InterceptForNotification(cmd);
-
     std::visit([this](auto&& command) {
         using T = std::decay_t<decltype(command)>;
 
@@ -130,100 +124,8 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::UnregisterGlobalEvent>) {
             event_dispatcher_->UnregisterGlobalEvent(command.event_name);
         }
-        else if constexpr (std::is_same_v<T, Commands::AddNotification>) {
-            if (notification_feed_) {
-                Notification notif;
-                notif.id = NotificationFeed::GenerateId();
-                notif.type = command.type;
-                notif.title = command.title;
-                notif.message = command.message;
-                notif.thread_name = command.thread_name;
-                notif.timestamp = NotificationFeed::GetCurrentTime();
-                notif.dismissible = command.dismissible;
-                notif.expandable = command.expandable;
-                notif.expanded_content = command.expanded_content;
-                notif.metadata = command.metadata;
-                notif.ttl_seconds = command.ttl_seconds;
-                notif.thread_id = command.thread_id;
+        // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)
+        // are now handled by the Lua notification system, not here
 
-                // Convert action data
-                for (const auto& action_data : command.actions) {
-                    NotificationAction action;
-                    action.id = action_data.id;
-                    action.label = action_data.label;
-                    notif.actions.push_back(std::move(action));
-                }
-
-                notification_feed_->AddNotification(std::move(notif));
-            }
-        }
-        else if constexpr (std::is_same_v<T, Commands::ClearNotifications>) {
-            if (notification_feed_) {
-                notification_feed_->Clear();
-            }
-        }
-        else if constexpr (std::is_same_v<T, Commands::DismissNotification>) {
-            if (notification_feed_) {
-                notification_feed_->Dismiss(command.notification_id);
-            }
-        }
-
-    }, cmd);
-}
-
-void CommandProcessor::InterceptForNotification(const Command& cmd) {
-    if (!notification_feed_) return;
-
-    std::visit([this](auto&& command) {
-        using T = std::decay_t<decltype(command)>;
-
-        if constexpr (std::is_same_v<T, Commands::SpawnThread>) {
-            Notification notif;
-            notif.id = NotificationFeed::GenerateId();
-            notif.type = static_cast<int>(NotificationType::Info);
-            notif.title = "Starting thread";
-            notif.message = command.script_path;
-            notif.thread_name = "Main";
-            notif.timestamp = NotificationFeed::GetCurrentTime();
-            notif.dismissible = true;
-            notif.expandable = false;
-            notif.ttl_seconds = 5.0;
-            notification_feed_->AddNotification(std::move(notif));
-        }
-        else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
-            // Don't create notifications for data model updates - too noisy for real-time data
-            // (This was causing 50+ notifications to pile up during streaming)
-        }
-        else if constexpr (std::is_same_v<T, Commands::LoadUIDocument>) {
-            Notification notif;
-            notif.id = NotificationFeed::GenerateId();
-            notif.type = static_cast<int>(NotificationType::Info);
-            notif.title = "Loading UI document";
-            notif.message = command.document_path;
-            notif.thread_name = "UI";
-            notif.timestamp = NotificationFeed::GetCurrentTime();
-            notif.dismissible = true;
-            notif.expandable = false;
-            notif.ttl_seconds = 5.0;
-            notification_feed_->AddNotification(std::move(notif));
-        }
-        else if constexpr (std::is_same_v<T, Commands::StopThread>) {
-            Notification notif;
-            notif.id = NotificationFeed::GenerateId();
-            notif.type = static_cast<int>(NotificationType::Warning);
-            notif.title = "Stopping thread";
-            notif.message = "Thread ID: " + std::to_string(command.thread_id);
-            notif.thread_name = "Main";
-            notif.timestamp = NotificationFeed::GetCurrentTime();
-            notif.dismissible = true;
-            notif.expandable = false;
-            notif.ttl_seconds = 5.0;
-            notification_feed_->AddNotification(std::move(notif));
-        }
-        else if constexpr (std::is_same_v<T, Commands::Print>) {
-            // Only show print commands as notifications for important messages
-            // (could filter based on content or add a flag)
-        }
-        // Other commands are not shown in notification feed (too noisy)
     }, cmd);
 }
