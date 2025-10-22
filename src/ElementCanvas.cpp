@@ -3,6 +3,7 @@
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/SystemInterface.h>
 #include <RmlUi/Lua/Interpreter.h>
+#include <RmlUi/Lua/Utilities.h>
 #include <glad/glad.h>
 #include <cmath>
 
@@ -451,6 +452,13 @@ void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down
         return;
     }
 
+    // Get the document this canvas belongs to and set it in registry
+    Rml::ElementDocument* document = GetOwnerDocument();
+    if (document) {
+        Rml::Lua::LuaType<Rml::ElementDocument>::push(L, document, false);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
+    }
+
     // Push arguments: key_name (string), key_down (boolean)
     lua_pushstring(L, key_name.c_str());
     lua_pushboolean(L, key_down);
@@ -460,6 +468,12 @@ void ElementCanvas::CallLuaKeyHandler(const Rml::String& key_name, bool key_down
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling Lua key handler '{}': {}", handler_func, error);
         lua_pop(L, 1);
+    }
+
+    // Clear the document from registry
+    if (document) {
+        lua_pushnil(L);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
     }
 }
 
@@ -493,6 +507,16 @@ void ElementCanvas::CallLuaMouseClickHandler(int button, bool button_down)
         return;
     }
 
+    // Get the document this canvas belongs to
+    Rml::ElementDocument* document = GetOwnerDocument();
+
+    // Set the document in Lua registry so trigger() can access it
+    // This mimics what RmlUI's event system does for event handlers
+    if (document) {
+        Rml::Lua::LuaType<Rml::ElementDocument>::push(L, document, false);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
+    }
+
     // Get canvas absolute position for coordinate conversion
     Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
 
@@ -510,6 +534,12 @@ void ElementCanvas::CallLuaMouseClickHandler(int button, bool button_down)
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling mouseclickhandler '{}': {}", handler_func, error);
         lua_pop(L, 1);
+    }
+
+    // Clear the document from registry after the call
+    if (document) {
+        lua_pushnil(L);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
     }
 }
 
@@ -544,6 +574,13 @@ void ElementCanvas::CallLuaMouseMoveHandler()
         return;
     }
 
+    // Get the document this canvas belongs to and set it in registry
+    Rml::ElementDocument* document = GetOwnerDocument();
+    if (document) {
+        Rml::Lua::LuaType<Rml::ElementDocument>::push(L, document, false);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
+    }
+
     // Get canvas absolute position for coordinate conversion
     Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
 
@@ -562,6 +599,12 @@ void ElementCanvas::CallLuaMouseMoveHandler()
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling Lua mousemove handler '{}': {}", handler_func, error);
         lua_pop(L, 1);
+    }
+
+    // Clear the document from registry
+    if (document) {
+        lua_pushnil(L);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
     }
 }
 
@@ -596,6 +639,13 @@ void ElementCanvas::CallLuaMouseScrollHandler(float wheel_x, float wheel_y)
         return;
     }
 
+    // Get the document this canvas belongs to and set it in registry
+    Rml::ElementDocument* document = GetOwnerDocument();
+    if (document) {
+        Rml::Lua::LuaType<Rml::ElementDocument>::push(L, document, false);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
+    }
+
     // Push arguments: wheel_x (horizontal scroll), wheel_y (vertical scroll)
     lua_pushnumber(L, wheel_x);
     lua_pushnumber(L, wheel_y);
@@ -605,5 +655,11 @@ void ElementCanvas::CallLuaMouseScrollHandler(float wheel_x, float wheel_y)
         const char* error = lua_tostring(L, -1);
         LOG_ERROR("ElementCanvas: Error calling mousescrollhandler '{}': {}", handler_func, error);
         lua_pop(L, 1);
+    }
+
+    // Clear the document from registry
+    if (document) {
+        lua_pushnil(L);
+        lua_setfield(L, LUA_REGISTRYINDEX, "_owner_document");
     }
 }
