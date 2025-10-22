@@ -4,3 +4,4 @@ build
 ui/fonts
 /logs/*
 /data/*.db
+/images/*.xcf

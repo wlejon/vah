@@ -27,9 +27,15 @@ find_package(efsw CONFIG REQUIRED)
 find_package(concurrentqueue CONFIG REQUIRED)
 find_package(nanovg CONFIG REQUIRED)
 
-# Add local RmlUi build
+# Fetch RmlUi from forked repository
+include(FetchContent)
 set(RMLUI_LUA_BINDINGS ON CACHE BOOL "Build Lua bindings for RmlUi" FORCE)
-add_subdirectory(D:/projects/RmlUi ${CMAKE_BINARY_DIR}/RmlUi)
+FetchContent_Declare(
+    RmlUi
+    GIT_REPOSITORY https://github.com/wlejon/RmlUi.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(RmlUi)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 
