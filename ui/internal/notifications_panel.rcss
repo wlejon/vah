@@ -27,7 +27,6 @@ body {
     box-sizing: border-box;
     background: #1e1e2e;
     border-radius: 16px;
-    border: 1px solid #45475a;
 }
 
 .notifications-header {
@@ -35,7 +34,6 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 24px;
-    border-bottom: 1px solid #313244;
     background: #181825;
     border-radius: 16px 16px 0 0;
 }
@@ -66,7 +64,6 @@ h1 {
     color: #f38ba8;
     padding: 6px 14px;
     border-radius: 6px;
-    border: 1px solid #f38ba8;
     font-family: Roboto;
     font-size: 12px;
     font-weight: 500;
@@ -101,7 +98,6 @@ h1 {
     color: #89b4fa;
     padding: 8px 16px;
     border-radius: 6px;
-    border: 1px solid #45475a;
     font-family: Roboto;
     font-size: 13px;
     font-weight: 500;
@@ -126,8 +122,6 @@ h1 {
     padding: 14px;
     gap: 12px;
     position: relative;
-    border: 1px solid #313244;
-    border-left: 3px solid #45475a;
 }
 
 .notification-read {
@@ -232,7 +226,6 @@ h1 {
     color: #a6adc8;
     padding: 5px 10px;
     border-radius: 5px;
-    border: 1px solid #45475a;
     font-family: Roboto;
     font-size: 11px;
     font-weight: 500;
@@ -278,7 +271,6 @@ h1 {
 .notifications-footer {
     text-align: center;
     padding: 16px 24px;
-    border-top: 1px solid #313244;
     background: #181825;
     border-radius: 0 0 16px 16px;
 }
@@ -288,7 +280,6 @@ h1 {
     color: #a6adc8;
     padding: 8px 20px;
     border-radius: 6px;
-    border: 1px solid #45475a;
     font-family: Roboto;
     font-size: 12px;
     font-weight: 500;

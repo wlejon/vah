@@ -22,7 +22,6 @@ function init_database()
     end
 
     database = db_handle
-    print("Notifications database opened successfully")
 
     -- Create notifications table
     local success, exec_error = database:execute([[
@@ -45,7 +44,6 @@ function init_database()
         return false
     end
 
-    print("Notifications table ready")
     return true
 end
 
@@ -122,7 +120,6 @@ function add_notification(notif)
         return false
     end
 
-    print("Added notification: " .. title)
     load_notifications()  -- Re-query and update UI
     return true
 end
@@ -145,7 +142,6 @@ function mark_read(notification_id)
         return false
     end
 
-    print("Marked notification as read: " .. notification_id)
     load_notifications()
     return true
 end
@@ -168,7 +164,6 @@ function dismiss_notification(notification_id)
         return false
     end
 
-    print("Dismissed notification: " .. notification_id)
     load_notifications()
     return true
 end
@@ -190,7 +185,6 @@ function dismiss_all()
         return false
     end
 
-    print("Dismissed all notifications")
     load_notifications()
     return true
 end
@@ -289,7 +283,6 @@ function startup()
 
     event.register("toggle_notifications", function(payload)
         ui_state.expanded = not ui_state.expanded
-        print("Notifications UI " .. (ui_state.expanded and "expanded" or "collapsed"))
 
         if ui_state.expanded then
             -- Show panel, hide badge
@@ -306,7 +299,6 @@ function startup()
 
     event.register("hide_notifications", function(payload)
         ui_state.expanded = false
-        print("Notifications UI collapsed")
 
         -- Show badge, hide panel
         ui.hide_document(PANEL_DOC_ID)
@@ -317,7 +309,6 @@ function startup()
 
     event.register("show_notifications", function(payload)
         ui_state.expanded = true
-        print("Notifications UI expanded")
 
         -- Show panel, hide badge
         ui.hide_document(BADGE_DOC_ID)
