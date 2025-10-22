@@ -5,9 +5,9 @@
     <link type="text/rcss" href="notifications_badge.rcss"/>
 </head>
 <body>
-    <div class="notification-badge-container">
-        <div class="notification-badge" onclick="trigger('show_notifications')" data-for="state : notification_ui_state">
-            <span class="badge-count">{{state.count}}</span>
+    <div class="notification-badge-container" data-model="notification_ui_state">
+        <div class="notification-badge" data-event-click="trigger('toggle_notifications')">
+            <span class="badge-count">{{notification_ui_state[0].count}}</span>
         </div>
     </div>
 </body>

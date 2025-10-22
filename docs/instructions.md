@@ -60,3 +60,4 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
+we've rewritten the way the notification system works. it current isn't "live" updating. when a notification is "dismissed" for example, the UI does not update to reflect the change. not until i relaunch the application does it pick up that the db has changed. 

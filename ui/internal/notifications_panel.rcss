@@ -2,7 +2,7 @@ body {
     font-family: Roboto;
     font-size: 14px;
     color: #cdd6f4;
-    background: transparent;
+    background: rgba(80,80,80,140);
     width: 100%;
     height: 100%;
     padding: 0;
@@ -21,29 +21,29 @@ body {
 }
 
 .notifications-container {
-    display: flex;
-    flex-direction: column;
+    top: 0;
     width: 90%;
-    max-width: 800px;
-    max-height: 90%;
-    padding: 20px;
+    padding: 0;
     box-sizing: border-box;
-    background: rgba(16, 16, 16, 0.95);
-    border-radius: 12px;
+    background: #1e1e2e;
+    border-radius: 16px;
+    border: 1px solid #45475a;
 }
 
 .notifications-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 2px #45475a;
+    padding: 24px;
+    border-bottom: 1px solid #313244;
+    background: #181825;
+    border-radius: 16px 16px 0 0;
 }
 
 h1 {
-    font-size: 28px;
-    color: #89b4fa;
+    font-size: 20px;
+    font-weight: bold;
+    color: #cdd6f4;
     margin: 0;
 }
 
@@ -54,58 +54,63 @@ h1 {
 }
 
 .notification-count {
-    font-size: 13px;
-    color: #a6adc8;
+    font-size: 12px;
+    color: #bac2de;
     background: #313244;
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 4px 10px;
+    border-radius: 8px;
 }
 
 .btn-clear-all {
-    background: #f38ba8;
-    color: #1e1e2e;
-    padding: 8px 16px;
-    border-radius: 4px;
+    background: #313244;
+    color: #f38ba8;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid #f38ba8;
     font-family: Roboto;
-    font-size: 13px;
-    font-weight: bold;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
 }
 
 .btn-clear-all:hover {
-    background: #eba0ac;
+    background: #f38ba8;
+    color: #1e1e2e;
 }
 
 .notifications-content {
     flex: 1;
     overflow-y: auto;
-    margin-bottom: 16px;
+    padding: 16px 24px;
 }
 
 .empty-state {
     text-align: center;
-    padding: 80px 20px;
+    padding: 60px 20px;
     color: #6c7086;
 }
 
 .empty-state p {
-    font-size: 18px;
-    margin-bottom: 20px;
+    font-size: 15px;
+    margin-bottom: 24px;
+    color: #7f849c;
 }
 
 .btn-test {
-    background: #89b4fa;
-    color: #1e1e2e;
-    padding: 10px 20px;
-    border-radius: 4px;
+    background: #313244;
+    color: #89b4fa;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid #45475a;
     font-family: Roboto;
-    font-size: 14px;
-    font-weight: bold;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
 }
 
 .btn-test:hover {
-    background: #74c7ec;
+    background: #45475a;
+    border-color: #89b4fa;
 }
 
 .notification-list {
@@ -116,20 +121,22 @@ h1 {
 
 .notification {
     display: flex;
-    background: #313244;
-    border-radius: 8px;
-    padding: 16px;
+    background: #181825;
+    border-radius: 10px;
+    padding: 14px;
     gap: 12px;
     position: relative;
-    border-left: 4px #45475a;
+    border: 1px solid #313244;
+    border-left: 3px solid #45475a;
 }
 
 .notification-read {
-    opacity: 0.6;
+    opacity: 0.5;
 }
 
 .notification:hover {
-    background: #383a4d;
+    background: #262637;
+    border-color: #45475a;
 }
 
 .notification-info {
@@ -149,10 +156,10 @@ h1 {
 }
 
 .notification-type-indicator {
-    width: 8px;
-    min-width: 8px;
-    border-radius: 4px;
-    margin-right: 4px;
+    width: 6px;
+    min-width: 6px;
+    border-radius: 3px;
+    align-self: stretch;
 }
 
 .type-info {
@@ -186,8 +193,8 @@ h1 {
 }
 
 .notification-title {
-    font-size: 16px;
-    font-weight: bold;
+    font-size: 14px;
+    font-weight: 600;
     color: #cdd6f4;
     margin: 0;
 }
@@ -196,18 +203,19 @@ h1 {
     font-size: 11px;
     color: #6c7086;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .notification-message {
-    font-size: 14px;
-    color: #bac2de;
+    font-size: 13px;
+    color: #a6adc8;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 .notification-source {
-    font-size: 11px;
-    color: #7f849c;
+    font-size: 10px;
+    color: #6c7086;
     font-style: italic;
 }
 
@@ -216,88 +224,101 @@ h1 {
     flex-direction: column;
     gap: 6px;
     justify-content: center;
-    min-width: 100px;
+    min-width: 90px;
 }
 
 .notification-actions button {
-    background: #45475a;
-    color: #cdd6f4;
-    padding: 6px 12px;
-    border-radius: 4px;
+    background: transparent;
+    color: #a6adc8;
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid #45475a;
     font-family: Roboto;
     font-size: 11px;
-    font-weight: bold;
+    font-weight: 500;
     cursor: pointer;
     text-align: center;
 }
 
 .notification-actions button:hover {
-    background: #585b70;
+    background: #313244;
+    border-color: #585b70;
 }
 
 .btn-action {
+    color: #89b4fa;
+    border-color: #89b4fa;
+}
+
+.btn-action:hover {
     background: #89b4fa;
     color: #1e1e2e;
 }
 
-.btn-action:hover {
-    background: #74c7ec;
+.btn-mark-read {
+    color: #a6e3a1;
+    border-color: #a6e3a1;
 }
 
-.btn-mark-read {
+.btn-mark-read:hover {
     background: #a6e3a1;
     color: #1e1e2e;
 }
 
-.btn-mark-read:hover {
-    background: #94e2d5;
-}
-
 .btn-dismiss {
-    background: #6c7086;
-    color: #cdd6f4;
+    color: #6c7086;
+    border-color: #45475a;
 }
 
 .btn-dismiss:hover {
-    background: #7f849c;
+    background: #45475a;
+    color: #cdd6f4;
 }
 
 .notifications-footer {
     text-align: center;
-    padding-top: 16px;
-    border-top: 1px #45475a;
+    padding: 16px 24px;
+    border-top: 1px solid #313244;
+    background: #181825;
+    border-radius: 0 0 16px 16px;
 }
 
 .notifications-footer button {
-    background: #585b70;
-    color: #cdd6f4;
-    padding: 8px 24px;
-    border-radius: 4px;
+    background: transparent;
+    color: #a6adc8;
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: 1px solid #45475a;
     font-family: Roboto;
-    font-size: 13px;
-    font-weight: bold;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
 }
 
 .notifications-footer button:hover {
-    background: #6c7086;
+    background: #313244;
+    border-color: #585b70;
 }
 
 scrollbarvertical {
-    width: 8px;
+    width: 10px;
 }
 
 scrollbarvertical slidertrack {
-    width: 8px;
+    width: 10px;
     background: transparent;
 }
 
 scrollbarvertical sliderbar {
     width: 6px;
-    margin-left: 1px;
-    background: #6c7086;
+    margin-left: 2px;
+    background: #45475a;
     border-radius: 3px;
     min-height: 30px;
+}
+
+scrollbarvertical sliderbar:hover {
+    background: #585b70;
 }
 
 scrollbarvertical sliderarrowdec,

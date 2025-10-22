@@ -255,10 +255,12 @@ function startup()
     end
 
     -- Register event handlers
-    event.register("add_notification", function(payload)
+    -- Global events - can be triggered by any thread
+    event.register_global("add_notification", function(payload)
         add_notification(payload)
     end)
 
+    -- Local events - only triggered by notification UI (user actions)
     event.register("dismiss_notification", function(payload)
         if payload.id then
             dismiss_notification(payload.id)
@@ -329,10 +331,6 @@ function startup()
 
     -- Load notifications and bind data BEFORE loading UI
     load_notifications()
-
-    -- update_ui_state is called by load_notifications, but we need to ensure it's set
-    -- This guarantees the data models exist before UI loads
-    update_ui_state()
 
     -- Load both UI documents
     -- Badge is shown by default, panel is hidden

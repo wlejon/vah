@@ -2,14 +2,15 @@ body {
     font-family: Roboto;
     font-size: 14px;
     color: #cdd6f4;
-    background: transparent;
-    width: 100%;
-    height: 100%;
+    background-color: transparent;
+    width: 60px;
+    height: 60px;
     padding: 0;
     margin: 0;
+    right: 0;
+    top: 0;
     box-sizing: border-box;
     z-index: 100000;
-    pointer-events: none;
 }
 
 .notification-badge-container {
@@ -20,12 +21,13 @@ body {
 
 .notification-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 48px;
-    height: 48px;
-    background: #89b4fa;
-    border-radius: 24px;
+    top: 12px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+    background: #1e1e2e;
+    border: 2px solid #89b4fa;
+    border-radius: 21px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -34,11 +36,15 @@ body {
 }
 
 .notification-badge:hover {
-    background: #74c7ec;
+    background: #89b4fa;
+}
+
+.notification-badge:hover .badge-count {
+    color: #1e1e2e;
 }
 
 .badge-count {
-    font-size: 18px;
-    font-weight: bold;
-    color: #1e1e2e;
+    font-size: 16px;
+    font-weight: 600;
+    color: #89b4fa;
 }

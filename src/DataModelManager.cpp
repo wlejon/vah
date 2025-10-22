@@ -188,7 +188,12 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
                         // Write back to DataStore (move to avoid copy)
                         data_store_->SetModel(context_model, std::move(mutable_data));
 
-                        // Dirty the model to trigger re-render
+                        // Invalidate cache and dirty the model to trigger re-render
+                        auto def_it = data_model_defs_.find(context_model);
+                        if (def_it != data_model_defs_.end()) {
+                            def_it->second->InvalidateCache();
+                        }
+
                         auto it_handle = data_model_handles_.find(context_model);
                         if (it_handle != data_model_handles_.end()) {
                             it_handle->second.DirtyVariable(context_model);
@@ -228,8 +233,14 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
             LOG_WARN("Failed to create data model '{}'", model_name);
         }
     } else {
-        // Model already exists - mark it dirty to trigger re-render
-        // TODO: Implement smarter change detection to avoid unnecessary re-renders
+        // Model already exists - invalidate cache and mark dirty to trigger re-render
+        // Invalidate cache first so the next render picks up the new data
+        auto def_it = data_model_defs_.find(model_name);
+        if (def_it != data_model_defs_.end()) {
+            def_it->second->InvalidateCache();
+        }
+
+        // Mark it dirty to trigger re-render
         it->second.DirtyVariable(model_name);
     }
 }

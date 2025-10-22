@@ -20,7 +20,6 @@
             </div>
 
             <div class="notifications-content" data-model="notifications">
-                <!-- Empty state -->
                 <div data-if="notifications.size == 0">
                     <div class="empty-state">
                         <p>No notifications</p>

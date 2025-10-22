@@ -297,3 +297,13 @@ const DataPath* DynamicTableDef::GetPath(void* ptr)
     // Otherwise it's a heap-allocated path
     return reinterpret_cast<DataPath*>(ptr);
 }
+
+void DynamicTableDef::InvalidateCache()
+{
+    // Clear the cached data snapshot
+    // Next access will call RefreshCache() to get latest data from DataStore
+    cached_data_.reset();
+
+    // Clear the path arena as well since paths reference old data
+    path_arena_.clear();
+}

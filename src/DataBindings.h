@@ -34,6 +34,10 @@ public:
     // Get a child element (for array indexing or struct member access)
     Rml::DataVariable Child(void* ptr, const Rml::DataAddressEntry& address) override;
 
+    // Invalidate cache (force refresh on next access)
+    // This should be called before DirtyVariable() to ensure UI picks up new data
+    void InvalidateCache();
+
 private:
     DataStore* store_;
     std::string model_name_;
