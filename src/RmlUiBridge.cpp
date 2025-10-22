@@ -49,10 +49,26 @@ namespace {
             }
         }
 
-        // Get the current document ID tracked by the bridge
-        std::string document_id = g_bridge->GetCurrentDocument();
+        // Get the document from Lua registry (set by RmlUI's LuaEventListener)
+        lua_getfield(L, LUA_REGISTRYINDEX, "_owner_document");
+        if (!lua_isuserdata(L, -1)) {
+            lua_pop(L, 1);
+            return luaL_error(L, "trigger() - no document context available (not called from event handler?)");
+        }
 
-        // Trigger the event with document context
+        Rml::ElementDocument* doc = Rml::Lua::LuaType<Rml::ElementDocument>::check(L, -1);
+        lua_pop(L, 1);
+
+        if (!doc) {
+            return luaL_error(L, "trigger() - failed to get document from registry");
+        }
+
+        std::string document_id = doc->GetId().c_str();
+        if (document_id.empty()) {
+            return luaL_error(L, "trigger() - document has no ID (document ID is required for event routing)");
+        }
+
+        // Trigger the event with the actual document that fired the event
         g_bridge->TriggerEvent(event_name, payload, document_id);
 
         return 0;  // No return values

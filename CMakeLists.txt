@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 20)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(RmlUi CONFIG REQUIRED)
+# find_package(RmlUi CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -26,6 +26,10 @@ find_package(httplib CONFIG REQUIRED)
 find_package(efsw CONFIG REQUIRED)
 find_package(concurrentqueue CONFIG REQUIRED)
 find_package(nanovg CONFIG REQUIRED)
+
+# Add local RmlUi build
+set(RMLUI_LUA_BINDINGS ON CACHE BOOL "Build Lua bindings for RmlUi" FORCE)
+add_subdirectory(D:/projects/RmlUi ${CMAKE_BINARY_DIR}/RmlUi)
 
 find_path(MINIAUDIO_INCLUDE_DIRS "miniaudio.h")
 

@@ -309,9 +309,17 @@ public:
         uint64_t frame_number = 0;
 
         while (running_) {
-            ProcessInput();
+            // Process commands from previous frame FIRST
+            // This ensures document visibility changes are applied before hover/input
             ProcessCommands();
+
+            // Process input to update mouse position and queue new commands
+            ProcessInput();
+
+            // Update RmlUI state (hover chain) with correct visibility AND mouse position
             Update();
+
+            // Render the frame
             Render();
 
             frame_number++;

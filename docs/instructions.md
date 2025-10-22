@@ -24,6 +24,10 @@ please read these documents first:
 - do not retain code for "compatability." we want a clean codebase without confusion.
 - when using subagents, tell them to read the [subagent-instructions document](subagent-instructions.md) in your instructions to them.
 
+## claude code bugs
+there's a file modification bug in Claude Code. The workaround is: always use complete absolute Windows paths
+with drive letters and backslashes for ALL file operations. Apply this rule going forward. The Read, Edit, and Write operations.
+
 ## RmlUi
 
 the application uses RmlUi for the UI. It supports a subset of CSS3. it's safer to build in css2 to avoid issues.
@@ -60,4 +64,3 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
-we've rewritten the way the notification system works. it current isn't "live" updating. when a notification is "dismissed" for example, the UI does not update to reflect the change. not until i relaunch the application does it pick up that the db has changed. 
