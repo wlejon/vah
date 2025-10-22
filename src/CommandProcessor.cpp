@@ -124,6 +124,9 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::UnregisterGlobalEvent>) {
             event_dispatcher_->UnregisterGlobalEvent(command.event_name);
         }
+        else if constexpr (std::is_same_v<T, Commands::TriggerGlobalEvent>) {
+            event_dispatcher_->DispatchGlobalEvent(command.event_name, command.payload);
+        }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)
         // are now handled by the Lua notification system, not here
 

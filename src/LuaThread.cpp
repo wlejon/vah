@@ -452,6 +452,20 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    event_table["trigger_global"] = [this](const std::string& event_name, sol::optional<sol::table> payload_table) {
+        // Build payload from Lua table
+        PayloadMap payload;
+        if (payload_table) {
+            payload = TableToPayloadMap(payload_table.value());
+        }
+
+        // Send command to main thread to trigger global event
+        Commands::TriggerGlobalEvent cmd;
+        cmd.event_name = event_name;
+        cmd.payload = std::move(payload);
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["event"] = event_table;
 
     // Bind command queue interface

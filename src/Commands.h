@@ -146,6 +146,11 @@ namespace Commands {
         std::string event_name;
     };
 
+    struct TriggerGlobalEvent {
+        std::string event_name;
+        PayloadMap payload;
+    };
+
     struct NotificationActionData {
         std::string id;
         std::string label;
@@ -202,6 +207,7 @@ using Command = std::variant<
     Commands::RemoveFileWatch,
     Commands::RegisterGlobalEvent,
     Commands::UnregisterGlobalEvent,
+    Commands::TriggerGlobalEvent,
     Commands::AddNotification,
     Commands::ClearNotifications,
     Commands::DismissNotification

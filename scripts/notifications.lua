@@ -23,7 +23,7 @@ function init_database()
 
     database = db_handle
 
-    -- Create notifications table
+    -- Create notifications table with expanded fields
     local success, exec_error = database:execute([[
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +35,12 @@ function init_database()
             read INTEGER DEFAULT 0,
             source TEXT,
             action_label TEXT,
-            action_event TEXT
+            action_event TEXT,
+            dismissible INTEGER DEFAULT 1,
+            expandable INTEGER DEFAULT 0,
+            expanded_content TEXT,
+            ttl REAL DEFAULT 0,
+            actions_json TEXT
         )
     ]])
 
@@ -84,6 +89,29 @@ function update_ui_state()
     }})
 end
 
+-- Helper to escape SQL strings
+local function escape_sql(str)
+    if type(str) ~= "string" then
+        return ""
+    end
+    return str:gsub("'", "''")
+end
+
+-- Helper to encode actions as JSON
+local function encode_actions(actions)
+    if not actions or type(actions) ~= "table" or #actions == 0 then
+        return ""
+    end
+
+    local parts = {}
+    for _, action in ipairs(actions) do
+        local id = escape_sql(action.id or "")
+        local label = escape_sql(action.label or "")
+        table.insert(parts, string.format('{"id":"%s","label":"%s"}', id, label))
+    end
+    return "[" .. table.concat(parts, ",") .. "]"
+end
+
 -- Add a new notification
 function add_notification(notif)
     if not database then
@@ -91,28 +119,53 @@ function add_notification(notif)
         return false
     end
 
+    -- Map numeric type to string type (for backward compatibility)
+    local type_map = {
+        [0] = "info",
+        [1] = "success",
+        [2] = "warning",
+        [3] = "error",
+        [4] = "progress",
+        [5] = "question"
+    }
+
     -- Validate required fields
-    local notif_type = notif.type or "info"
+    local notif_type = notif.type
+    if type(notif_type) == "number" then
+        notif_type = type_map[notif_type] or "info"
+    elseif type(notif_type) ~= "string" then
+        notif_type = "info"
+    end
+
     local title = notif.title or "Notification"
     local message = notif.message or ""
-    local source = notif.source or ""
+    local source = notif.source or notif.thread or ""
     local action_label = notif.action_label or ""
     local action_event = notif.action_event or ""
+    local dismissible = (notif.dismissible == nil) and 1 or (notif.dismissible and 1 or 0)
+    local expandable = notif.expandable and 1 or 0
+    local expanded_content = notif.expanded_content or ""
+    local ttl = notif.ttl or 5.0
+    local actions_json = encode_actions(notif.actions)
     local timestamp = os.time()
 
     -- Escape single quotes for SQL
-    local escaped_title = title:gsub("'", "''")
-    local escaped_message = message:gsub("'", "''")
-    local escaped_type = notif_type:gsub("'", "''")
-    local escaped_source = source:gsub("'", "''")
-    local escaped_action_label = action_label:gsub("'", "''")
-    local escaped_action_event = action_event:gsub("'", "''")
+    local escaped_title = escape_sql(title)
+    local escaped_message = escape_sql(message)
+    local escaped_type = escape_sql(notif_type)
+    local escaped_source = escape_sql(source)
+    local escaped_action_label = escape_sql(action_label)
+    local escaped_action_event = escape_sql(action_event)
+    local escaped_expanded_content = escape_sql(expanded_content)
+    local escaped_actions_json = escape_sql(actions_json)
 
     local sql = string.format([[
-        INSERT INTO notifications (timestamp, type, title, message, source, action_label, action_event)
-        VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s')
+        INSERT INTO notifications (timestamp, type, title, message, source, action_label, action_event,
+                                   dismissible, expandable, expanded_content, ttl, actions_json)
+        VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s', %f, '%s')
     ]], timestamp, escaped_type, escaped_title, escaped_message, escaped_source,
-       escaped_action_label, escaped_action_event)
+       escaped_action_label, escaped_action_event, dismissible, expandable,
+       escaped_expanded_content, ttl, escaped_actions_json)
 
     local success, error = database:execute(sql)
     if not success then
@@ -205,6 +258,47 @@ function handle_action(notification_id, action_event)
     print("Would dispatch event: " .. action_event)
 end
 
+-- Helper functions for common notification types
+local function success(title, message)
+    return add_notification({
+        type = "success",
+        title = title,
+        message = message or "",
+        dismissible = true,
+        ttl = 5.0
+    })
+end
+
+local function error(title, message)
+    return add_notification({
+        type = "error",
+        title = title,
+        message = message or "",
+        dismissible = true,
+        ttl = 0  -- Errors persist until dismissed
+    })
+end
+
+local function info(title, message)
+    return add_notification({
+        type = "info",
+        title = title,
+        message = message or "",
+        dismissible = true,
+        ttl = 5.0
+    })
+end
+
+local function warning(title, message)
+    return add_notification({
+        type = "warning",
+        title = title,
+        message = message or "",
+        dismissible = true,
+        ttl = 0  -- Warnings persist until dismissed
+    })
+end
+
 -- Add test notifications (for demonstration)
 function add_test_notifications()
     add_notification({
@@ -252,6 +346,22 @@ function startup()
     -- Global events - can be triggered by any thread
     event.register_global("add_notification", function(payload)
         add_notification(payload)
+    end)
+
+    event.register_global("notification_success", function(payload)
+        success(payload.title or "Success", payload.message)
+    end)
+
+    event.register_global("notification_error", function(payload)
+        error(payload.title or "Error", payload.message)
+    end)
+
+    event.register_global("notification_info", function(payload)
+        info(payload.title or "Info", payload.message)
+    end)
+
+    event.register_global("notification_warning", function(payload)
+        warning(payload.title or "Warning", payload.message)
     end)
 
     -- Local events - only triggered by notification UI (user actions)
@@ -344,3 +454,18 @@ function shutdown()
     end
     print("Notifications system shutting down")
 end
+
+-- Export notification API for use by other threads via global events
+-- Other threads can call: event.trigger_global("add_notification", {type = "info", title = "...", ...})
+-- Or use helper shortcuts:
+--   event.trigger_global("notification_success", {title = "Done", message = "Task completed"})
+--   event.trigger_global("notification_error", {title = "Failed", message = "Error occurred"})
+--   event.trigger_global("notification_info", {title = "Info", message = "FYI"})
+--   event.trigger_global("notification_warning", {title = "Warning", message = "Be careful"})
+return {
+    add = add_notification,
+    success = success,
+    error = error,
+    info = info,
+    warning = warning
+}

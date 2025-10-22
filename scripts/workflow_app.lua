@@ -504,12 +504,18 @@ function startup()
     print("Workflow Application started (thread_id: " .. thread_id .. ")")
 
     -- Send startup notification
-    notifications.success("Workflow App Started", "Initializing workflow application...")
+    event.trigger_global("notification_success", {
+        title = "Workflow App Started",
+        message = "Initializing workflow application..."
+    })
 
     -- Initialize workflow database
     if not workflow_db.init() then
         print("ERROR: Failed to initialize workflow database")
-        notifications.error("Database Error", "Failed to initialize workflow database")
+        event.trigger_global("notification_error", {
+            title = "Database Error",
+            message = "Failed to initialize workflow database"
+        })
         return
     end
 
@@ -523,11 +529,11 @@ function startup()
         user_response = payload.action_id
     end)
 
-    notifications.add({
-        type = 5,  -- AgentQuestion
+    event.trigger_global("add_notification", {
+        type = "question",
         title = "Welcome to Workflow App",
         message = "Would you like a quick tutorial on creating workflows?",
-        thread = "Workflow App",
+        source = "Workflow App",
         dismissible = false,
         ttl = 0,  -- Persists until user responds
         actions = {
@@ -538,11 +544,11 @@ function startup()
     })
 
     -- Test expandable notification
-    notifications.add({
-        type = 0,  -- Info
+    event.trigger_global("add_notification", {
+        type = "info",
         title = "Workflow System Info",
         message = "Click to view system details",
-        thread = "Workflow App",
+        source = "Workflow App",
         dismissible = true,
         expandable = true,
         ttl = 0,
@@ -621,11 +627,20 @@ function update(dt)
     -- Check if user responded to tutorial question
     if user_response then
         if user_response == "yes" then
-            notifications.info("Tutorial Mode", "Tutorial feature coming soon!")
+            event.trigger_global("notification_info", {
+                title = "Tutorial Mode",
+                message = "Tutorial feature coming soon!"
+            })
         elseif user_response == "no" then
-            notifications.info("Tutorial Skipped", "You can access help anytime from the menu.")
+            event.trigger_global("notification_info", {
+                title = "Tutorial Skipped",
+                message = "You can access help anytime from the menu."
+            })
         elseif user_response == "later" then
-            notifications.info("Reminder Set", "We'll ask again next time.")
+            event.trigger_global("notification_info", {
+                title = "Reminder Set",
+                message = "We'll ask again next time."
+            })
         end
         user_response = nil  -- Clear response
     end

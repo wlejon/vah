@@ -16,3 +16,8 @@ an example crud backed by sqlite.
 an example file editor using a custom element ElementTextEditor for content changes. 
 
 ![file editor example](images/file-editor-example.png)
+
+## workflow example
+an example workflow editor also using the nanovg backed custom canvas element.
+
+![workflow editor example](images/workflow-example.png)

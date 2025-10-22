@@ -64,3 +64,4 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
+we've refactored the notification system. we need to update the workflow app to use the new notifications. please investigate how notifications work and then update the usages in the workflow app to match the new api.
