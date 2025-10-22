@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Notification Badge</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="notifications_badge.rcss"/>
+</head>
+<body>
+    <div class="notification-badge-container">
+        <div class="notification-badge" onclick="trigger('show_notifications')" data-for="state : notification_ui_state">
+            <span class="badge-count">{{state.count}}</span>
+        </div>
+    </div>
+</body>
+</rml>

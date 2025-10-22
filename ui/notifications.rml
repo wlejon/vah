@@ -5,7 +5,15 @@
     <link type="text/rcss" href="notifications.rcss"/>
 </head>
 <body>
-    <div class="notifications-container">
+    <div data-model="notification_ui_state">
+        <!-- Notification Badge (shown when collapsed) -->
+        <div data-if="notification_ui_state[0].expanded == 0" class="notification-badge" onclick="trigger('show_notifications')">
+            <span data-if="notification_ui_state[0].count > 0" class="badge-count">{{notification_ui_state[0].count}}</span>
+            <span data-if="notification_ui_state[0].count == 0" class="badge-count">0</span>
+        </div>
+
+        <!-- Full Notification Panel (shown when expanded) -->
+        <div data-if="notification_ui_state[0].expanded == 1" class="notifications-container">
         <div class="notifications-header">
             <h1>Notifications</h1>
             <div class="header-actions" data-model="notifications">
@@ -80,7 +88,8 @@
 
         <!-- Footer -->
         <div class="notifications-footer">
-            <button onclick="trigger('close_app')">Close</button>
+            <button onclick="trigger('hide_notifications')">Close</button>
+        </div>
         </div>
     </div>
 </body>

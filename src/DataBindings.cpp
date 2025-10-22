@@ -61,6 +61,11 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
 {
     // Root table access: table[index] -> get a row, or table.size -> get size
     if (ptr == nullptr) {
+        // Refresh cache on root access (same as Size() does)
+        if (!cached_data_) {
+            RefreshCache();
+        }
+
         if (!cached_data_) {
             return Rml::DataVariable();
         }

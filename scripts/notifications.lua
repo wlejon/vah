@@ -4,6 +4,13 @@
 
 local database = nil
 local notifications = {}
+local ui_state = {
+    expanded = false  -- Track whether UI is expanded or collapsed
+}
+
+-- Document IDs
+local BADGE_DOC_ID = "notifications_badge"
+local PANEL_DOC_ID = "notifications_panel"
 
 -- Initialize the notifications database
 function init_database()
@@ -65,6 +72,18 @@ function load_notifications()
 
     -- Bind data to the model (triggers UI update)
     data.bind("notifications", notifications)
+
+    -- Update UI state with notification count
+    update_ui_state()
+end
+
+-- Update UI state data model
+function update_ui_state()
+    -- Bind as a single-element array so we can access fields directly
+    data.bind("notification_ui_state", {{
+        expanded = ui_state.expanded and 1 or 0,
+        count = #notifications
+    }})
 end
 
 -- Add a new notification
@@ -266,19 +285,67 @@ function startup()
         add_test_notifications()
     end)
 
+    event.register("toggle_notifications", function(payload)
+        ui_state.expanded = not ui_state.expanded
+        print("Notifications UI " .. (ui_state.expanded and "expanded" or "collapsed"))
+
+        if ui_state.expanded then
+            -- Show panel, hide badge
+            ui.hide_document(BADGE_DOC_ID)
+            ui.show_document(PANEL_DOC_ID)
+        else
+            -- Show badge, hide panel
+            ui.hide_document(PANEL_DOC_ID)
+            ui.show_document(BADGE_DOC_ID)
+        end
+
+        update_ui_state()
+    end)
+
+    event.register("hide_notifications", function(payload)
+        ui_state.expanded = false
+        print("Notifications UI collapsed")
+
+        -- Show badge, hide panel
+        ui.hide_document(PANEL_DOC_ID)
+        ui.show_document(BADGE_DOC_ID)
+
+        update_ui_state()
+    end)
+
+    event.register("show_notifications", function(payload)
+        ui_state.expanded = true
+        print("Notifications UI expanded")
+
+        -- Show panel, hide badge
+        ui.hide_document(BADGE_DOC_ID)
+        ui.show_document(PANEL_DOC_ID)
+
+        update_ui_state()
+    end)
+
+    -- Start with UI collapsed (badge visible)
+    ui_state.expanded = false
+
     -- Load notifications and bind data BEFORE loading UI
     load_notifications()
 
-    -- Load UI
-    ui.load_document("ui/notifications.rml", true, "notifications")
+    -- update_ui_state is called by load_notifications, but we need to ensure it's set
+    -- This guarantees the data models exist before UI loads
+    update_ui_state()
+
+    -- Load both UI documents
+    -- Badge is shown by default, panel is hidden
+    -- Data models are prioritized in command queue, so they'll be processed first
+    ui.load_document("ui/notifications_badge.rml", true, BADGE_DOC_ID)
+    ui.load_document("ui/notifications_panel.rml", false, PANEL_DOC_ID)
 
     print("Notifications system ready")
 end
 
 -- Update loop
 function update(dt)
-    -- Could periodically check for new notifications from other sources
-    -- For now, notifications are only added via events
+    -- Nothing needed - command queue handles proper ordering
 end
 
 -- Shutdown
