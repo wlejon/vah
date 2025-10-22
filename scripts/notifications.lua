@@ -7,6 +7,7 @@ local notifications = {}
 local ui_state = {
     expanded = false  -- Track whether UI is expanded or collapsed
 }
+local time_since_refresh = 0.0  -- Track time since last notification refresh
 
 -- Document IDs
 local BADGE_DOC_ID = "notifications_badge"
@@ -58,12 +59,18 @@ function load_notifications()
         return
     end
 
-    -- Query active (non-dismissed) notifications, most recent first
-    local results, error = database:query([[
+    -- Query active (non-dismissed, non-expired) notifications, most recent first
+    -- ttl = 0 means persist until dismissed
+    -- ttl > 0 means auto-expire after ttl seconds from timestamp
+    local current_time = os.time()
+    local sql = string.format([[
         SELECT * FROM notifications
         WHERE dismissed = 0
+          AND (ttl = 0 OR (timestamp + ttl) > %d)
         ORDER BY timestamp DESC
-    ]])
+    ]], current_time)
+
+    local results, error = database:query(sql)
 
     if error ~= "" then
         print("Error loading notifications: " .. error)
@@ -71,7 +78,13 @@ function load_notifications()
     end
 
     notifications = results or {}
-    print("Loaded " .. #notifications .. " active notifications")
+    print(string.format("Loaded %d active notifications (current_time: %d)", #notifications, current_time))
+
+    -- Debug: print each notification
+    for i, notif in ipairs(notifications) do
+        print(string.format("  [%d] %s (type=%s, ttl=%.1f, timestamp=%d, expires=%d)",
+            notif.id, notif.title, notif.type, notif.ttl, notif.timestamp, notif.timestamp + notif.ttl))
+    end
 
     -- Bind data to the model (triggers UI update)
     data.bind("notifications", notifications)
@@ -172,6 +185,9 @@ function add_notification(notif)
         print("Error adding notification: " .. error)
         return false
     end
+
+    print(string.format("Added notification: '%s' (type=%s, ttl=%.1f, timestamp=%d, expires=%d)",
+        title, notif_type, ttl, timestamp, timestamp + ttl))
 
     load_notifications()  -- Re-query and update UI
     return true
@@ -444,12 +460,41 @@ end
 
 -- Update loop
 function update(dt)
-    -- Nothing needed - command queue handles proper ordering
+    -- Refresh notifications every 0.5 seconds to remove expired ones
+    time_since_refresh = time_since_refresh + dt
+    if time_since_refresh >= 0.5 then
+        load_notifications()
+        time_since_refresh = 0.0
+    end
+end
+
+-- Cleanup old notifications from database
+function cleanup_old_notifications()
+    if not database then
+        return
+    end
+
+    -- Delete notifications that are dismissed or expired
+    local current_time = os.time()
+    local sql = string.format([[
+        DELETE FROM notifications
+        WHERE dismissed = 1
+           OR (ttl > 0 AND (timestamp + ttl) <= %d)
+    ]], current_time)
+
+    local success, error = database:execute(sql)
+
+    if not success then
+        print("Error cleaning up old notifications: " .. error)
+    else
+        print("Old notifications cleaned up")
+    end
 end
 
 -- Shutdown
 function shutdown()
     if database then
+        cleanup_old_notifications()
         database:close()
     end
     print("Notifications system shutting down")

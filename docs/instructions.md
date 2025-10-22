@@ -64,4 +64,6 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
-we've refactored the notification system. we need to update the workflow app to use the new notifications. please investigate how notifications work and then update the usages in the workflow app to match the new api.
+we've refactored the notification system. i'm not sure if we remembered to leave in a TTL for transient messages (info log equivalent, but visually). for example, notifications that the "app has started" from the workflow system should go away on their own within a few seconds. (10 or so). 
+
+please review this and determine what changes we should make to best support this. we might need to make improvements to the notification system. 
