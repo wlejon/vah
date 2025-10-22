@@ -38,11 +38,15 @@ private:
     DataStore* store_;
     std::string model_name_;
 
-    // Cached data snapshot (consistent within a render cycle)
-    // Using shared_ptr keeps the data alive even if the model is updated mid-render
+    // Cached data snapshot for consistency during rendering
+    // - Refreshed lazily on first access (when null)
+    // - shared_ptr keeps data alive even if Lua threads update mid-render
+    // - Old snapshot released when new one is fetched from DataStore
     std::shared_ptr<const DynamicTable> cached_data_;
 
-    // Arena allocator for DataPaths - cleared each render cycle
+    // Arena allocator for DataPaths
+    // - Allocates path objects during rendering
+    // - Cleared automatically on destruction (no manual clearing needed)
     std::vector<std::unique_ptr<DataPath>> path_arena_;
 
     // Helper: Get the value at a specific path

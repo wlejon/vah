@@ -2,6 +2,26 @@
 #include "Logger.h"
 #include <RmlUi/Core/Types.h>
 
+// Cache Strategy:
+// ----------------
+// DynamicTableDef maintains a cached snapshot of the data for consistency.
+// The cache is refreshed lazily (on-demand) when accessed and found to be null.
+//
+// Why caching?
+// 1. Consistency: RmlUi may call Size/Child/Get multiple times during a render.
+//    Without caching, if Lua updates data mid-render, we could read inconsistent state.
+// 2. Safety: shared_ptr keeps old data alive during render even if Lua replaces it.
+// 3. Performance: Avoids repeated DataStore lookups during a single render.
+//
+// Cache invalidation:
+// - Cache starts null (no data loaded yet)
+// - First access during render calls RefreshCache() -> gets latest shared_ptr
+// - Subsequent accesses use cached data (consistent snapshot)
+// - When Lua calls data.bind(), DataStore creates new shared_ptr
+// - Next render: first access gets new pointer, old data released
+//
+// No manual cache clearing needed - shared_ptr handles everything!
+
 DynamicTableDef::DynamicTableDef(DataStore* store, const std::string& model_name)
     : Rml::VariableDefinition(Rml::DataVariableType::Array)
     , store_(store)
@@ -18,6 +38,11 @@ DynamicTableDef::~DynamicTableDef()
 
 bool DynamicTableDef::Get(void* ptr, Rml::Variant& variant)
 {
+    // Refresh cache if not already loaded
+    if (!cached_data_) {
+        RefreshCache();
+    }
+
     // ptr encodes the row index and field path
     const DataPath* path = GetPath(ptr);
     const DynamicValue* value = GetValueAtPath(path);
@@ -32,10 +57,11 @@ bool DynamicTableDef::Get(void* ptr, Rml::Variant& variant)
 int DynamicTableDef::Size(void* ptr)
 {
     // If ptr is nullptr, we're asking for the root table size
-    // This is the start of a render cycle, so refresh cache and clear arena
     if (ptr == nullptr) {
-        RefreshCache();
-        path_arena_.clear();  // Free all DataPaths from previous render cycle
+        // Refresh cache if not already loaded
+        if (!cached_data_) {
+            RefreshCache();
+        }
         return cached_data_ ? static_cast<int>(cached_data_->size()) : 0;
     }
 
@@ -241,6 +267,10 @@ void* DynamicTableDef::AllocatePath(const DataPath& path)
 
 void DynamicTableDef::RefreshCache()
 {
+    // Get the latest data snapshot from DataStore
+    // - If Lua updated the model, this gets the new shared_ptr
+    // - The old cached_data_ is released (if we were the last holder)
+    // - DataStore returns shared_ptr, so data stays alive during this render
     cached_data_ = store_->GetModel(model_name_);
 }
 
