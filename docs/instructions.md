@@ -34,13 +34,9 @@ for assistance, please read the code directly or the documentation. they can be 
 
 Our loaded font does not have support for icons. stick to ascii in our loaded Roboto font. if you want icons/emojis, style the appropriate tag for the feel you're after instead.
 
-## current task
+## application design considerations
 
-this task fits within your context, there's no need to use subagents.
-
-you created a notification system. it has some issues. please read the code related to it and explore the rmlui codebase to understand. create a design in our system that properly uses the library.
-
-you often state that the "warnings are harmless" and i'm not trying to solve harm. I'm seeking to understand. you've never understood well enough to validate the claim in any case. 
+this application foundation does has some unusual design choices that you need to work within. it uses a lock-free implementation and does not use mutexes. it is multi-threaded through command queues. 
 
 ### main thread
 
@@ -54,37 +50,13 @@ every entry point for applications launches in its own isolated thread. this thr
 
 we communicate between threads using a command queue. the lua threads all use the command queue for interacting with other parts of the application. the application uses a lock-free implementation and does not use mutexes. it's threadsafe by never crossing the thread barrier.
 
-## expected output
+### data store
 
-tell me exactly where the "[RmlUi] Could not get value from data variable" warnings are coming from. our system cannot be so poorly designed as to cause the libraries it uses to throw warnings. we need to identify where in rmlui these issues are emited and figure out how to restructure our codebase to accommodate the library we're using.
+the databinding for rmlui is expanded in our system. we use a trigger() function call in the UI with an event name string. if this is within a databound for loop, the value of that iteration is included in the trigger as a payload to the event it's calling.
 
-## current relevant log
-[2025-10-21 19:17:45.397] [info] Processing 3 first-time data model registrations
-[2025-10-21 19:17:45.398] [info] [Lua Thread 1] Notifications system started
-[2025-10-21 19:17:45.398] [info] [Lua Thread 1] Notifications database opened successfully
-[2025-10-21 19:17:45.398] [info] [Lua Thread 1] Notifications table ready
-[2025-10-21 19:17:45.398] [info] [Lua Thread 1] Loaded 2 active notifications
-[2025-10-21 19:17:45.398] [info] Processing LoadUIDocument command: ui/notifications_badge.rml
-[2025-10-21 19:17:45.406] [warning] [RmlUi] Could not get value from data variable 'notification_ui_state[0].count'.
-[2025-10-21 19:17:45.407] [info] Stored document with ID: notifications_badge
-[2025-10-21 19:17:45.407] [warning] [RmlUi] Could not get value from data variable 'notification_ui_state[0].count'.
-[2025-10-21 19:17:45.409] [info] Loaded UI document: ui/notifications_badge.rml
-[2025-10-21 19:17:45.409] [info] [Lua Thread 2] Launcher started (thread_id: 2)
-[2025-10-21 19:17:45.409] [info] Processing LoadUIDocument command: ui/notifications_panel.rml
-[2025-10-21 19:17:45.413] [warning] [RmlUi] Could not get value from data variable 'notifications.size'.
-[2025-10-21 19:17:45.413] [warning] [RmlUi] Could not get value from data variable 'notifications.size'.
-[2025-10-21 19:17:45.428] [info] Stored document with ID: notifications_panel
-[2025-10-21 19:17:45.429] [info] Loaded UI document: ui/notifications_panel.rml
-[2025-10-21 19:17:45.429] [info] Processing LoadUIDocument command: ui/launcher.rml
-[2025-10-21 19:17:45.441] [info] Stored document with ID: launcher
-[2025-10-21 19:17:45.445] [info] Loaded UI document: ui/launcher.rml
-[2025-10-21 19:17:45.445] [info] [Lua Thread 1] Notifications system ready
-[2025-10-21 19:17:45.445] [info] [Lua Thread 2] Launcher ready
-[2025-10-21 19:17:47.123] [info] Shutting down Vah Engine...
-[2025-10-21 19:17:47.123] [info] ThreadManager: Stopping all 3 threads
-[2025-10-21 19:17:47.125] [info] Lua thread 0 finished normally
-[2025-10-21 19:17:47.125] [info] EventDispatcher: Unregistered thread 0
-[2025-10-21 19:17:47.130] [info] Lua thread 2 finished normally
-[2025-10-21 19:17:47.131] [info] Lua thread 1 finished normally
-[2025-10-21 19:17:47.132] [info] EventDispatcher: Unregistered thread 1
-[2025-10-21 19:17:47.132] [info] EventDispatcher: Unregistered thread 2
+you should review the data binding c++ implementation if you need to write rml using data. this ensures that you are operating with the latest api as it's not completely solidified yet.
+
+## current task
+
+this task fits within your context, there's no need to use subagents.
+

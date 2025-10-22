@@ -1,7 +1,7 @@
 <rml>
 <head>
     <title>Notifications Panel</title>
-    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="notifications_panel.rcss"/>
 </head>
 <body>

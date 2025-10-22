@@ -337,8 +337,8 @@ function startup()
     -- Load both UI documents
     -- Badge is shown by default, panel is hidden
     -- Data models are prioritized in command queue, so they'll be processed first
-    ui.load_document("ui/notifications_badge.rml", true, BADGE_DOC_ID)
-    ui.load_document("ui/notifications_panel.rml", false, PANEL_DOC_ID)
+    ui.load_document("ui/internal/notifications_badge.rml", true, BADGE_DOC_ID)
+    ui.load_document("ui/internal/notifications_panel.rml", false, PANEL_DOC_ID)
 
     print("Notifications system ready")
 end
