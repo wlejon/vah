@@ -77,6 +77,13 @@
                 <div class="app-name">Data Stream</div>
                 <p class="app-description">Streaming data visualization</p>
             </div>
+
+            <!-- Code Flow Viewer -->
+            <div class="app-card" onclick="launch_app('code_flow_viewer')">
+                <div class="app-icon">[V]</div>
+                <div class="app-name">Code Flow Viewer</div>
+                <p class="app-description">Visualize code flow through C++ and Lua layers</p>
+            </div>
         </div>
 
         <div class="footer">

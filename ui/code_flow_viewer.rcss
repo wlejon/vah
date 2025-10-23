@@ -1,0 +1,187 @@
+body {
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    font-family: Roboto;
+}
+
+.header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 120dp;
+    background-color: #252525;
+    padding: 20dp;
+    box-sizing: border-box;
+}
+
+.header h1 {
+    margin: 0 0 10dp 0;
+    font-size: 24dp;
+    color: #ffffff;
+}
+
+.controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15dp;
+}
+
+.viz-selector {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10dp;
+}
+
+.viz-selector label {
+    color: #cccccc;
+    font-size: 13dp;
+}
+
+select {
+    width: 300dp;
+    height: 32dp;
+    background-color: #333;
+    color: #ffffff;
+    font-size: 13dp;
+    padding: 5dp;
+    border-width: 1dp;
+    border-color: #555;
+    border-radius: 4dp;
+}
+
+select selectvalue {
+    width: auto;
+    margin-right: 30dp;
+    padding: 5dp;
+    height: 22dp;
+}
+
+select selectarrow {
+    width: 20dp;
+    height: 32dp;
+}
+
+select selectbox {
+    background-color: #2a2a2a;
+    border-width: 1dp;
+    border-color: #555;
+    margin-top: 2dp;
+    padding: 4dp;
+    max-height: 200dp;
+}
+
+select selectbox option {
+    width: auto;
+    padding: 6dp 8dp;
+    color: #ffffff;
+}
+
+select selectbox option:hover {
+    background-color: #4a4a4a;
+}
+
+select selectbox option:checked {
+    background-color: #555;
+}
+
+.canvas-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 120dp;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background-color: #1a1a1a;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    focus: auto;
+}
+
+.instructions {
+    position: absolute;
+    bottom: 20dp;
+    right: 20dp;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 15dp;
+    border-radius: 6dp;
+    color: #cccccc;
+    font-size: 12dp;
+    max-width: 300dp;
+}
+
+.instructions h3 {
+    margin: 0 0 8dp 0;
+    font-size: 14dp;
+    color: #ffffff;
+}
+
+.instructions p {
+    margin: 4dp 0;
+}
+
+.info-panel {
+    position: absolute;
+    top: 140dp;
+    right: 20dp;
+    width: 400dp;
+    max-height: 600dp;
+    background-color: rgba(30, 30, 40, 0.95);
+    border-width: 2dp;
+    border-color: #555;
+    border-radius: 8dp;
+    padding: 20dp;
+    overflow-y: auto;
+}
+
+.info-panel h2 {
+    margin: 0 0 10dp 0;
+    font-size: 18dp;
+    color: #ffffff;
+    padding-bottom: 8dp;
+}
+
+.info-panel .field {
+    margin: 12dp 0;
+}
+
+.info-panel .field-label {
+    color: #aaaaaa;
+    font-size: 11dp;
+    text-transform: uppercase;
+    letter-spacing: 0.5dp;
+    margin-bottom: 4dp;
+}
+
+.info-panel .field-value {
+    color: #e0e0e0;
+    font-size: 13dp;
+    line-height: 1.5;
+}
+
+.info-panel .field-value.code {
+    font-family: JetBrains Mono;
+    color: #88ccff;
+    font-size: 12dp;
+}
+
+.info-panel .connections {
+    margin-top: 12dp;
+}
+
+.info-panel .connection-item {
+    padding: 6dp;
+    background-color: rgba(60, 60, 80, 0.5);
+    margin: 4dp 0;
+    border-radius: 4dp;
+    font-size: 12dp;
+    color: #cccccc;
+}

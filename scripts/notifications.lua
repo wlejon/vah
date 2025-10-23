@@ -78,13 +78,6 @@ function load_notifications()
     end
 
     notifications = results or {}
-    print(string.format("Loaded %d active notifications (current_time: %d)", #notifications, current_time))
-
-    -- Debug: print each notification
-    for i, notif in ipairs(notifications) do
-        print(string.format("  [%d] %s (type=%s, ttl=%.1f, timestamp=%d, expires=%d)",
-            notif.id, notif.title, notif.type, notif.ttl, notif.timestamp, notif.timestamp + notif.ttl))
-    end
 
     -- Bind data to the model (triggers UI update)
     data.bind("notifications", notifications)

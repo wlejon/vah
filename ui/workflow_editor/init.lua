@@ -201,6 +201,9 @@ local function handle_workflow_key(key, key_down)
     -- No sync needed - input handlers trigger events to server
 end
 
+-- Expose editor instance globally for custom integrations (must be done in render function)
+_G.get_workflow_editor = function() return editor end
+
 -- Export public API
 return {
     -- Render and input handlers (for RML)

@@ -55,6 +55,11 @@ local apps = {
         name = "Data Stream",
         script = "scripts/data_stream.lua",
         document_id = "data_stream"
+    },
+    code_flow_viewer = {
+        name = "Code Flow Viewer",
+        script = "scripts/code_flow_viewer.lua",
+        document_id = "code_flow_viewer"
     }
 }
 

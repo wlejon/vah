@@ -1,0 +1,131 @@
+<rml>
+<head>
+    <title>Code Flow Viewer</title>
+    <link type="text/rcss" href="workflow_app.rcss"/>
+    <link type="text/rcss" href="code_flow_viewer.rcss" />
+    <script>
+    -- This script runs in the RmlUI Lua state on the MAIN THREAD
+    -- workflow_editor.lua sets globals: render_workflow, handle_workflow_*
+    require "workflow_editor"
+
+    function handle_viz_change(element)
+        -- element might be nil in some cases, handle gracefully
+        if not element then return end
+
+        -- Don't trigger if document doesn't have an ID yet (during initial load)
+        if not document or not document.id or document.id == '' then
+            return
+        end
+
+        local selected_value = element:GetAttribute('value')
+        if selected_value and selected_value ~= '' then
+            trigger('select_visualization', {id = selected_value})
+        end
+    end
+
+    -- Override workflow editor click handler to also send node selection events
+    local original_handle_workflow_click = handle_workflow_click
+    function handle_workflow_click(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
+        -- Call original handler
+        original_handle_workflow_click(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
+
+        -- After selection is made (on button up), notify Lua thread
+        if button == 0 and not button_down then
+            -- Access the workflow editor instance
+            local get_editor = _G.get_workflow_editor
+            if get_editor then
+                local editor = get_editor()
+                if editor and editor.selected_node then
+                    trigger('node_selected', {node_id = editor.selected_node})
+                else
+                    -- Node was deselected
+                    trigger('node_deselected', {})
+                end
+            end
+        end
+    end
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div class="controls">
+            <div class="viz-selector" data-model="visualizations">
+                <label>Select Visualization:</label>
+                <select id="viz_select" onchange="handle_viz_change(event.current_element)">
+                    <option data-for="viz : visualizations" data-attr-value="viz.id">
+                        {{viz.name}}
+                    </option>
+                </select>
+            </div>
+        </div>
+        <div data-model="active_visualization" data-for="info : active_visualization">
+            <h1>{{info.name}}</h1>
+            <p style="color: #aaaaaa; font-size: 13dp; margin-top: 5dp;">{{info.description}}</p>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas
+            id="workflow_canvas"
+            renderfunction="render_workflow"
+            keyhandler="handle_workflow_key"
+            mouseclickhandler="handle_workflow_click"
+            mousemovehandler="handle_workflow_move"
+            mousescrollhandler="handle_workflow_scroll"
+        />
+    </div>
+
+    <div class="instructions">
+        <h3>Controls</h3>
+        <p><strong>Mouse Wheel:</strong> Zoom in/out</p>
+        <p><strong>Middle Click + Drag:</strong> Pan canvas</p>
+        <p><strong>Left Click:</strong> Select node</p>
+        <p><strong>R Key:</strong> Reset view</p>
+        <p>Click nodes to see detailed information.</p>
+    </div>
+
+    <div class="info-panel" data-model="selected_node_info" data-if="selected_node_info.size > 0">
+        <div data-for="info : selected_node_info">
+            <h2>{{info.name}}</h2>
+
+            <div class="field">
+                <div class="field-label">Type</div>
+                <div class="field-value">{{info.type}}</div>
+            </div>
+
+            <div class="field" data-if="info.file != ''">
+                <div class="field-label">File Location</div>
+                <div class="field-value code">{{info.file}}</div>
+            </div>
+
+            <div class="field">
+                <div class="field-label">Description</div>
+                <div class="field-value">{{info.description}}</div>
+            </div>
+
+            <div class="field" data-if="info.details != ''">
+                <div class="field-label">Details</div>
+                <div class="field-value">{{info.details}}</div>
+            </div>
+
+            <div class="field" data-if="info.connections_to_count > 0">
+                <div class="field-label">Connects To</div>
+                <div class="connections">
+                    <div class="connection-item" data-for="conn : info.connections_to">
+                        → {{conn}}
+                    </div>
+                </div>
+            </div>
+
+            <div class="field" data-if="info.connections_from_count > 0">
+                <div class="field-label">Receives From</div>
+                <div class="connections">
+                    <div class="connection-item" data-for="conn : info.connections_from">
+                        ← {{conn}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
