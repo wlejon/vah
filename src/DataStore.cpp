@@ -33,3 +33,32 @@ void DataStore::RemoveModel(const std::string& name) {
         LOG_DEBUG("DataStore: Removed model '{}'", name);
     }
 }
+
+void DataStore::SetObject(const std::string& name, DynamicRow&& data) {
+    // Create a new shared_ptr with the data
+    auto new_data = std::make_shared<DynamicRow>(std::move(data));
+    objects_[name] = new_data;
+}
+
+std::shared_ptr<const DynamicRow> DataStore::GetObject(const std::string& name) const {
+    auto it = objects_.find(name);
+    if (it != objects_.end()) {
+        return it->second;
+    }
+    LOG_WARN("DataStore: Object '{}' not found, returning empty object", name);
+    // Return empty object wrapped in shared_ptr
+    static auto empty = std::make_shared<DynamicRow>();
+    return empty;
+}
+
+bool DataStore::HasObject(const std::string& name) const {
+    return objects_.find(name) != objects_.end();
+}
+
+void DataStore::RemoveObject(const std::string& name) {
+    auto it = objects_.find(name);
+    if (it != objects_.end()) {
+        objects_.erase(it);
+        LOG_DEBUG("DataStore: Removed object '{}'", name);
+    }
+}

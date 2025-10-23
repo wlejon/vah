@@ -43,7 +43,7 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
                         local new_node = node_module.create(editor, node_types, create_world_x, create_world_y, i)
                         if new_node then
                             -- Trigger node created event
-                            trigger('workflow_node_created', {
+                            emit('workflow_node_created', {
                                 node_id = new_node.id,
                                 type_index = new_node.type_index,
                                 x = new_node.x,
@@ -106,7 +106,7 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
                 end
 
                 -- Trigger server event to persist to database
-                trigger('workflow_node_moved', {
+                emit('workflow_node_moved', {
                     node_id = editor.dragging_node.id,
                     x = editor.dragging_node.x,
                     y = editor.dragging_node.y
@@ -134,7 +134,7 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
                             local success = connection.add(editor, from_node, from_port, to_node, to_port)
                             if success then
                                 -- Trigger connection added event
-                                trigger('workflow_connection_added', {
+                                emit('workflow_connection_added', {
                                     from_node = from_node,
                                     from_port = from_port,
                                     to_node = to_node,
@@ -279,7 +279,7 @@ function M.handle_key(editor, node_types, key, key_down)
             editor.selected_node = nil
 
             -- Trigger node deleted event
-            trigger('workflow_node_deleted', {node_id = deleted_node_id})
+            emit('workflow_node_deleted', {node_id = deleted_node_id})
         end
     end
 
@@ -314,7 +314,7 @@ function M.handle_key(editor, node_types, key, key_down)
         if new_node then
             editor.selected_node = new_node.id
             -- Trigger node created event
-            trigger('workflow_node_created', {
+            emit('workflow_node_created', {
                 node_id = new_node.id,
                 type_index = new_node.type_index,
                 x = new_node.x,

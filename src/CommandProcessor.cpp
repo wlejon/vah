@@ -107,6 +107,9 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
             data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));
         }
+        else if constexpr (std::is_same_v<T, Commands::UpdateDataObject>) {
+            data_model_manager_->UpdateObject(command.object_name, std::move(const_cast<DynamicRow&>(command.data)));
+        }
         else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
             document_manager_->ReloadDocument(command.document_id);
         }

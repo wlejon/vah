@@ -65,3 +65,7 @@ you should review the data binding c++ implementation if you need to write rml u
 this task fits within your context, there's no need to use subagents.
 
 let's build a whole app navigation system that is a core system, mirroring how the notification system works. design it like a file menu and for now have it be file -> close that closes the main application. file -> home should take me back to the launcher from an app.
+
+in order to build this, we need to fix our "trigger" system. it's currently doing some hacky lookups and we've even modified rmlui's library to support this. 
+
+please review the system, the databinding methods, the data store, the data model, and the lua bindings. please understand carefully what we're doing and explain it to me. i'll want to talk about changing this systems architecture in a very complex way so please demonstrate your understanding well.

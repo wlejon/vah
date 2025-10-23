@@ -68,3 +68,41 @@ private:
     // Helper: Refresh cache from DataStore
     void RefreshCache();
 };
+
+// Custom VariableDefinition for single objects (not tables)
+// This allows binding a single object like {field1 = val1, field2 = val2}
+// instead of an array of objects
+class DynamicObjectDef : public Rml::VariableDefinition {
+public:
+    DynamicObjectDef(DataStore* store, const std::string& model_name);
+    ~DynamicObjectDef() override;
+
+    // Get the value at ptr as a Variant
+    bool Get(void* ptr, Rml::Variant& variant) override;
+
+    // Get the size of the object (number of fields)
+    int Size(void* ptr) override;
+
+    // Get a child element (for field access)
+    Rml::DataVariable Child(void* ptr, const Rml::DataAddressEntry& address) override;
+
+    // Invalidate cache (force refresh on next access)
+    void InvalidateCache();
+
+private:
+    DataStore* store_;
+    std::string model_name_;
+
+    // Cached data snapshot for consistency during rendering
+    // For objects, we store a single row (the object's fields)
+    std::shared_ptr<const DynamicRow> cached_data_;
+
+    // Helper: Get the value at a specific field
+    const DynamicValue* GetField(const std::string& field_name);
+
+    // Helper: Convert DynamicValue to Rml::Variant
+    bool ConvertToVariant(const DynamicValue& value, Rml::Variant& variant);
+
+    // Helper: Refresh cache from DataStore
+    void RefreshCache();
+};

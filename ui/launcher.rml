@@ -5,7 +5,7 @@
     <link type="text/rcss" href="launcher.rcss" />
     <script>
         function launch_app(app_id)
-            trigger('launch_app', {app_id = app_id})
+            emit('launch_app', {app_id = app_id})
         end
     </script>
 </head>

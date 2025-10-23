@@ -9,24 +9,24 @@
         <div class="menu-bar">
             <!-- File Menu -->
             <div class="menu-item">
-                <div class="menu-label" data-event-click="trigger('toggle_file_menu')">
+                <div class="menu-label" onclick="emit('toggle_file_menu')">
                     File
                 </div>
                 <!-- Dropdown (shown when file_menu_open is true) -->
-                <div data-if="menu_state[0].file_menu_open == 1" class="menu-dropdown">
-                    <div class="menu-dropdown-item" data-event-click="trigger('menu_file_home')">
+                <div data-if="menu_state.file_menu_open == 1" class="menu-dropdown">
+                    <div class="menu-dropdown-item" onclick="emit('menu_file_home')">
                         Home
                     </div>
-                    <div class="menu-dropdown-item" data-event-click="trigger('menu_file_close')">
+                    <div class="menu-dropdown-item" onclick="emit('menu_file_close')">
                         Close
                     </div>
                 </div>
             </div>
         </div>
         <!-- Invisible overlay to close menu when clicking outside -->
-        <div data-if="menu_state[0].file_menu_open == 1"
+        <div data-if="menu_state.file_menu_open == 1"
              class="menu-overlay"
-             data-event-click="trigger('close_file_menu')">
+             onclick="emit('close_file_menu')">
         </div>
     </div>
 </body>

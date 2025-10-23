@@ -55,11 +55,11 @@
     </style>
     <script>
         function testEvent()
-            trigger('test_event', {message = 'Hello from UI!', count = 42})
+            emit('test_event', {message = 'Hello from UI!', count = 42})
         end
 
         function spawnThread()
-            trigger('spawn_test_thread')
+            emit('spawn_test_thread')
         end
     </script>
 </head>

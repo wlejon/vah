@@ -120,6 +120,21 @@ namespace {
         return result;
     }
 
+    // Helper to convert Lua table (single object) to DynamicRow
+    DynamicRow TableToDynamicRow(const sol::table& table) {
+        DynamicRow row;
+
+        // Iterate through all key-value pairs
+        for (const auto& [key, value] : table) {
+            if (key.is<std::string>()) {
+                std::string key_str = key.as<std::string>();
+                row[key_str] = ObjectToDynamicValue(value);
+            }
+        }
+
+        return row;
+    }
+
     // Helper to convert Lua table to PayloadMap (for configs, params, etc.)
     PayloadMap TableToPayloadMap(const sol::table& table) {
         PayloadMap result;
@@ -604,6 +619,17 @@ void LuaThread::SetupLuaBindings() {
         // Send command to main thread to update DataStore and dirty the model
         Commands::UpdateDataModel cmd;
         cmd.model_name = model_name;
+        cmd.data = std::move(dynamic_data);
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    data_table["bind_object"] = [this](const std::string& object_name, sol::table data) {
+        // Convert Lua table to DynamicRow (single object)
+        DynamicRow dynamic_data = TableToDynamicRow(data);
+
+        // Send command to main thread to update DataStore and dirty the object
+        Commands::UpdateDataObject cmd;
+        cmd.object_name = object_name;
         cmd.data = std::move(dynamic_data);
         command_queue_->enqueue(std::move(cmd));
     };

@@ -13,67 +13,6 @@ namespace {
     // Global reference to the data store for lua callbacks
     DataStore* g_data_store = nullptr;
 
-    // Lua callback for trigger function
-    int lua_trigger(lua_State* L) {
-        if (!g_bridge) {
-            return luaL_error(L, "RmlUiBridge not initialized");
-        }
-
-        // First argument: event name (required)
-        if (!lua_isstring(L, 1)) {
-            return luaL_error(L, "trigger() requires event name as first argument");
-        }
-        std::string event_name = lua_tostring(L, 1);
-
-        // Second argument: payload table (optional)
-        PayloadMap payload;
-        if (lua_istable(L, 2)) {
-            // Convert lua table to PayloadMap
-            lua_pushnil(L);  // First key
-            while (lua_next(L, 2) != 0) {
-                // Key at -2, value at -1
-                if (lua_isstring(L, -2)) {
-                    std::string key = lua_tostring(L, -2);
-
-                    if (lua_isboolean(L, -1)) {
-                        payload[key] = static_cast<bool>(lua_toboolean(L, -1));
-                    } else if (lua_isinteger(L, -1)) {
-                        payload[key] = static_cast<int>(lua_tointeger(L, -1));
-                    } else if (lua_isnumber(L, -1)) {
-                        payload[key] = lua_tonumber(L, -1);
-                    } else if (lua_isstring(L, -1)) {
-                        payload[key] = std::string(lua_tostring(L, -1));
-                    }
-                }
-                lua_pop(L, 1);  // Remove value, keep key for next iteration
-            }
-        }
-
-        // Get the document from Lua registry (set by RmlUI's LuaEventListener)
-        lua_getfield(L, LUA_REGISTRYINDEX, "_owner_document");
-        if (!lua_isuserdata(L, -1)) {
-            lua_pop(L, 1);
-            return luaL_error(L, "trigger() - no document context available (not called from event handler?)");
-        }
-
-        Rml::ElementDocument* doc = Rml::Lua::LuaType<Rml::ElementDocument>::check(L, -1);
-        lua_pop(L, 1);
-
-        if (!doc) {
-            return luaL_error(L, "trigger() - failed to get document from registry");
-        }
-
-        std::string document_id = doc->GetId().c_str();
-        if (document_id.empty()) {
-            return luaL_error(L, "trigger() - document has no ID (document ID is required for event routing)");
-        }
-
-        // Trigger the event with the actual document that fired the event
-        g_bridge->TriggerEvent(event_name, payload, document_id);
-
-        return 0;  // No return values
-    }
-
     // Lua callback for data.update_row() function
     // Updates an entire row in the DataStore immediately (main thread only)
     int lua_data_update_row(lua_State* L) {
@@ -245,6 +184,67 @@ namespace {
         return 0;
     }
 
+    // Lua callback for emit() - clean event emission without context recovery
+    int lua_emit(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // First argument: event name (required)
+        if (!lua_isstring(L, 1)) {
+            return luaL_error(L, "emit() requires event name as first argument");
+        }
+        std::string event_name = lua_tostring(L, 1);
+
+        // Second argument: payload table (optional)
+        PayloadMap payload;
+        if (lua_gettop(L) >= 2 && lua_istable(L, 2)) {
+            // Convert lua table to PayloadMap
+            lua_pushnil(L);  // First key
+            while (lua_next(L, 2) != 0) {
+                // Key at -2, value at -1
+                if (lua_isstring(L, -2)) {
+                    std::string key = lua_tostring(L, -2);
+
+                    if (lua_isboolean(L, -1)) {
+                        payload[key] = static_cast<bool>(lua_toboolean(L, -1));
+                    } else if (lua_isinteger(L, -1)) {
+                        payload[key] = static_cast<int64_t>(lua_tointeger(L, -1));
+                    } else if (lua_isnumber(L, -1)) {
+                        payload[key] = lua_tonumber(L, -1);
+                    } else if (lua_isstring(L, -1)) {
+                        payload[key] = std::string(lua_tostring(L, -1));
+                    }
+                }
+                lua_pop(L, 1);  // Remove value, keep key for next iteration
+            }
+        }
+
+        // Get the document from Lua registry (set by RmlUI's event system)
+        lua_getfield(L, LUA_REGISTRYINDEX, "_owner_document");
+        if (!lua_isuserdata(L, -1)) {
+            lua_pop(L, 1);
+            return luaL_error(L, "emit() - no document context available (not called from event handler?)");
+        }
+
+        Rml::ElementDocument* doc = Rml::Lua::LuaType<Rml::ElementDocument>::check(L, -1);
+        lua_pop(L, 1);
+
+        if (!doc) {
+            return luaL_error(L, "emit() - failed to get document from registry");
+        }
+
+        std::string document_id = doc->GetId().c_str();
+        if (document_id.empty()) {
+            return luaL_error(L, "emit() - document has no ID (document ID is required for event routing)");
+        }
+
+        // Route event to owner thread via EventDispatcher
+        g_bridge->TriggerEvent(event_name, payload, document_id);
+
+        return 0;  // No return values
+    }
+
 }
 
 RmlUiBridge::RmlUiBridge(EventDispatcher* event_dispatcher)
@@ -261,9 +261,9 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     data_store_ = data_store;
     g_data_store = data_store;
 
-    // Register the trigger function globally in RmlUI's lua state
-    lua_pushcfunction(L, lua_trigger);
-    lua_setglobal(L, "trigger");
+    // Register the emit() function (clean event system)
+    lua_pushcfunction(L, lua_emit);
+    lua_setglobal(L, "emit");
 
     // Create data table with get() and update_row() functions
     lua_newtable(L);
@@ -285,7 +285,7 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     // Register DOM introspection API
     DomIntrospection::RegisterLuaBindings(L);
 
-    LOG_INFO("RmlUiBridge: Registered trigger(), data, and DOM introspection functions in RmlUI lua state");
+    LOG_INFO("RmlUiBridge: Registered emit(), data, and DOM introspection functions in RmlUI lua state");
 }
 
 void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& payload, const std::string& document_id) {

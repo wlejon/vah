@@ -13,7 +13,7 @@
                     <span class="notification-count">{{notifications.size}} active</span>
                     <button class="btn-clear-all"
                             data-if="notifications.size > 0"
-                            onclick="trigger('dismiss_all_notifications')">
+                            onclick="emit('dismiss_all_notifications')">
                         Dismiss All
                     </button>
                 </div>
@@ -23,7 +23,7 @@
                 <div data-if="notifications.size == 0">
                     <div class="empty-state">
                         <p>No notifications</p>
-                        <button class="btn-test" onclick="trigger('add_test_notifications')">
+                        <button class="btn-test" onclick="emit('add_test_notifications')">
                             Add Test Notifications
                         </button>
                     </div>
@@ -32,9 +32,7 @@
                 <!-- Notification list -->
                 <div data-if="notifications.size > 0" class="notification-list">
                     <div data-for="notif, i : notifications">
-                        <div data-attr-class="'notification notification-' + notif.type + (notif.read == 1 ? ' notification-read' : '')"
-                             data-model="notifications"
-                             data-attr-data-row-index="i">
+                        <div data-attr-class="'notification notification-' + notif.type + (notif.read == 1 ? ' notification-read' : '')">
 
                             <!-- Type indicator -->
                             <div data-attr-class="'notification-type-indicator type-' + notif.type"></div>
@@ -56,20 +54,20 @@
                                 <!-- Custom action if available -->
                                 <button data-if="notif.action_label != ''"
                                         class="btn-action"
-                                        data-event-click="trigger('notification_action', notif.action_event)">
+                                        onclick="emit('notification_action', {action_event = notif.action_event, notification_id = notif.id})">
                                     {{notif.action_label}}
                                 </button>
 
                                 <!-- Mark as read (only if unread) -->
                                 <button data-if="notif.read == 0"
                                         class="btn-mark-read"
-                                        data-event-click="trigger('mark_notification_read')">
+                                        onclick="emit('mark_notification_read', {notification_id = notif.id})">
                                     Mark Read
                                 </button>
 
                                 <!-- Dismiss -->
                                 <button class="btn-dismiss"
-                                        data-event-click="trigger('dismiss_notification')">
+                                        onclick="emit('dismiss_notification', {notification_id = notif.id})">
                                     Dismiss
                                 </button>
                             </div>
@@ -80,7 +78,7 @@
 
             <!-- Footer -->
             <div class="notifications-footer">
-                <button onclick="trigger('hide_notifications')">Close</button>
+                <button onclick="emit('hide_notifications')">Close</button>
             </div>
         </div>
     </div>

@@ -3,6 +3,29 @@
     <title>SQLite Database Demo</title>
     <link type="text/rcss" href="reset.rcss"/>
     <link type="text/rcss" href="sqlite_demo.rcss"/>
+    <script>
+        function save_contact(document, event)
+            local button = event.current_element
+            local cid = button:GetAttribute('data-cid')
+            local name = document:GetElementById('name_' .. cid):GetAttribute('value')
+            local email = document:GetElementById('email_' .. cid):GetAttribute('value')
+            local phone = document:GetElementById('phone_' .. cid):GetAttribute('value')
+            local company = document:GetElementById('company_' .. cid):GetAttribute('value')
+            emit('save_contact', {
+                id = tonumber(cid),
+                name = name,
+                email = email,
+                phone = phone,
+                company = company
+            })
+        end
+
+        function delete_contact(document, event)
+            local button = event.current_element
+            local cid = button:GetAttribute('data-cid')
+            emit('delete_contact', {id = tonumber(cid)})
+        end
+    </script>
 </head>
 <body>
     <div class="container">
@@ -16,7 +39,7 @@
                 Total: {{contacts.size}} contacts
             </div>
             <div class="toolbar-right">
-                <button onclick="trigger('add_contact', {})">Add Random Contact</button>
+                <button onclick="emit('add_contact')">Add Random Contact</button>
             </div>
         </div>
 
@@ -36,34 +59,30 @@
 
                 <!-- Table rows using data-for -->
                 <div data-for="contact, i : contacts">
-                    <div class="table-row" data-attr-id="'row_' + contact.id" data-model="contacts" data-attr-data-row-index="i">
+                    <div class="table-row" data-attr-id="'row_' + contact.id" data-attr-data-contact-id="contact.id">
                         <div class="col-name">
                             <input type="text"
-                                   data-attr-value="contact.name"
-                                   data-attr-track="true"
-                                   data-attr-field="'name'" />
+                                   data-attr-id="'name_' + contact.id"
+                                   data-attr-value="contact.name" />
                         </div>
                         <div class="col-email">
                             <input type="text"
-                                   data-attr-value="contact.email"
-                                   data-attr-track="true"
-                                   data-attr-field="'email'" />
+                                   data-attr-id="'email_' + contact.id"
+                                   data-attr-value="contact.email" />
                         </div>
                         <div class="col-phone">
                             <input type="text"
-                                   data-attr-value="contact.phone"
-                                   data-attr-track="true"
-                                   data-attr-field="'phone'" />
+                                   data-attr-id="'phone_' + contact.id"
+                                   data-attr-value="contact.phone" />
                         </div>
                         <div class="col-company">
                             <input type="text"
-                                   data-attr-value="contact.company"
-                                   data-attr-track="true"
-                                   data-attr-field="'company'" />
+                                   data-attr-id="'company_' + contact.id"
+                                   data-attr-value="contact.company" />
                         </div>
                         <div class="col-actions">
-                            <button class="btn-save" data-event-click="trigger('save_contact')">Save</button>
-                            <button class="btn-delete" data-event-click="trigger('delete_contact')">Delete</button>
+                            <button class="btn-save" data-attr-data-cid="contact.id" onclick="save_contact(document, event)">Save</button>
+                            <button class="btn-delete" data-attr-data-cid="contact.id" onclick="delete_contact(document, event)">Delete</button>
                         </div>
                     </div>
                 </div>

@@ -127,7 +127,7 @@
 
         <div class="file-list" data-model="files">
             <div data-for="file, i : files">
-                <div class="file-item" data-event-click="trigger('navigate')" data-attr-data-row-index="i">
+                <div class="file-item" onclick="emit('navigate', {path = file.path, is_directory = file.is_directory})">
                     <span class="file-icon">{{file.icon}}</span>
                     <span class="file-name">{{file.name}}</span>
                     <span class="file-size">{{file.size}}</span>

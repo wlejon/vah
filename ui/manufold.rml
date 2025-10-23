@@ -9,7 +9,7 @@
             if input then
                 local value = input:GetAttribute('value')
                 if value and value ~= '' then
-                    trigger('send_message', {message = value})
+                    emit('send_message', {message = value})
                     input:SetAttribute('value', '')
                 end
             end
@@ -20,7 +20,7 @@
             if input then
                 local value = input:GetAttribute('value')
                 if value and value ~= '' then
-                    trigger('submit_feedback', {feedback = value})
+                    emit('submit_feedback', {feedback = value})
                     input:SetAttribute('value', '')
                 end
             end
@@ -87,7 +87,7 @@
                 </div>
 
                 <div data-if="m.can_proceed && !m.is_thinking" class="action-panel">
-                    <button onclick="trigger('start_exploration')">Start Exploration</button>
+                    <button onclick="emit('start_exploration')">Start Exploration</button>
                 </div>
 
                 <div data-if="m.is_thinking" class="thinking-indicator">
@@ -132,7 +132,7 @@
                     <textarea id="feedback_input" placeholder="Enter feedback or corrections..."></textarea>
                     <div class="button-group">
                         <button onclick="submit_feedback(document)">Submit Feedback</button>
-                        <button class="primary" onclick="trigger('approve_understanding')">Approve Understanding</button>
+                        <button class="primary" onclick="emit('approve_understanding')">Approve Understanding</button>
                     </div>
                 </div>
 
@@ -158,8 +158,8 @@
                 </div>
 
                 <div data-if="m.has_schema && !m.schema_approved" class="action-panel">
-                    <button class="primary" onclick="trigger('approve_schema')">Approve Schema</button>
-                    <button onclick="trigger('send_message', {message = 'Please revise the schema'})">Request Changes</button>
+                    <button class="primary" onclick="emit('approve_schema')">Approve Schema</button>
+                    <button onclick="emit('send_message', {message = 'Please revise the schema'})">Request Changes</button>
                 </div>
 
                 <!-- Conversation -->
@@ -194,7 +194,7 @@
                 </div>
 
                 <div data-if="m.has_scripts && m.import_progress == 0" class="action-panel">
-                    <button class="primary" onclick="trigger('start_import')">Start Import</button>
+                    <button class="primary" onclick="emit('start_import')">Start Import</button>
                 </div>
             </div>
 
@@ -221,13 +221,13 @@
 
                 <div class="action-panel">
                     <button class="primary">Open Environment</button>
-                    <button onclick="trigger('reset_session')">Create Another</button>
+                    <button onclick="emit('reset_session')">Create Another</button>
                 </div>
             </div>
 
             <!-- Global actions -->
             <div class="global-actions">
-                <button class="secondary" onclick="trigger('reset_session')">Reset Session</button>
+                <button class="secondary" onclick="emit('reset_session')">Reset Session</button>
             </div>
 
         </div>

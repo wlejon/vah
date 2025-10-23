@@ -19,7 +19,7 @@
 
         local selected_value = element:GetAttribute('value')
         if selected_value and selected_value ~= '' then
-            trigger('select_visualization', {id = selected_value})
+            emit('select_visualization', {id = selected_value})
         end
     end
 
@@ -36,10 +36,10 @@
             if get_editor then
                 local editor = get_editor()
                 if editor and editor.selected_node then
-                    trigger('node_selected', {node_id = editor.selected_node})
+                    emit('node_selected', {node_id = editor.selected_node})
                 else
                     -- Node was deselected
-                    trigger('node_deselected', {})
+                    emit('node_deselected', {})
                 end
             end
         end

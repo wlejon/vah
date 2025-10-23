@@ -88,11 +88,11 @@ end
 
 -- Update UI state data model
 function update_ui_state()
-    -- Bind as a single-element array so we can access fields directly
-    data.bind("notification_ui_state", {{
+    -- Bind as a single object (not an array)
+    data.bind_object("notification_ui_state", {
         expanded = ui_state.expanded and 1 or 0,
         count = #notifications
-    }})
+    })
 end
 
 -- Helper to escape SQL strings

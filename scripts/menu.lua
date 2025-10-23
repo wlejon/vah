@@ -11,10 +11,10 @@ local MENU_DOC_ID = "app_menu"
 
 -- Update menu state data model
 function update_menu_state()
-    -- Bind as a single-element array so we can access fields directly
-    data.bind("menu_state", {{
+    -- Bind as a single object (not an array)
+    data.bind_object("menu_state", {
         file_menu_open = menu_state.file_menu_open and 1 or 0
-    }})
+    })
 end
 
 -- Register local event handlers (UI interactions)
@@ -71,11 +71,11 @@ function startup()
     register_local_events()
     register_global_events()
 
+    -- Initialize menu state BEFORE loading UI
+    update_menu_state()
+
     -- Load menu UI
     ui.load_document("ui/internal/menu.rml", true, MENU_DOC_ID)
-
-    -- Initialize menu state
-    update_menu_state()
 
     print("Menu system started")
 end

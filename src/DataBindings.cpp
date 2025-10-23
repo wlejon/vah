@@ -307,3 +307,158 @@ void DynamicTableDef::InvalidateCache()
     // Clear the path arena as well since paths reference old data
     path_arena_.clear();
 }
+
+// ============================================================================
+// DynamicObjectDef Implementation
+// ============================================================================
+
+DynamicObjectDef::DynamicObjectDef(DataStore* store, const std::string& model_name)
+    : Rml::VariableDefinition(Rml::DataVariableType::Struct)
+    , store_(store)
+    , model_name_(model_name)
+{
+}
+
+DynamicObjectDef::~DynamicObjectDef()
+{
+}
+
+bool DynamicObjectDef::Get(void* ptr, Rml::Variant& variant)
+{
+    // Refresh cache if not already loaded
+    if (!cached_data_) {
+        RefreshCache();
+    }
+
+    // For the root object (ptr == nullptr), we can't convert it to a Variant
+    // RmlUi will access fields via Child()
+    if (ptr == nullptr) {
+        return false;
+    }
+
+    // ptr is actually a pointer to a field name string
+    const std::string* field_name = reinterpret_cast<const std::string*>(ptr);
+    const DynamicValue* value = GetField(*field_name);
+
+    if (!value) {
+        return false;
+    }
+
+    return ConvertToVariant(*value, variant);
+}
+
+int DynamicObjectDef::Size(void* ptr)
+{
+    // Refresh cache if not already loaded
+    if (!cached_data_) {
+        RefreshCache();
+    }
+
+    // Return the number of fields in the object
+    return cached_data_ ? static_cast<int>(cached_data_->size()) : 0;
+}
+
+Rml::DataVariable DynamicObjectDef::Child(void* ptr, const Rml::DataAddressEntry& address)
+{
+    // Refresh cache if not already loaded
+    if (!cached_data_) {
+        RefreshCache();
+    }
+
+    if (!cached_data_) {
+        return Rml::DataVariable();
+    }
+
+    // Root object access: obj.field -> get field value
+    if (ptr == nullptr) {
+        // Handle named field access (e.g., menu_state.file_menu_open)
+        if (!address.name.empty() && address.index == -1) {
+            std::string field_name(address.name.data(), address.name.size());
+
+            // Check if field exists
+            if (cached_data_->find(field_name) == cached_data_->end()) {
+                LOG_DEBUG("DynamicObjectDef: Field '{}' not found in object '{}'", field_name, model_name_);
+                return Rml::DataVariable();
+            }
+
+            // Return a pointer to the field name (we'll use this in Get())
+            // We need to allocate this string on the heap so it stays alive
+            // Store it in a static map to avoid memory leaks
+            static std::unordered_map<std::string, std::string> field_name_storage;
+            auto& stored_name = field_name_storage[field_name];
+            stored_name = field_name;
+
+            return Rml::DataVariable(this, reinterpret_cast<void*>(&stored_name));
+        }
+
+        // Handle special cases like .size
+        if (!address.name.empty() && address.name == "size") {
+            return Rml::MakeLiteralIntVariable(static_cast<int>(cached_data_->size()));
+        }
+    }
+
+    // We don't support nested objects for now (could be added later)
+    return Rml::DataVariable();
+}
+
+const DynamicValue* DynamicObjectDef::GetField(const std::string& field_name)
+{
+    if (!cached_data_) {
+        return nullptr;
+    }
+
+    auto it = cached_data_->find(field_name);
+    if (it == cached_data_->end()) {
+        return nullptr;
+    }
+
+    return &it->second;
+}
+
+bool DynamicObjectDef::ConvertToVariant(const DynamicValue& value, Rml::Variant& variant)
+{
+    return std::visit([&](auto&& val) -> bool {
+        using T = std::decay_t<decltype(val)>;
+
+        if constexpr (std::is_same_v<T, std::monostate>) {
+            variant = Rml::Variant();
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, bool>) {
+            variant = val;
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, int64_t>) {
+            variant = static_cast<int>(val);
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, double>) {
+            variant = static_cast<float>(val);
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, std::string>) {
+            variant = Rml::String(val.c_str());
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, std::shared_ptr<DynamicMap>>) {
+            // Nested objects can't be directly converted to variants
+            // They should be accessed via Child()
+            return false;
+        }
+        else {
+            return false;
+        }
+    }, value);
+}
+
+void DynamicObjectDef::RefreshCache()
+{
+    // Get the latest data snapshot from DataStore
+    cached_data_ = store_->GetObject(model_name_);
+}
+
+void DynamicObjectDef::InvalidateCache()
+{
+    // Clear the cached data snapshot
+    cached_data_.reset();
+}

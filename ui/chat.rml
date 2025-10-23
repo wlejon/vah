@@ -9,7 +9,7 @@
             if input then
                 local value = input:GetAttribute('value')
                 if value and value ~= '' then
-                    trigger('send_message', {text = value})
+                    emit('send_message', {text = value})
                     input:SetAttribute('value', '')
                 end
             end
@@ -35,7 +35,7 @@
     <div class="input-area">
         <input type="text" id="chat_input" />
         <button onclick="send_chat_message(document)">Send</button>
-        <button class="secondary" data-event-click="trigger('clear_chat')">Clear</button>
+        <button class="secondary" onclick="emit('clear_chat')">Clear</button>
     </div>
 </body>
 </rml>

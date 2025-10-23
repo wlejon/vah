@@ -37,7 +37,7 @@
                 </div>
                 <div class="button-group-header">
                     <button onclick="switch_to_workflow_list_view(document); trigger('reload_workflows')">Workflows</button>
-                    <button onclick="trigger('new_workflow')">New Workflow</button>
+                    <button onclick="emit('new_workflow')">New Workflow</button>
                     <button class="config-btn" onclick="switch_to_node_editor_view(document)">Configure Node Types</button>
                 </div>
             </div>
@@ -56,18 +56,18 @@
             <div class="header">
                 <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>My Workflows</h1>
-                <button onclick="trigger('new_workflow', {})">+ New Workflow</button>
+                <button onclick="emit('new_workflow', {})">+ New Workflow</button>
             </div>
 
             <div class="main-container">
                 <div class="workflows-list">
                     <div class="workflows-container" data-model="workflows" data-for="workflow,i : workflows">
-                        <div class="workflow-item" data-attr-data-row-index="i">
-                            <div class="workflow-item-content" data-event-click="trigger('select_workflow')" onclick="switch_to_workflow_view(document)">
+                        <div class="workflow-item">
+                            <div class="workflow-item-content" onclick="emit('select_workflow', {id = workflow.id}); switch_to_workflow_view(document)">
                                 <h3>{{ workflow.name }}</h3>
                                 <p class="workflow-meta">Updated: {{ workflow.updated_at }}</p>
                             </div>
-                            <button class="delete-btn" data-event-click="trigger('delete_workflow')">×</button>
+                            <button class="delete-btn" onclick="emit('delete_workflow', {id = workflow.id})">×</button>
                         </div>
                     </div>
                 </div>
@@ -79,7 +79,7 @@
             <div class="header">
                 <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>Node Type Editor</h1>
-                <button onclick="trigger('add_new_node_type', {})">+ New Node Type</button>
+                <button onclick="emit('add_new_node_type', {})">+ New Node Type</button>
             </div>
 
             <div class="main-container">
@@ -87,7 +87,7 @@
                 <div class="node-types-list">
                     <h2>Node Types</h2>
                     <div class="node-types-container" data-model="node_types" data-for="node_type,i : node_types">
-                        <div class="node-type-item" data-event-click="trigger('select_node_type')" data-attr-data-row-index="i">
+                        <div class="node-type-item" onclick="emit('select_node_type', {id = node_type.id})">
                             <div class="color-preview" data-attr-style-background-color="'rgba(' + node_type.color_r + ',' + node_type.color_g + ',' + node_type.color_b + ',' + node_type.color_a + ')'"></div>
                             <span class="node-type-name">{{ node_type.name }}</span>
                         </div>
@@ -96,12 +96,12 @@
 
                 <!-- Right side: Editor for selected node type -->
                 <div class="editor-panel" data-model="selected_node" data-if="selected_node.size > 0" data-for="node,i : selected_node">
-                    <div data-attr-data-row-index="i">
+                    <div>
                         <h2>Edit Node Type</h2>
 
                         <div class="form-section">
                             <label>Name:</label>
-                            <input type="text" name="node_name" data-attr-value="node.name" data-attr-track="true" data-attr-field="'name'" />
+                            <input type="text" name="node_name" data-attr-value="node.name" />
                         </div>
 
                         <div class="form-section">
@@ -109,19 +109,19 @@
                             <div class="color-inputs">
                                 <div class="color-input-group">
                                     <label>R:</label>
-                                    <input type="text" name="color_r" data-attr-value="node.color_r" data-attr-track="true" data-attr-field="'color_r'" size="3" maxlength="3"/>
+                                    <input type="text" name="color_r" data-attr-value="node.color_r" size="3" maxlength="3"/>
                                 </div>
                                 <div class="color-input-group">
                                     <label>G:</label>
-                                    <input type="text" name="color_g" data-attr-value="node.color_g" data-attr-track="true" data-attr-field="'color_g'" size="3" maxlength="3"/>
+                                    <input type="text" name="color_g" data-attr-value="node.color_g" size="3" maxlength="3"/>
                                 </div>
                                 <div class="color-input-group">
                                     <label>B:</label>
-                                    <input type="text" name="color_b" data-attr-value="node.color_b" data-attr-track="true" data-attr-field="'color_b'" size="3" maxlength="3"/>
+                                    <input type="text" name="color_b" data-attr-value="node.color_b" size="3" maxlength="3"/>
                                 </div>
                                 <div class="color-input-group">
                                     <label>A:</label>
-                                    <input type="text" name="color_a" data-attr-value="node.color_a" data-attr-track="true" data-attr-field="'color_a'" size="3" maxlength="3"/>
+                                    <input type="text" name="color_a" data-attr-value="node.color_a" size="3" maxlength="3"/>
                                 </div>
                             </div>
                             <div class="color-preview-large" data-attr-style-background-color="'rgba(' + node.color_r + ',' + node.color_g + ',' + node.color_b + ',' + node.color_a + ')'"></div>
@@ -130,12 +130,12 @@
                         <div class="form-section">
                             <div class="ports-header">
                                 <label>Input Ports:</label>
-                                <button onclick="trigger('add_input_port', {})">+ Add Input</button>
+                                <button onclick="emit('add_input_port', {})">+ Add Input</button>
                             </div>
                             <div class="ports-list" data-for="port,i : node.inputs">
                                 <div class="port-item">
-                                    <input type="text" data-attr-name="'input_port_' + i" data-attr-value="port" data-attr-track="true" data-attr-field="'input_port_' + i" />
-                                    <button class="delete-btn" onclick="trigger('delete_input_port', {index = i})">×</button>
+                                    <input type="text" data-attr-name="'input_port_' + i" data-attr-value="port" />
+                                    <button class="delete-btn" onclick="emit('delete_input_port', {index = i})">×</button>
                                 </div>
                             </div>
                         </div>
@@ -143,19 +143,19 @@
                         <div class="form-section">
                             <div class="ports-header">
                                 <label>Output Ports:</label>
-                                <button onclick="trigger('add_output_port', {})">+ Add Output</button>
+                                <button onclick="emit('add_output_port', {})">+ Add Output</button>
                             </div>
                             <div class="ports-list" data-for="port,i : node.outputs">
                                 <div class="port-item">
-                                    <input type="text" data-attr-name="'output_port_' + i" data-attr-value="port" data-attr-track="true" data-attr-field="'output_port_' + i" />
-                                    <button class="delete-btn" onclick="trigger('delete_output_port', {index = i})">×</button>
+                                    <input type="text" data-attr-name="'output_port_' + i" data-attr-value="port" />
+                                    <button class="delete-btn" onclick="emit('delete_output_port', {index = i})">×</button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="button-group">
-                            <button class="save-btn" data-event-click="trigger('save_node_type')">Save Changes</button>
-                            <button class="delete-btn" data-event-click="trigger('delete_node_type')">Delete Node Type</button>
+                            <button class="save-btn" onclick="emit('save_node_type')">Save Changes</button>
+                            <button class="delete-btn" onclick="emit('delete_node_type')">Delete Node Type</button>
                         </div>
                     </div>
                 </div>

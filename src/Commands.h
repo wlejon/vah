@@ -117,6 +117,11 @@ namespace Commands {
         DynamicTable data;
     };
 
+    struct UpdateDataObject {
+        std::string object_name;
+        DynamicRow data;
+    };
+
     struct TriggerTextEditorModified {
         std::string element_id;
         bool modified;
@@ -204,6 +209,7 @@ using Command = std::variant<
     Commands::SetTextEditorModified,
     Commands::SetTextEditorConfig,
     Commands::UpdateDataModel,
+    Commands::UpdateDataObject,
     Commands::TriggerTextEditorModified,
     Commands::FileChanged,
     Commands::AddFileWatch,

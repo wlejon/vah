@@ -45,7 +45,14 @@ public:
     bool HasModel(const std::string& name) const;
     void RemoveModel(const std::string& name);
 
+    // Object binding API (for single objects, not tables)
+    void SetObject(const std::string& name, DynamicRow&& data);
+    std::shared_ptr<const DynamicRow> GetObject(const std::string& name) const;
+    bool HasObject(const std::string& name) const;
+    void RemoveObject(const std::string& name);
+
 private:
     // shared_ptr used to keep data alive during render cycle
     std::unordered_map<std::string, std::shared_ptr<DynamicTable>> models_;
+    std::unordered_map<std::string, std::shared_ptr<DynamicRow>> objects_;
 };
