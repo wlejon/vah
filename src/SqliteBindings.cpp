@@ -56,7 +56,7 @@ public:
         return {true, ""};
     }
 
-    std::tuple<sol::object, std::string> Query(sol::this_state s, const std::string& sql) {
+    std::tuple<sol::object, std::string> Query(sol::this_state s, const std::string& sql, sol::variadic_args va) {
         sol::state_view lua(s);
 
         if (!db_) {
@@ -69,6 +69,43 @@ public:
         if (rc != SQLITE_OK) {
             std::string error = sqlite3_errmsg(db_);
             return {sol::nil, "SQL prepare error: " + error};
+        }
+
+        // Bind parameters if provided
+        int param_index = 1;
+        for (const auto& arg : va) {
+            sol::type arg_type = arg.get_type();
+
+            switch (arg_type) {
+                case sol::type::number: {
+                    // Try integer first, fall back to double
+                    if (arg.is<int64_t>()) {
+                        sqlite3_bind_int64(stmt, param_index, arg.as<int64_t>());
+                    } else {
+                        sqlite3_bind_double(stmt, param_index, arg.as<double>());
+                    }
+                    break;
+                }
+                case sol::type::string: {
+                    std::string str = arg.as<std::string>();
+                    sqlite3_bind_text(stmt, param_index, str.c_str(), -1, SQLITE_TRANSIENT);
+                    break;
+                }
+                case sol::type::boolean: {
+                    sqlite3_bind_int(stmt, param_index, arg.as<bool>() ? 1 : 0);
+                    break;
+                }
+                case sol::type::nil: {
+                    sqlite3_bind_null(stmt, param_index);
+                    break;
+                }
+                default: {
+                    sqlite3_finalize(stmt);
+                    return {sol::nil, "Unsupported parameter type at index " + std::to_string(param_index)};
+                }
+            }
+
+            param_index++;
         }
 
         // Get column info
@@ -121,7 +158,7 @@ public:
         return {results, ""};
     }
 
-    std::tuple<sol::object, std::string> QuerySingle(sol::this_state s, const std::string& sql) {
+    std::tuple<sol::object, std::string> QuerySingle(sol::this_state s, const std::string& sql, sol::variadic_args va) {
         sol::state_view lua(s);
 
         if (!db_) {
@@ -134,6 +171,42 @@ public:
         if (rc != SQLITE_OK) {
             std::string error = sqlite3_errmsg(db_);
             return {sol::nil, "SQL prepare error: " + error};
+        }
+
+        // Bind parameters if provided
+        int param_index = 1;
+        for (const auto& arg : va) {
+            sol::type arg_type = arg.get_type();
+
+            switch (arg_type) {
+                case sol::type::number: {
+                    if (arg.is<int64_t>()) {
+                        sqlite3_bind_int64(stmt, param_index, arg.as<int64_t>());
+                    } else {
+                        sqlite3_bind_double(stmt, param_index, arg.as<double>());
+                    }
+                    break;
+                }
+                case sol::type::string: {
+                    std::string str = arg.as<std::string>();
+                    sqlite3_bind_text(stmt, param_index, str.c_str(), -1, SQLITE_TRANSIENT);
+                    break;
+                }
+                case sol::type::boolean: {
+                    sqlite3_bind_int(stmt, param_index, arg.as<bool>() ? 1 : 0);
+                    break;
+                }
+                case sol::type::nil: {
+                    sqlite3_bind_null(stmt, param_index);
+                    break;
+                }
+                default: {
+                    sqlite3_finalize(stmt);
+                    return {sol::nil, "Unsupported parameter type at index " + std::to_string(param_index)};
+                }
+            }
+
+            param_index++;
         }
 
         // Get column info
