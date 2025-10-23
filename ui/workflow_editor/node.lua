@@ -34,12 +34,26 @@ function M.create(editor, node_types, x, y, node_type_index)
     return node
 end
 
--- Calculate node height based on port count
+-- Calculate node height based on port count and label lines
+-- Uses whichever is taller: port spacing or label text
 function M.get_height(editor, node)
     local port_count = math.max(#node.inputs, #node.outputs)
-    return editor.node_header_height +
-           (port_count * editor.node_port_height) +
-           editor.node_padding
+    local port_height = port_count * editor.node_port_height
+
+    -- Calculate label height if present
+    local label_height = 0
+    if node.label then
+        local line_count = 1
+        for _ in node.label:gmatch("\n") do
+            line_count = line_count + 1
+        end
+        label_height = line_count * 18 + editor.node_padding  -- 18px per line
+    end
+
+    -- Body height is whichever is taller (ports are on sides, label in center)
+    local body_height = math.max(port_height, label_height)
+
+    return editor.node_header_height + body_height + editor.node_padding
 end
 
 -- Get port position in world coordinates

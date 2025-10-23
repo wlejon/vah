@@ -175,6 +175,13 @@ INSERT INTO node_types (flow_id, name, type, color_r, color_g, color_b, color_a,
  'RENDER: Title, score, lines, level, controls, overlays',
  'NanoVG text rendering. Game over overlay: semi-transparent black + red text. Pause overlay: yellow text');
 
+-- Add ports for each node type (all node types get 1 input and 1 output for flow visualization)
+INSERT INTO ports (node_type_id, port_name, port_type, port_index)
+SELECT id, 'in', 'input', 0 FROM node_types WHERE flow_id = (SELECT id FROM flows WHERE app_name = 'tetris');
+
+INSERT INTO ports (node_type_id, port_name, port_type, port_index)
+SELECT id, 'out', 'output', 0 FROM node_types WHERE flow_id = (SELECT id FROM flows WHERE app_name = 'tetris');
+
 -- Create nodes with positions (using auto-layout)
 INSERT INTO nodes (flow_id, node_type_id, label, x, y) VALUES
 ((SELECT id FROM flows WHERE app_name = 'tetris'), 1, 'START:\ninit_game()', 100, 100),

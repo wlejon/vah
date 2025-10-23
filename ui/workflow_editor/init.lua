@@ -46,6 +46,7 @@ local function build_nodes_from_server()
                     y = node_data.y,
                     type_index = node_data.type_index,
                     name = node_type.name,
+                    label = node_data.label,  -- Include custom label from data
                     color = nvg.rgba(
                         node_type.color_r or 128,
                         node_type.color_g or 128,

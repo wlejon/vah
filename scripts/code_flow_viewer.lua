@@ -211,6 +211,19 @@ local function load_visualization(viz_id)
         return false
     end
 
+    -- Load ports for all node types
+    local ports_result, ports_error = database:query([[
+        SELECT node_type_id, port_name, port_type, port_index
+        FROM ports
+        WHERE node_type_id IN (SELECT id FROM node_types WHERE flow_id = ?)
+        ORDER BY node_type_id, port_type, port_index
+    ]], flow_id)
+
+    if ports_error ~= "" then
+        print("ERROR: Failed to load ports: " .. ports_error)
+        return false
+    end
+
     -- Load nodes
     local nodes_result, nodes_error = database:query([[
         SELECT n.id, n.node_type_id, n.label, n.x, n.y,
@@ -248,11 +261,30 @@ local function load_visualization(viz_id)
         connections = {}
     }
 
+    -- Organize ports by node_type_id
+    local ports_by_type = {}
+    for _, port in ipairs(ports_result or {}) do
+        if not ports_by_type[port.node_type_id] then
+            ports_by_type[port.node_type_id] = {inputs = {}, outputs = {}}
+        end
+
+        if port.port_type == "input" then
+            -- Insert at the correct index (port_index is 0-based)
+            ports_by_type[port.node_type_id].inputs[port.port_index + 1] = port.port_name
+        elseif port.port_type == "output" then
+            ports_by_type[port.node_type_id].outputs[port.port_index + 1] = port.port_name
+        end
+    end
+
     -- Build node types array (indexed by database id for lookup)
     local node_type_id_to_index = {}
     for _, nt in ipairs(node_types_result or {}) do
         local index = #workflow_data.node_types + 1
         node_type_id_to_index[nt.id] = index
+
+        -- Get ports for this node type from database
+        local ports = ports_by_type[nt.id] or {inputs = {}, outputs = {}}
+
         table.insert(workflow_data.node_types, {
             name = nt.name,
             type = nt.type,
@@ -263,8 +295,8 @@ local function load_visualization(viz_id)
             file = nt.file_location or "",
             description = nt.description or "",
             details = nt.details or "",
-            inputs = {},  -- These could be queried from a ports table if needed
-            outputs = {}
+            inputs = ports.inputs,
+            outputs = ports.outputs
         })
     end
 
@@ -332,12 +364,18 @@ local function load_visualization(viz_id)
             -- Get node type
             local node_type = node_types_data[node.type_index]
             if node_type then
+                -- Replace literal \n with actual newlines
+                local label = node.label
+                if label then
+                    label = label:gsub("\\n", "\n")
+                end
+
                 table.insert(nodes, {
                     id = node.id,
                     type_index = node.type_index,
                     x = node.x or 0,
                     y = node.y or 0,
-                    label = node.label  -- Custom label for visualization
+                    label = label  -- Custom label for visualization
                 })
             end
         end

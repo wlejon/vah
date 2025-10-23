@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS nodes (
     y REAL DEFAULT 0
 );
 
+-- Ports define inputs and outputs for node types
+CREATE TABLE IF NOT EXISTS ports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_type_id INTEGER NOT NULL REFERENCES node_types(id) ON DELETE CASCADE,
+    port_name TEXT NOT NULL,
+    port_type TEXT NOT NULL CHECK(port_type IN ('input', 'output')),
+    port_index INTEGER NOT NULL,  -- Order of the port (0-based)
+    UNIQUE(node_type_id, port_type, port_index)
+);
+
 -- Connections define the edges between nodes
 CREATE TABLE IF NOT EXISTS connections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +57,7 @@ CREATE TABLE IF NOT EXISTS connections (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_node_types_flow ON node_types(flow_id);
+CREATE INDEX IF NOT EXISTS idx_ports_node_type ON ports(node_type_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_flow ON nodes(flow_id);
 CREATE INDEX IF NOT EXISTS idx_connections_flow ON connections(flow_id);
 CREATE INDEX IF NOT EXISTS idx_connections_from ON connections(from_node_id);

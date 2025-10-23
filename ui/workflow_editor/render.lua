@@ -199,13 +199,28 @@ local function draw_single_node(nvg_ctx, editor, colors, node)
     nvg.strokeColor(nvg_ctx, border_color)
     nvg.stroke(nvg_ctx)
 
-    -- Node name
+    -- Node name in header
     nvg.fontSize(nvg_ctx, 14.0)
     nvg.fontFace(nvg_ctx, "roboto")
     nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_MIDDLE)
     nvg.fillColor(nvg_ctx, colors.text)
     nvg.text(nvg_ctx, node.x + editor.node_width / 2,
              node.y + editor.node_header_height / 2, node.name)
+
+    -- Render label in body section (centered between ports)
+    if node.label then
+        nvg.fontSize(nvg_ctx, 13.0)
+        nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_TOP)
+        nvg.fillColor(nvg_ctx, colors.text_dim)
+
+        -- Split label by newlines and render each line
+        local y_offset = node.y + editor.node_header_height + editor.node_padding
+        local line_height = 18
+        for line in (node.label .. "\n"):gmatch("([^\n]*)\n") do
+            nvg.text(nvg_ctx, node.x + editor.node_width / 2, y_offset, line)
+            y_offset = y_offset + line_height
+        end
+    end
 
     -- Input ports
     nvg.fontSize(nvg_ctx, 11.0)
