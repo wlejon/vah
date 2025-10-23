@@ -2,6 +2,7 @@
 
 #include "Commands.h"
 #include <memory>
+#include <functional>
 
 // Forward declarations
 class ThreadManager;
@@ -15,7 +16,8 @@ public:
         ThreadManager* thread_manager,
         DocumentManager* document_manager,
         DataModelManager* data_model_manager,
-        EventDispatcher* event_dispatcher
+        EventDispatcher* event_dispatcher,
+        std::function<void()> on_close_application = nullptr
     );
     ~CommandProcessor() = default;
 
@@ -27,4 +29,5 @@ private:
     DocumentManager* document_manager_;
     DataModelManager* data_model_manager_;
     EventDispatcher* event_dispatcher_;
+    std::function<void()> on_close_application_;
 };

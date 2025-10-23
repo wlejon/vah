@@ -9,12 +9,14 @@ CommandProcessor::CommandProcessor(
     ThreadManager* thread_manager,
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
-    EventDispatcher* event_dispatcher
+    EventDispatcher* event_dispatcher,
+    std::function<void()> on_close_application
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
     , event_dispatcher_(event_dispatcher)
+    , on_close_application_(on_close_application)
 {
 }
 
@@ -126,6 +128,12 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         }
         else if constexpr (std::is_same_v<T, Commands::TriggerGlobalEvent>) {
             event_dispatcher_->DispatchGlobalEvent(command.event_name, command.payload);
+        }
+        else if constexpr (std::is_same_v<T, Commands::CloseApplication>) {
+            LOG_INFO("Processing CloseApplication command");
+            if (on_close_application_) {
+                on_close_application_();
+            }
         }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)
         // are now handled by the Lua notification system, not here

@@ -145,6 +145,13 @@ function startup()
     event.register("close_app", close_current_app)
     event.register("thread_spawned", on_thread_spawned)
 
+    -- Register global event handlers (for menu system)
+    event.register_global("return_to_launcher", close_current_app)
+    event.register_global("close_application", function(payload)
+        print("Closing application via menu")
+        command.close_application()
+    end)
+
     -- Load launcher UI
     ui.load_document("ui/launcher.rml", true, "launcher")
 

@@ -176,6 +176,9 @@ namespace Commands {
     struct DismissNotification {
         std::string notification_id;
     };
+
+    struct CloseApplication {
+    };
 }
 
 // Variant holding all possible command types
@@ -210,7 +213,8 @@ using Command = std::variant<
     Commands::TriggerGlobalEvent,
     Commands::AddNotification,
     Commands::ClearNotifications,
-    Commands::DismissNotification
+    Commands::DismissNotification,
+    Commands::CloseApplication
 >;
 
 // Response sent from main thread to lua thread

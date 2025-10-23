@@ -488,6 +488,11 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    command_table["close_application"] = [this]() {
+        Commands::CloseApplication cmd;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["command"] = command_table;
 
     // Bind UI operations

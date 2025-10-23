@@ -64,6 +64,4 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
-i want to visualize the flow of code for vah through each of the examples. 
-
-you've created an example that maps the tetris code flow. all the nodes in the visualization are collapsed and i'm not sure if they're meant to have body sections or not. please investigate and figure out why they look so odd. 
+let's build a whole app navigation system that is a core system, mirroring how the notification system works. design it like a file menu and for now have it be file -> close that closes the main application. file -> home should take me back to the launcher from an app.

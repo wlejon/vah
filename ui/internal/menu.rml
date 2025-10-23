@@ -1,0 +1,33 @@
+<rml>
+<head>
+    <title>Application Menu</title>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
+    <link type="text/rcss" href="menu.rcss"/>
+</head>
+<body>
+    <div class="menu-container" data-model="menu_state">
+        <div class="menu-bar">
+            <!-- File Menu -->
+            <div class="menu-item">
+                <div class="menu-label" data-event-click="trigger('toggle_file_menu')">
+                    File
+                </div>
+                <!-- Dropdown (shown when file_menu_open is true) -->
+                <div data-if="menu_state[0].file_menu_open == 1" class="menu-dropdown">
+                    <div class="menu-dropdown-item" data-event-click="trigger('menu_file_home')">
+                        Home
+                    </div>
+                    <div class="menu-dropdown-item" data-event-click="trigger('menu_file_close')">
+                        Close
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Invisible overlay to close menu when clicking outside -->
+        <div data-if="menu_state[0].file_menu_open == 1"
+             class="menu-overlay"
+             data-event-click="trigger('close_file_menu')">
+        </div>
+    </div>
+</body>
+</rml>

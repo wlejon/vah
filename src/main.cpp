@@ -259,7 +259,8 @@ public:
             thread_manager_.get(),
             document_manager_.get(),
             data_model_manager_.get(),
-            event_dispatcher_.get()
+            event_dispatcher_.get(),
+            [this]() { running_ = false; }  // Callback to close application
         );
 
         // Setup RmlUI lua bindings - pass context so we can create data models
