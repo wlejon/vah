@@ -1,9 +1,17 @@
 -- Manufold Agent System
 -- Agent-assisted workflow for transforming unstructured data into structured knowledge environments
+-- Enhanced with view-oriented tools
 
 local LMStudioClient = require("lm_studio_client")
 local HarmonyAdapter = require("harmony_adapter")
-local tool_definitions = require("tool_definitions")
+local manufold_tools = require("manufold_tools")
+
+-- Import tool modules
+local FileInspector = require("file_inspector")
+local SchemaExecutor = require("schema_executor")
+local DbInspector = require("db_inspector")
+local ParserExecutor = require("parser_executor")
+local ViewGenerator = require("view_generator")
 
 -- Create LM Studio client and model adapter
 local client = LMStudioClient.new("http://127.0.0.1:1234", "openai/gpt-oss-20b")
@@ -68,67 +76,251 @@ local agent_state = {
 
 -- System prompt generation using adapter
 local function get_system_prompt(workflow_state)
-    return adapter:generate_system_prompt(tool_definitions, workflow_state)
+    return adapter:generate_system_prompt(manufold_tools, workflow_state)
 end
 
--- Execute a tool call
+-- Execute a tool call with view-oriented results
 local function execute_tool(tool_name, arguments)
-    print("Executing tool: " .. tool_name .. " with args: " .. json.encode(arguments))
+    print("Executing tool: " .. tool_name)
+    if arguments then
+        print("  Args: " .. json.encode(arguments):sub(1, 200))
+    end
 
+    -- File System Tools
     if tool_name == "list_files" then
-        return {
-            success = true,
-            result = agent_state.ingested_files
-        }
+        local result = FileInspector.list_files(agent_state.ingested_files)
+        return {success = true, result = result}
 
-    elseif tool_name == "read_file" then
-        local path = arguments.path
-        if not path then
+    elseif tool_name == "inspect_file" then
+        if not arguments or not arguments.path then
             return {success = false, error = "Missing path parameter"}
         end
 
-        print("Reading file: " .. path)
-        local content, error = fs.read_file(path)
-        if error and error ~= "" then
-            print("Read error: " .. tostring(error))
-            return {success = false, error = error}
+        local result = FileInspector.inspect_file(arguments.path, arguments.max_bytes)
+        if result.error then
+            return {success = false, error = result.error}
         end
+        return {success = true, result = result}
 
-        print("Read " .. (content and #content or 0) .. " bytes")
-        return {success = true, result = content}
+    elseif tool_name == "analyze_file_collection" then
+        local result = FileInspector.analyze_collection(agent_state.ingested_files)
+        return {success = true, result = result}
 
-    elseif tool_name == "create_comprehension_doc" then
-        agent_state.comprehension_doc = arguments.content or ""
-        agent_state.show_feedback_input = true
-        agent_state.current_state = WORKFLOW_STATES.VALIDATION
-        agent_state.status_message = get_status_for_state()
-        update_ui()
-
-        return {success = true, result = "Comprehension document created"}
-
+    -- Schema Tools
     elseif tool_name == "propose_schema" then
         if not arguments or not arguments.schema then
-            print("ERROR: propose_schema called with null or missing schema")
             return {success = false, error = "Missing schema parameter"}
         end
 
+        -- Summarize and validate schema
+        local result = SchemaExecutor.summarize_schema(arguments.schema)
+
+        -- Store schema
         agent_state.proposed_schema = arguments.schema
-        -- Convert to JSON for display
         agent_state.schema_json = json.encode(arguments.schema, true) or "{}"
         agent_state.current_state = WORKFLOW_STATES.MODEL_DESIGN
         agent_state.status_message = get_status_for_state()
         update_ui()
 
-        return {success = true, result = "Schema proposed"}
+        return {success = true, result = result}
 
+    elseif tool_name == "execute_schema" then
+        if not agent_state.proposed_schema then
+            return {success = false, error = "No schema has been proposed yet"}
+        end
+
+        if not arguments or not arguments.db_path then
+            return {success = false, error = "Missing db_path parameter"}
+        end
+
+        -- Execute schema
+        local result = SchemaExecutor.execute_schema(agent_state.proposed_schema, arguments.db_path)
+
+        -- Update agent state
+        if result.ready_for_import then
+            agent_state.db_path = arguments.db_path
+            agent_state.schema_approved = true
+        end
+
+        return {success = true, result = result}
+
+    elseif tool_name == "introspect_database" then
+        if not arguments or not arguments.db_path then
+            return {success = false, error = "Missing db_path parameter"}
+        end
+
+        local include_stats = arguments.include_data_stats
+        local result = DbInspector.introspect(arguments.db_path, include_stats)
+
+        if result.error then
+            return {success = false, error = result.error}
+        end
+
+        return {success = true, result = result}
+
+    -- Parser Tools
     elseif tool_name == "generate_parser" then
+        if not arguments or not arguments.file_type or not arguments.script_content or
+           not arguments.target_table or not arguments.field_mapping then
+            return {success = false, error = "Missing required parameters"}
+        end
+
+        -- Generate unique parser ID
+        local parser_id = "parser_" .. arguments.file_type .. "_" .. os.time()
+
+        -- Register parser
+        local result = ParserExecutor.register_parser(
+            parser_id,
+            arguments.file_type,
+            arguments.script_content,
+            arguments.target_table,
+            arguments.field_mapping
+        )
+
+        -- Store script info
         table.insert(agent_state.generated_scripts, {
+            parser_id = parser_id,
             file_type = arguments.file_type,
-            script = arguments.script_content
+            script = arguments.script_content,
+            target_table = arguments.target_table
         })
         update_ui()
 
-        return {success = true, result = "Parser script generated"}
+        return {success = true, result = result}
+
+    elseif tool_name == "execute_parser" then
+        if not arguments or not arguments.parser_id or not arguments.file_paths or not arguments.db_path then
+            return {success = false, error = "Missing required parameters"}
+        end
+
+        local dry_run = arguments.dry_run or false
+
+        local result = ParserExecutor.execute_parser(
+            arguments.parser_id,
+            arguments.file_paths,
+            arguments.db_path,
+            dry_run
+        )
+
+        if result.execution_summary and result.execution_summary.error then
+            return {success = false, error = result.execution_summary.error}
+        end
+
+        -- Update import progress
+        if not dry_run then
+            agent_state.import_progress = 100
+            agent_state.import_status = string.format(
+                "Imported %d rows from %d files",
+                result.execution_summary.total_rows_inserted or 0,
+                result.execution_summary.files_processed or 0
+            )
+            update_ui()
+        end
+
+        return {success = true, result = result}
+
+    elseif tool_name == "validate_import" then
+        if not arguments or not arguments.db_path or not arguments.table_name then
+            return {success = false, error = "Missing required parameters"}
+        end
+
+        local result = ParserExecutor.validate_import(
+            arguments.db_path,
+            arguments.table_name,
+            arguments.validation_rules
+        )
+
+        if result.error then
+            return {success = false, error = result.error}
+        end
+
+        return {success = true, result = result}
+
+    -- Documentation Tools
+    elseif tool_name == "create_comprehension_doc" then
+        if not arguments or not arguments.content then
+            return {success = false, error = "Missing content parameter"}
+        end
+
+        agent_state.comprehension_doc = arguments.content
+        agent_state.show_feedback_input = true
+        agent_state.current_state = WORKFLOW_STATES.VALIDATION
+        agent_state.status_message = get_status_for_state()
+        update_ui()
+
+        -- Analyze document
+        local word_count = 0
+        for _ in arguments.content:gmatch("%S+") do
+            word_count = word_count + 1
+        end
+
+        local section_count = 0
+        for _ in arguments.content:gmatch("\n#") do
+            section_count = section_count + 1
+        end
+
+        local result = {
+            document_summary = {
+                section_count = section_count,
+                word_count = word_count,
+                topics_covered = {"(extracted from document)"}
+            },
+            ready_for_validation = true
+        }
+
+        return {success = true, result = result}
+
+    -- View Generation Tools
+    elseif tool_name == "generate_view" then
+        if not arguments or not arguments.view_type or not arguments.data_source then
+            return {success = false, error = "Missing required parameters"}
+        end
+
+        local result = ViewGenerator.generate_view(
+            arguments.view_type,
+            arguments.data_source,
+            arguments.layout_preferences
+        )
+
+        if result.error then
+            return {success = false, error = result.error}
+        end
+
+        -- Save generated files
+        for _, file in ipairs(result.generated_files) do
+            -- Create directory if needed
+            local dir = fs.dirname(file.path)
+            if dir and dir ~= "" then
+                fs.create_dir(dir)
+            end
+
+            -- Write file
+            local write_success, write_err = fs.write_file(file.path, file.content)
+            if not write_success then
+                print("Warning: Failed to write " .. file.path .. ": " .. (write_err or "unknown error"))
+            else
+                print("Generated: " .. file.path)
+            end
+        end
+
+        return {success = true, result = result}
+
+    elseif tool_name == "query_data" then
+        if not arguments or not arguments.db_path or not arguments.query then
+            return {success = false, error = "Missing required parameters"}
+        end
+
+        local result = DbInspector.query_data(
+            arguments.db_path,
+            arguments.query,
+            arguments.max_rows
+        )
+
+        if result.error then
+            return {success = false, error = result.error}
+        end
+
+        return {success = true, result = result}
 
     else
         return {success = false, error = "Unknown tool: " .. tool_name}
@@ -191,7 +383,7 @@ local function send_to_agent(user_message)
     local message = response.choices[1].message
     local content = message.content or ""
 
-    print("Agent response: " .. content)
+    print("Agent response: " .. content:sub(1, 200) .. (content:len() > 200 and "..." or ""))
 
     -- Parse and execute tool calls
     local tool_calls = parse_tool_calls(content)
@@ -229,8 +421,8 @@ local function send_to_agent(user_message)
 
             -- Log result
             if result.success then
-                local result_str = type(result.result) == "string" and result.result:sub(1, 100) or json.encode(result.result):sub(1, 100)
-                print("Tool result: " .. result_str .. (result_str:len() >= 100 and "..." or ""))
+                local result_preview = json.encode(result.result):sub(1, 300)
+                print("Tool success: " .. result_preview .. (result_preview:len() >= 300 and "..." or ""))
             else
                 print("Tool error: " .. (result.error or "Unknown error"))
             end
@@ -296,11 +488,18 @@ local function on_files_dropped(payload)
         -- Ingest directory recursively
         fs.walk(path, function(entry_path, is_dir, size)
             if not is_dir then
+                -- Determine if binary
+                local ext = fs.extension(entry_path)
+                local is_binary = ext == ".jpg" or ext == ".png" or ext == ".pdf" or
+                                 ext == ".zip" or ext == ".exe" or ext == ".bin"
+
                 table.insert(agent_state.ingested_files, {
                     path = entry_path,
                     name = fs.basename(entry_path),
                     size = size or 0,
-                    type = fs.extension(entry_path) or "unknown"
+                    type = ext or "unknown",
+                    mime_type = "text/plain",
+                    is_binary = is_binary
                 })
             end
             return true  -- Continue walking
@@ -312,11 +511,17 @@ local function on_files_dropped(payload)
             file_size = stat_result.size
         end
 
+        local ext = fs.extension(path)
+        local is_binary = ext == ".jpg" or ext == ".png" or ext == ".pdf" or
+                         ext == ".zip" or ext == ".exe" or ext == ".bin"
+
         table.insert(agent_state.ingested_files, {
             path = path,
             name = fs.basename(path),
             size = file_size,
-            type = fs.extension(path) or "unknown"
+            type = ext or "unknown",
+            mime_type = "text/plain",
+            is_binary = is_binary
         })
     end
 
@@ -337,20 +542,9 @@ local function on_start_exploration(payload)
 
     -- Send initial message to agent
     local initial_message = string.format(
-        "I have ingested %d files. Please analyze this data and help me understand what it represents. Here's a summary:\n\n",
+        "I have ingested %d files. Please use the list_files tool to see the collection, then begin analysis.",
         agent_state.file_count
     )
-
-    -- Add file list
-    for i, file in ipairs(agent_state.ingested_files) do
-        if i <= 20 then  -- Limit to first 20 files
-            initial_message = initial_message .. string.format("- %s (%s)\n", file.name, file.type)
-        end
-    end
-
-    if agent_state.file_count > 20 then
-        initial_message = initial_message .. string.format("... and %d more files\n", agent_state.file_count - 20)
-    end
 
     send_to_agent(initial_message)
 end
@@ -386,9 +580,8 @@ local function on_approve_understanding(payload)
     agent_state.status_message = get_status_for_state()
     update_ui()
 
-    -- Trigger schema design with minimal message
-    -- The system prompt for model_design phase will force the tool call
-    send_to_agent("APPROVED")
+    -- Trigger schema design
+    send_to_agent("APPROVED. Please now propose a database schema using the propose_schema tool.")
 end
 
 local function on_approve_schema(payload)
@@ -397,48 +590,65 @@ local function on_approve_schema(payload)
     agent_state.schema_approved = true
     agent_state.current_state = WORKFLOW_STATES.TRANSFORMATION
     agent_state.status_message = get_status_for_state()
+
+    -- Create database path
+    agent_state.session_id = "session_" .. os.time()
+    agent_state.db_path = "data/" .. agent_state.session_id .. ".db"
+
     update_ui()
 
-    -- Trigger parser generation with minimal message
-    -- The system prompt for transformation phase will force the tool calls
-    send_to_agent("APPROVED")
+    -- Trigger schema execution and parser generation
+    send_to_agent(string.format(
+        "APPROVED. First execute the schema using execute_schema with db_path '%s'. Then generate parser scripts for each file type.",
+        agent_state.db_path
+    ))
 end
 
 local function on_start_import(payload)
     print("Starting import")
 
-    -- Create database
-    agent_state.session_id = "session_" .. os.time()
-    agent_state.db_path = "data/" .. agent_state.session_id .. ".db"
+    if #agent_state.generated_scripts == 0 then
+        print("ERROR: No parser scripts generated")
+        return
+    end
 
-    -- For now, just simulate the import
-    -- In a real implementation, we'd execute the generated scripts
+    if not agent_state.db_path or agent_state.db_path == "" then
+        print("ERROR: No database path set")
+        return
+    end
 
-    agent_state.import_progress = 0
-    agent_state.import_status = "Starting import..."
-    update_ui()
-
-    -- Simulate import progress
-    local progress_timer = 0
-    local function simulate_import()
-        if agent_state.import_progress < 100 then
-            agent_state.import_progress = agent_state.import_progress + 10
-            agent_state.import_status = string.format("Importing... %d%%", agent_state.import_progress)
-            update_ui()
-        else
-            agent_state.current_state = WORKFLOW_STATES.VIEW_GENERATION
-            agent_state.status_message = get_status_for_state()
-            update_ui()
-
-            -- Ask agent to generate views
-            send_to_agent("Data import complete. Please generate an overview interface for the imported data.")
+    -- Group files by type
+    local files_by_type = {}
+    for _, file in ipairs(agent_state.ingested_files) do
+        if not file.is_binary then
+            local ext = file.type or "unknown"
+            if not files_by_type[ext] then
+                files_by_type[ext] = {}
+            end
+            table.insert(files_by_type[ext], file.path)
         end
     end
 
-    -- This is a simplified version - in reality we'd use a timer or coroutine
-    for i = 1, 10 do
-        simulate_import()
+    -- Execute each parser
+    for _, script_info in ipairs(agent_state.generated_scripts) do
+        local file_paths = files_by_type[script_info.file_type] or {}
+
+        if #file_paths > 0 then
+            print(string.format("Executing parser for %s files (%d files)", script_info.file_type, #file_paths))
+
+            local execute_msg = string.format(
+                "Execute parser '%s' on %d files using execute_parser tool.",
+                script_info.parser_id,
+                #file_paths
+            )
+            send_to_agent(execute_msg)
+        end
     end
+
+    -- Transition to view generation after import
+    agent_state.current_state = WORKFLOW_STATES.VIEW_GENERATION
+    agent_state.status_message = get_status_for_state()
+    update_ui()
 end
 
 local function on_reset_session(payload)
@@ -460,6 +670,9 @@ local function on_reset_session(payload)
     agent_state.status_message = get_status_for_state()
     agent_state.can_proceed = false
     agent_state.show_feedback_input = false
+    agent_state.db_path = ""
+    agent_state.import_progress = 0
+    agent_state.import_status = ""
 
     update_ui()
 end
@@ -486,6 +699,7 @@ function startup()
     ui.load_document("ui/manufold.rml", true, "manufold")
 
     print("Manufold Agent ready")
+    print("Tools loaded: " .. #manufold_tools .. " enhanced tools with view-oriented responses")
 end
 
 function update(dt)

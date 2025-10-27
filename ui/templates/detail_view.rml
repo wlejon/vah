@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>{title}</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="templates/detail_view.rcss"/>
+</head>
+<body>
+    <div class="detail-container" data-model="{model_name}_detail">
+        <div data-for="item : {model_name}_detail">
+            {detail_fields}
+        </div>
+    </div>
+</body>
+</rml>

@@ -65,3 +65,26 @@ you should review the data binding c++ implementation if you need to write rml u
 this task fits within your context, there's no need to use subagents.
 
 please perform a code review. once you have a good understanding of the long term goal, please compare the current foundation to what we need to best support lua implementation of the manufold-client. 
+
+you've made some agent tools recently: 
+PS D:\projects\vah> git status
+On branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   scripts/manufold_agent.lua
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        scripts/db_inspector.lua
+        scripts/file_inspector.lua
+        scripts/manufold_tools.lua
+        scripts/parser_executor.lua
+        scripts/schema_executor.lua
+        scripts/view_generator.lua
+        ui/templates/
+
+i'd like you to be able to test these tools. in order for that to work, we'll need an mcp server running in lua. let's get an mcp server working so that you can connect to a running vah instance and operate it.

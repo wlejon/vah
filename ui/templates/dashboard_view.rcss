@@ -1,0 +1,25 @@
+.dashboard {
+    padding: 20dp;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200dp, 1fr));
+    gap: 20dp;
+}
+
+.stat-card {
+    background: white;
+    padding: 20dp;
+    border-radius: 8dp;
+    box-shadow: 0 2dp 4dp rgba(0,0,0,0.1);
+}
+
+.stat-label {
+    font-size: 14dp;
+    color: #666;
+    margin-bottom: 10dp;
+}
+
+.stat-value {
+    font-size: 32dp;
+    font-weight: bold;
+    color: #333;
+}

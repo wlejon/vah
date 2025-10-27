@@ -1,0 +1,28 @@
+<rml>
+<head>
+    <title>{title}</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="templates/table_view.rcss"/>
+</head>
+<body>
+    <div class="table-container" data-model="{model_name}_data">
+        <div class="table-header">
+            <h1 class="table-title">{title}</h1>
+            <div class="table-stats" data-for="stats : {model_name}_stats">
+                {{stats.row_count}} rows
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>{table_headers}</tr>
+            </thead>
+            <tbody>
+                <tr data-for="row : {model_name}_data">
+                    {table_cells}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</rml>

@@ -1,0 +1,18 @@
+.detail-container {
+    padding: 20dp;
+    max-width: 600dp;
+}
+
+.detail-field {
+    margin-bottom: 15dp;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 5dp;
+}
+
+.field-value {
+    color: #333;
+}

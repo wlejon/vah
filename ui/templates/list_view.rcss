@@ -1,0 +1,19 @@
+body {
+    padding: 20dp;
+}
+
+.list-container {
+    background: white;
+    border-radius: 8dp;
+    overflow: auto;
+}
+
+.list-item {
+    padding: 15dp 20dp;
+    border-bottom: 1dp solid #eee;
+    cursor: pointer;
+}
+
+.list-item:hover {
+    background: #f5f5f5;
+}

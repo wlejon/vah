@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <title>{title}</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="templates/list_view.rcss"/>
+</head>
+<body>
+    <div class="list-container">
+        <div data-for="item : {model_name}_data">
+            <div class="list-item" onclick="emit('select_item', {{id = item.{id_field}}}">
+                {{item.{display_field}}}
+            </div>
+        </div>
+    </div>
+</body>
+</rml>

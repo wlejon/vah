@@ -1,0 +1,17 @@
+<rml>
+<head>
+    <title>{title}</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="templates/dashboard_view.rcss"/>
+</head>
+<body>
+    <div class="dashboard" data-model="dashboard_stats">
+        <div data-for="stat : dashboard_stats">
+            <div class="stat-card">
+                <div class="stat-label">{{stat.label}}</div>
+                <div class="stat-value">{{stat.value}}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
