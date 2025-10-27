@@ -8,6 +8,7 @@ local ui_state = {
     expanded = false  -- Track whether UI is expanded or collapsed
 }
 local time_since_refresh = 0.0  -- Track time since last notification refresh
+local expanded_notifications = {}  -- Track which notifications are expanded by ID
 
 -- Document IDs
 local BADGE_DOC_ID = "notifications_badge"
@@ -40,6 +41,7 @@ function init_database()
             dismissible INTEGER DEFAULT 1,
             expandable INTEGER DEFAULT 0,
             expanded_content TEXT,
+            content_format TEXT DEFAULT 'text',
             ttl REAL DEFAULT 0,
             actions_json TEXT
         )
@@ -63,14 +65,14 @@ function load_notifications()
     -- ttl = 0 means persist until dismissed
     -- ttl > 0 means auto-expire after ttl seconds from timestamp
     local current_time = os.time()
-    local sql = string.format([[
+    local sql = [[
         SELECT * FROM notifications
         WHERE dismissed = 0
-          AND (ttl = 0 OR (timestamp + ttl) > %d)
+          AND (ttl = 0 OR (timestamp + ttl) > ?)
         ORDER BY timestamp DESC
-    ]], current_time)
+    ]]
 
-    local results, error = database:query(sql)
+    local results, error = database:query(sql, current_time)
 
     if error ~= "" then
         print("Error loading notifications: " .. error)
@@ -78,6 +80,11 @@ function load_notifications()
     end
 
     notifications = results or {}
+
+    -- Add expanded state to each notification
+    for _, notif in ipairs(notifications) do
+        notif.is_expanded = expanded_notifications[notif.id] and 1 or 0
+    end
 
     -- Bind data to the model (triggers UI update)
     data.bind("notifications", notifications)
@@ -95,14 +102,6 @@ function update_ui_state()
     })
 end
 
--- Helper to escape SQL strings
-local function escape_sql(str)
-    if type(str) ~= "string" then
-        return ""
-    end
-    return str:gsub("'", "''")
-end
-
 -- Helper to encode actions as JSON
 local function encode_actions(actions)
     if not actions or type(actions) ~= "table" or #actions == 0 then
@@ -111,8 +110,8 @@ local function encode_actions(actions)
 
     local parts = {}
     for _, action in ipairs(actions) do
-        local id = escape_sql(action.id or "")
-        local label = escape_sql(action.label or "")
+        local id = (action.id or ""):gsub('"', '\\"')  -- Escape quotes for JSON
+        local label = (action.label or ""):gsub('"', '\\"')
         table.insert(parts, string.format('{"id":"%s","label":"%s"}', id, label))
     end
     return "[" .. table.concat(parts, ",") .. "]"
@@ -151,29 +150,21 @@ function add_notification(notif)
     local dismissible = (notif.dismissible == nil) and 1 or (notif.dismissible and 1 or 0)
     local expandable = notif.expandable and 1 or 0
     local expanded_content = notif.expanded_content or ""
+    local content_format = notif.content_format or "text"  -- "text" or "markup"
     local ttl = notif.ttl or 5.0
     local actions_json = encode_actions(notif.actions)
     local timestamp = os.time()
 
-    -- Escape single quotes for SQL
-    local escaped_title = escape_sql(title)
-    local escaped_message = escape_sql(message)
-    local escaped_type = escape_sql(notif_type)
-    local escaped_source = escape_sql(source)
-    local escaped_action_label = escape_sql(action_label)
-    local escaped_action_event = escape_sql(action_event)
-    local escaped_expanded_content = escape_sql(expanded_content)
-    local escaped_actions_json = escape_sql(actions_json)
-
-    local sql = string.format([[
+    local sql = [[
         INSERT INTO notifications (timestamp, type, title, message, source, action_label, action_event,
-                                   dismissible, expandable, expanded_content, ttl, actions_json)
-        VALUES (%d, '%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s', %f, '%s')
-    ]], timestamp, escaped_type, escaped_title, escaped_message, escaped_source,
-       escaped_action_label, escaped_action_event, dismissible, expandable,
-       escaped_expanded_content, ttl, escaped_actions_json)
+                                   dismissible, expandable, expanded_content, content_format, ttl, actions_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ]]
 
-    local success, error = database:execute(sql)
+    local success, error = database:query(sql,
+        timestamp, notif_type, title, message, source,
+        action_label, action_event, dismissible, expandable,
+        expanded_content, content_format, ttl, actions_json)
     if not success then
         print("Error adding notification: " .. error)
         return false
@@ -192,13 +183,13 @@ function mark_read(notification_id)
         return false
     end
 
-    local sql = string.format([[
+    local sql = [[
         UPDATE notifications
         SET read = 1
-        WHERE id = %d
-    ]], notification_id)
+        WHERE id = ?
+    ]]
 
-    local success, error = database:execute(sql)
+    local success, error = database:query(sql, notification_id)
     if not success then
         print("Error marking notification as read: " .. error)
         return false
@@ -214,13 +205,13 @@ function dismiss_notification(notification_id)
         return false
     end
 
-    local sql = string.format([[
+    local sql = [[
         UPDATE notifications
         SET dismissed = 1
-        WHERE id = %d
-    ]], notification_id)
+        WHERE id = ?
+    ]]
 
-    local success, error = database:execute(sql)
+    local success, error = database:query(sql, notification_id)
     if not success then
         print("Error dismissing notification: " .. error)
         return false
@@ -236,11 +227,13 @@ function dismiss_all()
         return false
     end
 
-    local success, error = database:execute([[
+    local sql = [[
         UPDATE notifications
         SET dismissed = 1
         WHERE dismissed = 0
-    ]])
+    ]]
+
+    local success, error = database:query(sql)
 
     if not success then
         print("Error dismissing all notifications: " .. error)
@@ -314,21 +307,24 @@ function add_test_notifications()
         type = "info",
         title = "System Started",
         message = "Vah notification system is now running",
-        source = "system"
+        source = "system",
+        ttl = 0  -- Persist until dismissed
     })
 
     add_notification({
         type = "success",
         title = "Task Complete",
         message = "File processing finished successfully",
-        source = "file_processor"
+        source = "file_processor",
+        ttl = 0  -- Persist until dismissed
     })
 
     add_notification({
         type = "warning",
         title = "Low Memory",
         message = "Available memory is below 20%",
-        source = "system_monitor"
+        source = "system_monitor",
+        ttl = 0  -- Persist until dismissed
     })
 
     add_notification({
@@ -337,7 +333,11 @@ function add_test_notifications()
         message = "Compilation error in main.cpp line 42",
         source = "build_system",
         action_label = "View Details",
-        action_event = "show_build_log"
+        action_event = "show_build_log",
+        expandable = 1,
+        content_format = "text",
+        ttl = 0,  -- Persist until dismissed
+        expanded_content = "Error details:\n  File: main.cpp\n  Line: 42\n  Error: undefined reference to 'calculateSum'\n\nStack trace:\n  1. main() at main.cpp:42\n  2. calculateTotal() at utils.cpp:15\n\nSuggested fix:\nEnsure calculateSum() is declared in the header file."
     })
 end
 
@@ -398,6 +398,19 @@ function startup()
 
     event.register("add_test_notifications", function(payload)
         add_test_notifications()
+    end)
+
+    event.register("toggle_notification_expand", function(payload)
+        if payload.id then
+            local notif_id = payload.id
+            -- Toggle expanded state
+            if expanded_notifications[notif_id] then
+                expanded_notifications[notif_id] = nil
+            else
+                expanded_notifications[notif_id] = true
+            end
+            load_notifications()  -- Refresh to update UI
+        end
     end)
 
     event.register("toggle_notifications", function(payload)
@@ -469,13 +482,13 @@ function cleanup_old_notifications()
 
     -- Delete notifications that are dismissed or expired
     local current_time = os.time()
-    local sql = string.format([[
+    local sql = [[
         DELETE FROM notifications
         WHERE dismissed = 1
-           OR (ttl > 0 AND (timestamp + ttl) <= %d)
-    ]], current_time)
+           OR (ttl > 0 AND (timestamp + ttl) <= ?)
+    ]]
 
-    local success, error = database:execute(sql)
+    local success, error = database:query(sql, current_time)
 
     if not success then
         print("Error cleaning up old notifications: " .. error)

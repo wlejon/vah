@@ -32,18 +32,40 @@
                 <!-- Notification list -->
                 <div data-if="notifications.size > 0" class="notification-list">
                     <div data-for="notif, i : notifications">
-                        <div data-attr-class="'notification notification-' + notif.type + (notif.read == 1 ? ' notification-read' : '')">
+                        <div data-attr-class="'notification notification-' + notif.type + (notif.read == 1 ? ' notification-read' : '') + (notif.expandable == 1 ? ' notification-expandable' : '') + (notif.is_expanded == 1 ? ' notification-expanded' : '')">
 
                             <!-- Type indicator -->
                             <div data-attr-class="'notification-type-indicator type-' + notif.type"></div>
 
                             <!-- Content -->
-                            <div class="notification-content">
+                            <div class="notification-content"
+                                 data-attr-data-notification-id="notif.id"
+                                 data-attr-data-expandable="notif.expandable"
+                                 onclick="
+                                     local notif_id = event.current_element:GetAttribute('data-notification-id')
+                                     local expandable = event.current_element:GetAttribute('data-expandable')
+                                     if expandable == '1' then
+                                         emit('toggle_notification_expand', {id = tonumber(notif_id)})
+                                     end
+                                 ">
                                 <div class="notification-header-row">
-                                    <h3 class="notification-title">{{notif.title}}</h3>
+                                    <h3 class="notification-title">
+                                        {{notif.title}}
+                                        <span data-if="notif.expandable == 1" class="expand-indicator">{{notif.is_expanded == 1 ? '▼' : '▶'}}</span>
+                                    </h3>
                                     <span class="notification-time">{{notif.timestamp}}</span>
                                 </div>
                                 <p class="notification-message">{{notif.message}}</p>
+
+                                <!-- Expanded content - text format (default, pre-formatted text with selection) -->
+                                <div data-if="notif.is_expanded == 1 && notif.expanded_content != '' && (notif.content_format == '' || notif.content_format == 'text')" class="notification-expanded-text">
+                                    <pre class="notification-text-content">{{notif.expanded_content}}</pre>
+                                </div>
+
+                                <!-- Expanded content - markup format -->
+                                <div data-if="notif.is_expanded == 1 && notif.expanded_content != '' && notif.content_format == 'markup'" class="notification-expanded-markup" data-rml="notif.expanded_content">
+                                </div>
+
                                 <div data-if="notif.source != ''" class="notification-source">
                                     Source: {{notif.source}}
                                 </div>
@@ -54,20 +76,34 @@
                                 <!-- Custom action if available -->
                                 <button data-if="notif.action_label != ''"
                                         class="btn-action"
-                                        onclick="emit('notification_action', {action_event = notif.action_event, notification_id = notif.id})">
+                                        data-attr-data-notification-id="notif.id"
+                                        data-attr-data-action-event="notif.action_event"
+                                        onclick="
+                                            local notif_id = event.current_element:GetAttribute('data-notification-id')
+                                            local action_event = event.current_element:GetAttribute('data-action-event')
+                                            emit('notification_action', {action_event = action_event, id = tonumber(notif_id)})
+                                        ">
                                     {{notif.action_label}}
                                 </button>
 
                                 <!-- Mark as read (only if unread) -->
                                 <button data-if="notif.read == 0"
                                         class="btn-mark-read"
-                                        onclick="emit('mark_notification_read', {notification_id = notif.id})">
+                                        data-attr-data-notification-id="notif.id"
+                                        onclick="
+                                            local notif_id = event.current_element:GetAttribute('data-notification-id')
+                                            emit('mark_notification_read', {id = tonumber(notif_id)})
+                                        ">
                                     Mark Read
                                 </button>
 
                                 <!-- Dismiss -->
                                 <button class="btn-dismiss"
-                                        onclick="emit('dismiss_notification', {notification_id = notif.id})">
+                                        data-attr-data-notification-id="notif.id"
+                                        onclick="
+                                            local notif_id = event.current_element:GetAttribute('data-notification-id')
+                                            emit('dismiss_notification', {id = tonumber(notif_id)})
+                                        ">
                                     Dismiss
                                 </button>
                             </div>

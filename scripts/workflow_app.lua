@@ -551,6 +551,7 @@ function startup()
         source = "Workflow App",
         dismissible = true,
         expandable = true,
+        content_format = "markup",
         ttl = 0,
         expanded_content = [[
 <p>The workflow system is now ready for use.</p>

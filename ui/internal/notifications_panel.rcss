@@ -21,12 +21,15 @@ body {
 }
 
 .notifications-container {
-    top: 0;
     width: 90%;
+    max-width: 800px;
+    height: 80%;
     padding: 0;
     box-sizing: border-box;
     background: #1e1e2e;
     border-radius: 16px;
+    display: flex;
+    flex-direction: column;
 }
 
 .notifications-header {
@@ -79,6 +82,7 @@ h1 {
     flex: 1;
     overflow-y: auto;
     padding: 16px 24px;
+    min-height: 0;
 }
 
 .empty-state {
@@ -179,6 +183,14 @@ h1 {
     gap: 8px;
 }
 
+.notification-expandable .notification-content {
+    cursor: pointer;
+}
+
+.notification-expandable .notification-content:hover {
+    opacity: 0.9;
+}
+
 .notification-header-row {
     display: flex;
     justify-content: space-between;
@@ -191,6 +203,14 @@ h1 {
     font-weight: 600;
     color: #cdd6f4;
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.expand-indicator {
+    font-size: 10px;
+    color: #6c7086;
 }
 
 .notification-time {
@@ -211,6 +231,102 @@ h1 {
     font-size: 10px;
     color: #6c7086;
     font-style: italic;
+}
+
+.notification-expanded-text {
+    margin-top: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notification-text-content {
+    font-size: 12px;
+    color: #bac2de;
+    background: #11111b;
+    padding: 10px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: "JetBrains Mono";
+    line-height: 1.5;
+    margin: 0;
+    border-width: 1px;
+    border-color: #313244;
+}
+
+.notification-expanded-markup {
+    font-size: 12px;
+    color: #bac2de;
+    background: #11111b;
+    padding: 12px;
+    border-radius: 6px;
+    line-height: 1.6;
+    margin-top: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    word-wrap: break-word;
+}
+
+.notification-expanded-markup p {
+    margin: 8px 0;
+}
+
+.notification-expanded-markup ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.notification-expanded-markup li {
+    margin: 4px 0;
+}
+
+.notification-expanded-markup strong {
+    color: #cdd6f4;
+    font-weight: 600;
+}
+
+.notification-expanded-markup pre {
+    background: #181825;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono";
+    font-size: 11px;
+    margin: 8px 0;
+    color: #a6adc8;
+    white-space: pre-wrap;
+}
+
+.notification-expanded-text scrollbarvertical,
+.notification-expanded-markup scrollbarvertical {
+    width: 8px;
+}
+
+.notification-expanded-text scrollbarvertical slidertrack,
+.notification-expanded-markup scrollbarvertical slidertrack {
+    width: 8px;
+    background: transparent;
+}
+
+.notification-expanded-text scrollbarvertical sliderbar,
+.notification-expanded-markup scrollbarvertical sliderbar {
+    width: 4px;
+    margin-left: 2px;
+    background: #45475a;
+    border-radius: 2px;
+    min-height: 20px;
+}
+
+.notification-expanded-text scrollbarvertical sliderbar:hover,
+.notification-expanded-markup scrollbarvertical sliderbar:hover {
+    background: #585b70;
+}
+
+.notification-expanded-text scrollbarvertical sliderarrowdec,
+.notification-expanded-text scrollbarvertical sliderarrowinc,
+.notification-expanded-markup scrollbarvertical sliderarrowdec,
+.notification-expanded-markup scrollbarvertical sliderarrowinc {
+    width: 0px;
+    height: 0px;
 }
 
 .notification-actions {
