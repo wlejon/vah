@@ -56,7 +56,7 @@ we communicate between threads using a command queue. the lua threads all use th
 
 ### data store
 
-the databinding for rmlui is expanded in our system. we use a trigger() function call in the UI with an event name string. if this is within a databound for loop, the value of that iteration is included in the trigger as a payload to the event it's calling.
+the databinding for rmlui is expanded in our system. we use a emit() function call in the UI with an event name string. 
 
 you should review the data binding c++ implementation if you need to write rml using data. this ensures that you are operating with the latest api as it's not completely solidified yet.
 
@@ -64,8 +64,4 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
-let's build a whole app navigation system that is a core system, mirroring how the notification system works. design it like a file menu and for now have it be file -> close that closes the main application. file -> home should take me back to the launcher from an app.
-
-in order to build this, we need to fix our "trigger" system. it's currently doing some hacky lookups and we've even modified rmlui's library to support this. 
-
-please review the system, the databinding methods, the data store, the data model, and the lua bindings. please understand carefully what we're doing and explain it to me. i'll want to talk about changing this systems architecture in a very complex way so please demonstrate your understanding well.
+please perform a code review. once you have a good understanding of the long term goal, please compare the current foundation to what we need to best support lua implementation of the manufold-client. 

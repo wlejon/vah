@@ -73,20 +73,14 @@ function add_contact(name, email, phone, company, notes)
         return false
     end
 
-    -- Escape single quotes for SQL
-    local escaped_name = name:gsub("'", "''")
-    local escaped_email = email:gsub("'", "''")
-    local escaped_phone = (phone or ""):gsub("'", "''")
-    local escaped_company = (company or ""):gsub("'", "''")
-    local escaped_notes = (notes or ""):gsub("'", "''")
-
-    local sql = string.format([[
+    -- Use parameterized query to prevent SQL injection
+    local sql = [[
         INSERT INTO contacts (name, email, phone, company, notes)
-        VALUES ('%s', '%s', '%s', '%s', '%s')
-    ]], escaped_name, escaped_email, escaped_phone, escaped_company, escaped_notes)
+        VALUES (?, ?, ?, ?, ?)
+    ]]
 
-    local success, error = database:execute(sql)
-    if not success then
+    local result, error = database:query(sql, name, email, phone or "", company or "", notes or "")
+    if error ~= "" then
         print("Error adding contact: " .. error)
         return false
     end
@@ -101,21 +95,16 @@ function save_contact(contact_id, name, email, phone, company)
         return false
     end
 
-    -- Escape single quotes for SQL
-    local escaped_name = name:gsub("'", "''")
-    local escaped_email = email:gsub("'", "''")
-    local escaped_phone = phone:gsub("'", "''")
-    local escaped_company = company:gsub("'", "''")
-
-    local sql = string.format([[
+    -- Use parameterized query to prevent SQL injection
+    local sql = [[
         UPDATE contacts
-        SET name = '%s', email = '%s', phone = '%s', company = '%s'
-        WHERE id = %d
-    ]], escaped_name, escaped_email, escaped_phone, escaped_company, contact_id)
+        SET name = ?, email = ?, phone = ?, company = ?
+        WHERE id = ?
+    ]]
 
-    local success, error = database:execute(sql)
+    local result, error = database:query(sql, name, email, phone, company, contact_id)
 
-    if not success then
+    if error ~= "" then
         print("Error updating contact: " .. error)
         return false
     end
@@ -130,10 +119,11 @@ function delete_contact(contact_id)
         return false
     end
 
-    local sql = string.format("DELETE FROM contacts WHERE id = %d", contact_id)
-    local success, error = database:execute(sql)
+    -- Use parameterized query
+    local sql = "DELETE FROM contacts WHERE id = ?"
+    local result, error = database:query(sql, contact_id)
 
-    if not success then
+    if error ~= "" then
         print("Error deleting contact: " .. error)
         return false
     end

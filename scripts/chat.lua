@@ -123,7 +123,7 @@ function send_message_text(user_input)
     end
 end
 
--- Event handlers called from UI via trigger()
+-- Event handlers called from UI via emit()
 local function on_send_message(payload)
     -- The text is passed from the RML inline script
     local input = payload.text or ""

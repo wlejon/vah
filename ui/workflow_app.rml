@@ -36,7 +36,7 @@
                     <h1>{{ wf.name }}</h1>
                 </div>
                 <div class="button-group-header">
-                    <button onclick="switch_to_workflow_list_view(document); trigger('reload_workflows')">Workflows</button>
+                    <button onclick="switch_to_workflow_list_view(document); emit('reload_workflows')">Workflows</button>
                     <button onclick="emit('new_workflow')">New Workflow</button>
                     <button class="config-btn" onclick="switch_to_node_editor_view(document)">Configure Node Types</button>
                 </div>
