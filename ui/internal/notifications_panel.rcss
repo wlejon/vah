@@ -183,14 +183,6 @@ h1 {
     gap: 8px;
 }
 
-.notification-expandable .notification-content {
-    cursor: pointer;
-}
-
-.notification-expandable .notification-content:hover {
-    opacity: 0.9;
-}
-
 .notification-header-row {
     display: flex;
     justify-content: space-between;
@@ -206,6 +198,18 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.notification-title[data-expandable='1'] {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: #6c7086;
+}
+
+.notification-title[data-expandable='1']:hover {
+    text-decoration-color: #89b4fa;
+    color: #89b4fa;
 }
 
 .expand-indicator {
@@ -235,23 +239,28 @@ h1 {
 
 .notification-expanded-text {
     margin-top: 8px;
-    max-height: 300px;
-    overflow-y: auto;
 }
 
-.notification-text-content {
-    font-size: 12px;
-    color: #bac2de;
+.notification-texteditor-wrapper {
+    width: 100%;
+    max-height: 400px;
+    overflow-y: auto;
     background: #11111b;
-    padding: 10px;
     border-radius: 6px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-family: "JetBrains Mono";
-    line-height: 1.5;
-    margin: 0;
     border-width: 1px;
     border-color: #313244;
+    box-sizing: border-box;
+}
+
+.notification-texteditor {
+    width: 100%;
+    font-size: 12px;
+    color: #bac2de;
+    background: transparent;
+    padding: 10px;
+    font-family: "JetBrains Mono";
+    line-height: 1.5;
+    border-width: 0;
 }
 
 .notification-expanded-markup {
@@ -296,18 +305,18 @@ h1 {
     white-space: pre-wrap;
 }
 
-.notification-expanded-text scrollbarvertical,
+.notification-texteditor-wrapper scrollbarvertical,
 .notification-expanded-markup scrollbarvertical {
     width: 8px;
 }
 
-.notification-expanded-text scrollbarvertical slidertrack,
+.notification-texteditor-wrapper scrollbarvertical slidertrack,
 .notification-expanded-markup scrollbarvertical slidertrack {
     width: 8px;
     background: transparent;
 }
 
-.notification-expanded-text scrollbarvertical sliderbar,
+.notification-texteditor-wrapper scrollbarvertical sliderbar,
 .notification-expanded-markup scrollbarvertical sliderbar {
     width: 4px;
     margin-left: 2px;
@@ -316,13 +325,13 @@ h1 {
     min-height: 20px;
 }
 
-.notification-expanded-text scrollbarvertical sliderbar:hover,
+.notification-texteditor-wrapper scrollbarvertical sliderbar:hover,
 .notification-expanded-markup scrollbarvertical sliderbar:hover {
     background: #585b70;
 }
 
-.notification-expanded-text scrollbarvertical sliderarrowdec,
-.notification-expanded-text scrollbarvertical sliderarrowinc,
+.notification-texteditor-wrapper scrollbarvertical sliderarrowdec,
+.notification-texteditor-wrapper scrollbarvertical sliderarrowinc,
 .notification-expanded-markup scrollbarvertical sliderarrowdec,
 .notification-expanded-markup scrollbarvertical sliderarrowinc {
     width: 0px;
@@ -333,8 +342,9 @@ h1 {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    justify-content: center;
-    min-width: 90px;
+    justify-content: flex-start;
+    align-self: flex-start;
+    min-width: 100px;
 }
 
 .notification-actions button {
@@ -347,6 +357,8 @@ h1 {
     font-weight: 500;
     cursor: pointer;
     text-align: center;
+    min-width: 90px;
+    white-space: nowrap;
 }
 
 .notification-actions button:hover {

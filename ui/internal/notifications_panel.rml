@@ -38,28 +38,30 @@
                             <div data-attr-class="'notification-type-indicator type-' + notif.type"></div>
 
                             <!-- Content -->
-                            <div class="notification-content"
-                                 data-attr-data-notification-id="notif.id"
-                                 data-attr-data-expandable="notif.expandable"
-                                 onclick="
-                                     local notif_id = event.current_element:GetAttribute('data-notification-id')
-                                     local expandable = event.current_element:GetAttribute('data-expandable')
-                                     if expandable == '1' then
-                                         emit('toggle_notification_expand', {id = tonumber(notif_id)})
-                                     end
-                                 ">
+                            <div class="notification-content">
                                 <div class="notification-header-row">
-                                    <h3 class="notification-title">
-                                        {{notif.title}}
-                                        <span data-if="notif.expandable == 1" class="expand-indicator">{{notif.is_expanded == 1 ? '▼' : '▶'}}</span>
+                                    <h3 class="notification-title"
+                                        data-attr-data-notification-id="notif.id"
+                                        data-attr-data-expandable="notif.expandable"
+                                        onclick="
+                                            local notif_id = event.current_element:GetAttribute('data-notification-id')
+                                            local expandable = event.current_element:GetAttribute('data-expandable')
+                                            if expandable == '1' then
+                                                emit('toggle_notification_expand', {id = tonumber(notif_id)})
+                                            end
+                                        ">
+                                        <span>{{notif.title}}</span>
+                                        <span data-if="notif.expandable == 1" class="expand-indicator">{{notif.is_expanded == 1 ? 'v' : '>'}}</span>
                                     </h3>
                                     <span class="notification-time">{{notif.timestamp}}</span>
                                 </div>
                                 <p class="notification-message">{{notif.message}}</p>
 
-                                <!-- Expanded content - text format (default, pre-formatted text with selection) -->
+                                <!-- Expanded content - text format (default, readonly texteditor for selection) -->
                                 <div data-if="notif.is_expanded == 1 && notif.expanded_content != '' && (notif.content_format == '' || notif.content_format == 'text')" class="notification-expanded-text">
-                                    <pre class="notification-text-content">{{notif.expanded_content}}</pre>
+                                    <div class="notification-texteditor-wrapper">
+                                        <texteditor class="notification-texteditor" data-attr-value="notif.expanded_content" />
+                                    </div>
                                 </div>
 
                                 <!-- Expanded content - markup format -->
@@ -73,17 +75,15 @@
 
                             <!-- Actions -->
                             <div class="notification-actions">
-                                <!-- Custom action if available -->
-                                <button data-if="notif.action_label != ''"
+                                <!-- Expand button for expandable notifications -->
+                                <button data-if="notif.expandable == 1"
                                         class="btn-action"
                                         data-attr-data-notification-id="notif.id"
-                                        data-attr-data-action-event="notif.action_event"
                                         onclick="
                                             local notif_id = event.current_element:GetAttribute('data-notification-id')
-                                            local action_event = event.current_element:GetAttribute('data-action-event')
-                                            emit('notification_action', {action_event = action_event, id = tonumber(notif_id)})
+                                            emit('toggle_notification_expand', {id = tonumber(notif_id)})
                                         ">
-                                    {{notif.action_label}}
+                                    {{notif.is_expanded == 1 ? 'Hide Details' : 'View Details'}}
                                 </button>
 
                                 <!-- Mark as read (only if unread) -->

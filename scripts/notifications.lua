@@ -332,8 +332,6 @@ function add_test_notifications()
         title = "Build Failed",
         message = "Compilation error in main.cpp line 42",
         source = "build_system",
-        action_label = "View Details",
-        action_event = "show_build_log",
         expandable = 1,
         content_format = "text",
         ttl = 0,  -- Persist until dismissed
