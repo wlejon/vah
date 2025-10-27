@@ -2,6 +2,17 @@
 -- Interactive testing UI for markdown template renderer
 
 local renderer = require("template_renderer")
+local markdown_parser = require("markdown_parser")
+
+-- Load template from file
+local function load_template(path)
+    local content, err = fs.read(path)
+    if err ~= "" then
+        print("Error loading template: " .. err)
+        return ""
+    end
+    return content
+end
 
 -- Initial example data showcasing all template features
 local example_data = {
@@ -32,44 +43,8 @@ local example_data = {
     }
 }
 
--- Initial example template showcasing all features
-local example_template = [[
-# {{type}} Database View
-
-{{#if recent_action}}
-**Recent Activity:** {{recent_action}}
-**Timestamp:** {{timestamp}}
-
-{{/if}}
-## Overview
-
-- **Total Records:** {{data.total}}
-- **Current Page:** {{data.page}} of {{data.total_pages}}
-- **Database:** {{metadata.database}}
-- **Table:** {{metadata.table_name}}
-
-{{#if has_recent_activity}}
-## Statistics
-
-{{#each stats}}
-- **{{@key}}:** {{@value}}
-{{/each}}
-{{/if}}
-
-## Contact List
-
-{{#each data.items}}
-{{#if @first}}
-| ID | Name | Email | Status | Age |
-|----|------|-------|--------|-----|
-{{/if}}
-| {{id}} | {{name}} | {{email}} | {{status}} | {{age}} |
-{{/each}}
-
----
-
-Page {{data.page}} of {{data.total_pages}} (showing {{data.limit}} per page)
-]]
+-- Load initial example template from file
+local example_template = load_template("ui/templates/example_template.md")
 
 -- Current state
 local current_json = ""
@@ -79,6 +54,7 @@ local current_data = example_data
 -- Output model
 local output_data = {
     content = "",
+    parsed_rml = "",
     error = ""
 }
 
@@ -102,9 +78,28 @@ function render_template()
     if not render_ok then
         output_data.error = "Template Error: " .. tostring(render_result)
         output_data.content = ""
+        output_data.parsed_rml = ""
+
+        -- Clear rendered RML panel
+        ui.set_element_text("rml_rendered_content", "")
     else
         output_data.error = ""
         output_data.content = render_result
+
+        -- Parse markdown to RML
+        local parse_ok, parse_result = pcall(markdown_parser.to_rml, render_result)
+        if not parse_ok then
+            output_data.error = "Markdown Parse Error: " .. tostring(parse_result)
+            output_data.parsed_rml = ""
+
+            -- Clear rendered RML panel
+            ui.set_element_text("rml_rendered_content", "")
+        else
+            output_data.parsed_rml = parse_result
+
+            -- Inject the RML into the fourth panel for rendering
+            ui.set_element_text("rml_rendered_content", parse_result)
+        end
     end
 
     data.bind("output", {output_data})
@@ -113,8 +108,8 @@ end
 function startup()
     print("Template Tester started (thread_id: " .. thread_id .. ")")
 
-    -- Convert example data to JSON
-    current_json = json.encode(example_data)
+    -- Convert example data to pretty JSON
+    current_json = json.encode_pretty(example_data)
     current_template = example_template
 
     -- Register event handlers

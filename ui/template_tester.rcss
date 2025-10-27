@@ -50,6 +50,11 @@ body {
     height: 100%;
 }
 
+.rml-panel {
+    flex: 1;
+    height: 100%;
+}
+
 .panel-header {
     display: flex;
     flex-direction: row;
@@ -108,6 +113,99 @@ texteditor {
     font-size: 12dp;
     line-height: 1.6;
     white-space: pre-wrap;
+}
+
+.rml-rendered {
+    /* Let the rendered RML use its own styling */
+    font-family: "Roboto";
+    font-size: 14dp;
+    line-height: 1.6;
+    color: #d4d4d4;
+}
+
+/* Style for rendered markdown elements */
+.rml-rendered h1 {
+    font-size: 24dp;
+    font-weight: 500;
+    margin-top: 0dp;
+    margin-bottom: 10dp;
+    color: #cccccc;
+}
+
+.rml-rendered h2 {
+    font-size: 20dp;
+    font-weight: 500;
+    margin-top: 15dp;
+    margin-bottom: 10dp;
+    color: #cccccc;
+}
+
+.rml-rendered h3 {
+    font-size: 16dp;
+    font-weight: 500;
+    margin-top: 12dp;
+    margin-bottom: 8dp;
+    color: #cccccc;
+}
+
+.rml-rendered p {
+    margin-top: 0dp;
+    margin-bottom: 10dp;
+}
+
+.rml-rendered ul {
+    margin-left: 20dp;
+    margin-bottom: 10dp;
+}
+
+.rml-rendered li {
+    margin-bottom: 5dp;
+}
+
+.rml-rendered strong {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.rml-rendered em {
+    font-style: italic;
+}
+
+.rml-rendered .inline-code {
+    font-family: "JetBrains Mono";
+    background-color: #2d2d30;
+    padding: 2dp 4dp;
+    color: #ce9178;
+}
+
+.rml-rendered .code-block {
+    font-family: "JetBrains Mono";
+    background-color: #1e1e1e;
+    padding: 10dp;
+    margin-bottom: 10dp;
+    border-width: 1dp;
+    border-color: #3e3e42;
+    white-space: pre-wrap;
+}
+
+.rml-rendered .md-table {
+    margin-bottom: 10dp;
+    border-width: 1dp;
+    border-color: #3e3e42;
+}
+
+.rml-rendered .md-table th {
+    background-color: #2d2d30;
+    padding: 6dp 10dp;
+    font-weight: 500;
+    border-width: 1dp;
+    border-color: #3e3e42;
+}
+
+.rml-rendered .md-table td {
+    padding: 6dp 10dp;
+    border-width: 1dp;
+    border-color: #3e3e42;
 }
 
 .error-message {

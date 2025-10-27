@@ -64,16 +64,5 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task fits within your context, there's no need to use subagents.
 
-we recently introduced an mcp server and mcp client to interact with it. i'd like to expand the tools available. 
+we recently created an app called template_tester that let's me look at the markdown templating system. please update the json to pretty print. please take the templates out of strings and put them in files that we load. 
 
-we should think through this carefully. i essentially want to give the mcp server tools to explore the application with all the functionality the user has. i want to create a second type of "view" that is for llms. i don't really want to have functionality like "ls" equivalent, i instead want the view to have provided ls information along with the "view" of the application. i want calls in for functionality to be returning information as if it were trying to show the state of the app in a condensed text format. 
-
-let me explain the users experience. let's say i'm creating a row for some tabular data. when i click the "create row" button in an application, it'll show me success by expanding the UI to have the new row, for example. it'll also update the row count, for example. it'll move the cursor to the next line in the first cell and be ready for data entry, for example. all of these things are signals to the user about the action they took. when an mcp tool is called, i want this sort of nuanced data to be returned and not just "success" or "failure." i think, in order to achieve this, we need to think about it fundamentally. 
-
-if we think about it carefully, i think we'll find an idiomatic structure that makes tool naming and functionality obvious. when asking the questions "what does a tool do?" it'll be easy to gain enough clues from the name itself. this only happens with the foundation is built well enough to give this understanding.
-
-importantly, the views should be created in markdown.
-
-## expected results
-
-we are talking about the design and then creating documents to guide future implementation. we are not creating code (nor writing code in documents). we are talking and planning. 

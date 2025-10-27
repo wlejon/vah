@@ -31,10 +31,10 @@
             </div>
         </div>
 
-        <!-- Right Panel: Rendered Output -->
+        <!-- Third Panel: Hydrated Template -->
         <div class="panel output-panel">
             <div class="panel-header">
-                <h2>Rendered Markdown</h2>
+                <h2>Hydrated Template</h2>
             </div>
             <div class="output-container" data-model="output">
                 <div data-for="out : output">
@@ -43,6 +43,16 @@
                     </div>
                     <div data-if="!out.error" class="output-content">{{out.content}}</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Fourth Panel: Parsed RML -->
+        <div class="panel rml-panel">
+            <div class="panel-header">
+                <h2>Parsed RML</h2>
+            </div>
+            <div class="output-container">
+                <div id="rml_rendered_content" class="rml-rendered"></div>
             </div>
         </div>
     </div>
