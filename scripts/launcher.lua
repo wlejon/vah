@@ -65,6 +65,11 @@ local apps = {
         name = "MCP Client",
         script = "scripts/mcp_client.lua",
         document_id = "mcp_client"
+    },
+    template_tester = {
+        name = "Template Tester",
+        script = "scripts/template_tester.lua",
+        document_id = "template_tester"
     }
 }
 

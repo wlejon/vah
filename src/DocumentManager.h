@@ -6,10 +6,11 @@
 #include "DataStore.h"  // For DynamicTable and DynamicValue types
 
 class RmlUiBridge;  // Forward declaration
+class EventDispatcher;  // Forward declaration
 
 class DocumentManager {
 public:
-    DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge = nullptr);
+    DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge = nullptr, EventDispatcher* event_dispatcher = nullptr);
     ~DocumentManager() = default;
 
     // Document lifecycle
@@ -49,6 +50,7 @@ public:
 private:
     Rml::Context* context_;
     RmlUiBridge* rmlui_bridge_;
+    EventDispatcher* event_dispatcher_;
     std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
 
     // Flag to track if documents changed this frame

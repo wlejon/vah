@@ -251,7 +251,7 @@ public:
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(event_dispatcher_.get());
 
         // Initialize managers
-        document_manager_ = std::make_unique<DocumentManager>(rml_context_, rmlui_bridge_.get());
+        document_manager_ = std::make_unique<DocumentManager>(rml_context_, rmlui_bridge_.get(), event_dispatcher_.get());
         data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), event_dispatcher_.get());
 
         // Initialize command processor (needs all managers)

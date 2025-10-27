@@ -1,0 +1,123 @@
+body {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: "Roboto";
+    height: 100%;
+    width: 100%;
+}
+
+.header {
+    background-color: #252526;
+    padding: 15dp 20dp;
+    border-bottom-width: 1dp;
+    border-bottom-color: #3e3e42;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 20dp;
+    font-weight: 500;
+    color: #cccccc;
+}
+
+.main-container {
+    display: flex;
+    flex-direction: row;
+    padding: 10dp;
+    gap: 10dp;
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    background-color: #252526;
+    border-width: 1dp;
+    border-color: #3e3e42;
+}
+
+.json-panel {
+    flex: 1;
+    height: 100%;
+}
+
+.template-panel {
+    flex: 1;
+    height: 100%;
+}
+
+.output-panel {
+    flex: 1;
+    height: 100%;
+}
+
+.panel-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #2d2d30;
+    padding: 10dp 15dp;
+    border-bottom-width: 1dp;
+    border-bottom-color: #3e3e42;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 14dp;
+    font-weight: 500;
+    color: #cccccc;
+}
+
+.panel-header button {
+    background-color: #0e639c;
+    color: #ffffff;
+    padding: 6dp 12dp;
+    font-size: 13dp;
+}
+
+.panel-header button:hover {
+    background-color: #1177bb;
+}
+
+.panel-header button:active {
+    background-color: #094771;
+}
+
+.editor-container {
+    flex: 1;
+    overflow: hidden;
+}
+
+texteditor {
+    width: 100%;
+    height: 100%;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: "JetBrains Mono";
+    font-size: 13dp;
+}
+
+.output-container {
+    flex: 1;
+    overflow: auto;
+    padding: 15dp;
+}
+
+.output-content {
+    font-family: "JetBrains Mono";
+    font-size: 12dp;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.error-message {
+    background-color: #5a1d1d;
+    color: #f48771;
+    padding: 10dp;
+    border-width: 1dp;
+    border-color: #be1100;
+}
+
+.error-message strong {
+    color: #f48771;
+}

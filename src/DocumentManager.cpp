@@ -1,6 +1,7 @@
 #include "DocumentManager.h"
 #include "ElementTextEditor.h"
 #include "RmlUiBridge.h"
+#include "EventDispatcher.h"
 #include "Logger.h"
 #include <algorithm>
 #include <RmlUi/Lua/Interpreter.h>
@@ -11,9 +12,10 @@ extern "C" {
 #include <lauxlib.h>
 }
 
-DocumentManager::DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge)
+DocumentManager::DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridge, EventDispatcher* event_dispatcher)
     : context_(context)
     , rmlui_bridge_(rmlui_bridge)
+    , event_dispatcher_(event_dispatcher)
 {
 }
 
@@ -329,17 +331,32 @@ void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
 
             doc->Close();
             auto new_doc = context_->LoadDocument(src.c_str());
+
+            // Update tracked documents map if this doc has an ID
+            std::string reloaded_doc_id;
+            for (auto& [doc_id, tracked_doc] : loaded_documents_) {
+                if (tracked_doc == doc) {
+                    loaded_documents_[doc_id] = new_doc;
+                    if (new_doc) {
+                        new_doc->SetId(doc_id.c_str());
+                    }
+                    reloaded_doc_id = doc_id;
+                    break;
+                }
+            }
+
             if (new_doc && was_visible) {
                 new_doc->Show();
             }
 
-            // Update tracked documents map if this doc has an ID
-            for (auto& [doc_id, tracked_doc] : loaded_documents_) {
-                if (tracked_doc == doc) {
-                    loaded_documents_[doc_id] = new_doc;
-                    break;
-                }
+            // Force context update to rebind data models
+            context_->Update();
+
+            // Notify owning thread that document was reloaded
+            if (event_dispatcher_ && !reloaded_doc_id.empty()) {
+                event_dispatcher_->DispatchEvent(reloaded_doc_id, "document_reloaded", {});
             }
+
             break;
         }
     }
@@ -368,9 +385,14 @@ void DocumentManager::HandleRcssFileChanged() {
         auto new_doc = context_->LoadDocument(src.c_str());
 
         // Update tracked documents
+        std::string reloaded_doc_id;
         for (auto& [doc_id, tracked_doc] : loaded_documents_) {
             if (tracked_doc == doc) {
                 loaded_documents_[doc_id] = new_doc;
+                if (new_doc) {
+                    new_doc->SetId(doc_id.c_str());
+                }
+                reloaded_doc_id = doc_id;
                 break;
             }
         }
@@ -378,7 +400,15 @@ void DocumentManager::HandleRcssFileChanged() {
         if (new_doc && was_visible) {
             new_doc->Show();
         }
+
+        // Notify owning thread that document was reloaded
+        if (event_dispatcher_ && !reloaded_doc_id.empty()) {
+            event_dispatcher_->DispatchEvent(reloaded_doc_id, "document_reloaded", {});
+        }
     }
+
+    // Force context update to rebind data models
+    context_->Update();
 }
 
 void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
@@ -431,9 +461,14 @@ void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
         auto new_doc = context_->LoadDocument(src.c_str());
 
         // Update tracked documents
+        std::string reloaded_doc_id;
         for (auto& [doc_id, tracked_doc] : loaded_documents_) {
             if (tracked_doc == doc) {
                 loaded_documents_[doc_id] = new_doc;
+                if (new_doc) {
+                    new_doc->SetId(doc_id.c_str());
+                }
+                reloaded_doc_id = doc_id;
                 break;
             }
         }
@@ -441,7 +476,15 @@ void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
         if (new_doc && was_visible) {
             new_doc->Show();
         }
+
+        // Notify owning thread that document was reloaded
+        if (event_dispatcher_ && !reloaded_doc_id.empty()) {
+            event_dispatcher_->DispatchEvent(reloaded_doc_id, "document_reloaded", {});
+        }
     }
+
+    // Force context update to rebind data models
+    context_->Update();
 }
 
 void DocumentManager::UnloadAllDocuments() {

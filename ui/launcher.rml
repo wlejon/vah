@@ -91,6 +91,13 @@
                 <div class="app-name">MCP Client</div>
                 <p class="app-description">Model Context Protocol client - connect to MCP servers and call tools</p>
             </div>
+
+            <!-- Template Tester -->
+            <div class="app-card" onclick="launch_app('template_tester')">
+                <div class="app-icon">[X]</div>
+                <div class="app-name">Template Tester</div>
+                <p class="app-description">Test markdown template rendering with live JSON data binding</p>
+            </div>
         </div>
 
         <div class="footer">

@@ -1,0 +1,50 @@
+<rml>
+<head>
+    <title>Template Tester</title>
+    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="template_tester.rcss"/>
+</head>
+<body>
+    <div class="header">
+        <h1>Markdown Template Tester</h1>
+    </div>
+
+    <div class="main-container">
+        <!-- Left Panel: JSON Data -->
+        <div class="panel json-panel">
+            <div class="panel-header">
+                <h2>JSON Data</h2>
+                <button onclick="emit('render')">Render</button>
+            </div>
+            <div class="editor-container">
+                <texteditor id="json_editor" onmodified="emit('json_modified', {content = event.parameters.content})" />
+            </div>
+        </div>
+
+        <!-- Middle Panel: Template -->
+        <div class="panel template-panel">
+            <div class="panel-header">
+                <h2>Markdown Template</h2>
+            </div>
+            <div class="editor-container">
+                <texteditor id="template_editor" onmodified="emit('template_modified', {content = event.parameters.content})" />
+            </div>
+        </div>
+
+        <!-- Right Panel: Rendered Output -->
+        <div class="panel output-panel">
+            <div class="panel-header">
+                <h2>Rendered Markdown</h2>
+            </div>
+            <div class="output-container" data-model="output">
+                <div data-for="out : output">
+                    <div data-if="out.error" class="error-message">
+                        <strong>Error:</strong> {{out.error}}
+                    </div>
+                    <div data-if="!out.error" class="output-content">{{out.content}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
