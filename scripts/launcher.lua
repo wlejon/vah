@@ -60,6 +60,11 @@ local apps = {
         name = "Code Flow Viewer",
         script = "scripts/code_flow_viewer.lua",
         document_id = "code_flow_viewer"
+    },
+    mcp_client = {
+        name = "MCP Client",
+        script = "scripts/mcp_client.lua",
+        document_id = "mcp_client"
     }
 }
 

@@ -127,7 +127,11 @@
 
         <div class="file-list" data-model="files">
             <div data-for="file, i : files">
-                <div class="file-item" onclick="emit('navigate', {path = file.path, is_directory = file.is_directory})">
+                <div class="file-item" data-attr-data-target="file.target" data-attr-data-is-dir="file.is_dir" onclick="
+                    local target = event.current_element:GetAttribute('data-target')
+                    local is_dir = event.current_element:GetAttribute('data-is-dir')
+                    emit('navigate', {target = target, is_dir = (is_dir == '1' or is_dir == 'true')})
+                ">
                     <span class="file-icon">{{file.icon}}</span>
                     <span class="file-name">{{file.name}}</span>
                     <span class="file-size">{{file.size}}</span>

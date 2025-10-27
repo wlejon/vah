@@ -5,7 +5,7 @@
     <link type="text/rcss" href="menu.rcss"/>
 </head>
 <body>
-    <div class="menu-container" data-model="menu_state">
+    <div class="menu-container" data-model="menu_data">
         <div class="menu-bar">
             <!-- File Menu -->
             <div class="menu-item">
@@ -13,7 +13,7 @@
                     File
                 </div>
                 <!-- Dropdown (shown when file_menu_open is true) -->
-                <div data-if="menu_state.file_menu_open == 1" class="menu-dropdown">
+                <div data-if="menu_data.file_menu_open == 1" class="menu-dropdown">
                     <div class="menu-dropdown-item" onclick="emit('menu_file_home')">
                         Home
                     </div>
@@ -22,12 +22,31 @@
                     </div>
                 </div>
             </div>
+
+            <!-- MCP Status Menu -->
+            <div class="menu-item mcp-status-item">
+                <div class="menu-label" onclick="emit('toggle_mcp_menu')">
+                    <span data-if="menu_data.mcp_status == 'stopped'" class="mcp-status-dot status-stopped"></span>
+                    <span data-if="menu_data.mcp_status == 'starting'" class="mcp-status-dot status-starting"></span>
+                    <span data-if="menu_data.mcp_status == 'running'" class="mcp-status-dot status-running"></span>
+                    <span data-if="menu_data.mcp_status == 'stopping'" class="mcp-status-dot status-stopping"></span>
+                    MCP
+                </div>
+                <!-- Dropdown (shown when mcp_menu_open is true) -->
+                <div data-if="menu_data.mcp_menu_open == 1" class="menu-dropdown">
+                    <div class="mcp-status-info">{{menu_data.mcp_status_text}}</div>
+                    <div data-if="menu_data.mcp_is_stopped == 1" class="menu-dropdown-item" onclick="emit('menu_mcp_start')">
+                        Start Server
+                    </div>
+                    <div data-if="menu_data.mcp_is_running == 1" class="menu-dropdown-item" onclick="emit('menu_mcp_stop')">
+                        Stop Server
+                    </div>
+                </div>
+            </div>
         </div>
         <!-- Invisible overlay to close menu when clicking outside -->
-        <div data-if="menu_state.file_menu_open == 1"
-             class="menu-overlay"
-             onclick="emit('close_file_menu')">
-        </div>
+        <div data-if="menu_data.file_menu_open == 1" class="menu-overlay" onclick="emit('close_file_menu')"></div>
+        <div data-if="menu_data.mcp_menu_open == 1" class="menu-overlay" onclick="emit('close_mcp_menu')"></div>
     </div>
 </body>
 </rml>

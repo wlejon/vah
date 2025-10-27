@@ -1,0 +1,260 @@
+<rml>
+<head>
+    <title>MCP Client</title>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
+    <style>
+        body {
+            font-family: Roboto;
+            font-size: 14px;
+            color: #cdd6f4;
+            background: #1e1e2e;
+            padding: 20px;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #cdd6f4;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #89b4fa;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            background: #313244;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-text {
+            color: #a6adc8;
+        }
+
+        .button {
+            padding: 8px 16px;
+            background: #89b4fa;
+            color: #1e1e2e;
+            border-width: 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .button:hover {
+            background: #74c7ec;
+        }
+
+        .button-secondary {
+            background: #313244;
+            color: #cdd6f4;
+        }
+
+        .button-secondary:hover {
+            background: #45475a;
+        }
+
+        .tools-section {
+            background: #313244;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .tools-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tool-item {
+            background: #1e1e2e;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            border-width: 2px;
+            border-color: transparent;
+        }
+
+        .tool-item:hover {
+            border-color: #89b4fa;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: #89b4fa;
+            margin-bottom: 4px;
+        }
+
+        .tool-description {
+            font-size: 12px;
+            color: #a6adc8;
+        }
+
+        .call-section {
+            background: #313244;
+            padding: 16px;
+            border-radius: 4px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cdd6f4;
+            font-weight: 500;
+        }
+
+        .textbox {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1e1e2e;
+            border-width: 1px;
+            border-color: #45475a;
+            border-radius: 4px;
+            color: #cdd6f4;
+            font-family: "JetBrains Mono";
+            font-size: 13px;
+        }
+
+        .textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 8px 12px;
+            background: #1e1e2e;
+            border-width: 1px;
+            border-color: #45475a;
+            border-radius: 4px;
+            color: #cdd6f4;
+            font-family: "JetBrains Mono";
+            font-size: 13px;
+        }
+
+        .result-box {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            background: #1e1e2e;
+            border-width: 1px;
+            border-color: #45475a;
+            border-radius: 4px;
+            color: #a6e3a1;
+            font-family: "JetBrains Mono";
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-y: auto;
+        }
+
+        .no-tools {
+            text-align: center;
+            color: #a6adc8;
+            padding: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" data-model="mcp_client_data">
+        <h1>MCP Client</h1>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-text">{{mcp_client_data.status_text}}</div>
+            <div class="button-group">
+                <div data-if="mcp_client_data.is_disconnected == 1"
+                     class="button"
+                     onclick="emit('mcp_connect')">
+                    Connect
+                </div>
+                <div data-if="mcp_client_data.is_connected == 1"
+                     class="button button-secondary"
+                     onclick="emit('mcp_disconnect')">
+                    Disconnect
+                </div>
+                <div data-if="mcp_client_data.is_connected == 1"
+                     class="button button-secondary"
+                     onclick="emit('mcp_reload_tools')">
+                    Reload Tools
+                </div>
+            </div>
+        </div>
+
+        <!-- Tools Section -->
+        <div data-if="mcp_client_data.is_connected == 1" class="tools-section">
+            <h2>Available Tools ({{mcp_client_data.tools_loaded}})</h2>
+
+            <div data-if="mcp_client_data.tools_loaded == 0" class="no-tools">
+                No tools available. Click "Reload Tools" to refresh.
+            </div>
+
+            <div data-if="mcp_client_data.tools_loaded > 0" class="tools-list" data-model="mcp_tools">
+                <div data-for="tool : mcp_tools">
+                    <div class="tool-item" data-attr-data-tool-name="tool.name" onclick="
+                        local tool_name = event.current_element:GetAttribute('data-tool-name')
+                        emit('mcp_select_tool', {tool_name = tool_name})
+                    ">
+                        <div class="tool-name">{{tool.name}}</div>
+                        <div class="tool-description">{{tool.description}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tool Call Section -->
+        <div data-if="mcp_client_data.is_connected == 1" class="call-section">
+            <h2>Call Tool</h2>
+
+            <div class="input-group">
+                <div class="label">Selected Tool:</div>
+                <div class="textbox">{{mcp_client_data.selected_tool}}</div>
+            </div>
+
+            <div class="input-group">
+                <div class="label">Tool Arguments (JSON):</div>
+                <textarea id="tool_input_area" class="textarea" cols="60" rows="5" data-attr-value="mcp_client_data.tool_input"></textarea>
+            </div>
+
+            <div class="input-group">
+                <div class="button" onclick="
+                    local textarea = document:GetElementById('tool_input_area')
+                    if textarea then
+                        local input_value = textarea:GetAttribute('value')
+                        emit('mcp_call_tool', {input_json = input_value})
+                    end
+                ">Call Tool</div>
+            </div>
+
+            <div class="input-group">
+                <div class="label">Result:</div>
+                <div class="result-box">{{mcp_client_data.result}}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
