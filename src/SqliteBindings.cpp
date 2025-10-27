@@ -377,7 +377,7 @@ public:
             // Bind values
             for (size_t i = 0; i < col_names.size(); i++) {
                 sol::object value = row[col_names[i]];
-                int param_index = i + 1;
+                int param_index = static_cast<int>(i) + 1;
 
                 if (value.is<int64_t>()) {
                     sqlite3_bind_int64(stmt, param_index, value.as<int64_t>());
@@ -583,8 +583,6 @@ void SetupBindings(sol::state& lua) {
     };
 
     lua["db"] = db_table;
-
-    LOG_INFO("SQLite bindings initialized");
 }
 
 } // namespace SqliteBindings

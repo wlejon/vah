@@ -150,8 +150,6 @@ void SetupBindings(sol::state& lua) {
     json_table["decode"] = Decode;
 
     lua["json"] = json_table;
-
-    LOG_INFO("JSON bindings initialized");
 }
 
 } // namespace JsonBindings

@@ -528,9 +528,6 @@ function startup()
     -- Register built-in tools
     register_builtin_tools()
 
-    -- Initialize UI state
-    update_ui_state()
-
     print("MCP server system ready (use start command to launch server)")
 end
 

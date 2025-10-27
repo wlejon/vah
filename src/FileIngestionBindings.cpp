@@ -124,8 +124,6 @@ void SetupBindings(sol::state& lua) {
     };
 
     lua["ingest"] = ingest_table;
-
-    LOG_INFO("FileIngestion bindings initialized");
 }
 
 } // namespace FileIngestionBindings

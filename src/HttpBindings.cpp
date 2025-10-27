@@ -581,8 +581,6 @@ void SetupBindings(sol::state& lua, LuaThread* thread) {
         "stop", &HttpServer::Stop,
         "is_running", &HttpServer::IsRunning
     );
-
-    LOG_INFO("HTTP bindings initialized");
 }
 
 } // namespace HttpBindings

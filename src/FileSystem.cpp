@@ -324,8 +324,6 @@ void SetupBindings(sol::state& lua) {
     };
 
     lua["fs"] = fs_table;
-
-    LOG_INFO("FileSystem bindings initialized");
 }
 
 } // namespace FileSystemBindings

@@ -131,8 +131,6 @@ void SetupBindings(sol::state& lua) {
             return {false, "Failed to remove watch"};
         }
     );
-
-    LOG_INFO("FileWatcher bindings initialized");
 }
 
 } // namespace FileWatcherBindings
