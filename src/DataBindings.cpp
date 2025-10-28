@@ -1,6 +1,9 @@
 #include "DataBindings.h"
 #include "Logger.h"
 #include <RmlUi/Core/Types.h>
+#include <cfloat>
+#include <climits>
+#include <cmath>
 
 // Cache Strategy:
 // ----------------
@@ -21,6 +24,11 @@
 // - Next render: first access gets new pointer, old data released
 //
 // No manual cache clearing needed - shared_ptr handles everything!
+
+// Maximum row index that can be encoded as a simple integer pointer
+// This limit avoids confusion with actual heap pointers on typical systems
+// Rows beyond this limit would need nested path allocation (currently not supported for root)
+constexpr intptr_t MAX_SIMPLE_ROW_INDEX = 1000000;
 
 DynamicTableDef::DynamicTableDef(DataStore* store, const std::string& model_name)
     : Rml::VariableDefinition(Rml::DataVariableType::Array)
@@ -144,6 +152,34 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
     // Lua arrays use 1-based indexing, but RmlUi uses 0-based indexing
     // Convert to string key matching Lua's 1-based index
     else if (address.index >= 0) {
+        // Validate array index before creating path
+        // Get the parent value to check if it's an array and validate bounds
+        const DynamicValue* parent_value = nullptr;
+        if (parent_path->path.empty()) {
+            // Accessing a field directly on the row
+            auto field_it = row.find(parent_path->path.empty() ? "" : parent_path->path.back());
+            if (!parent_path->path.empty() && field_it != row.end()) {
+                parent_value = &field_it->second;
+            }
+        } else {
+            parent_value = GetValueAtPath(parent_path);
+        }
+
+        // Check if parent is a nested object (array-like structure)
+        if (parent_value) {
+            if (auto nested = std::get_if<std::shared_ptr<DynamicMap>>(parent_value)) {
+                if (*nested) {
+                    // Check if the 1-based index exists in the nested map
+                    std::string index_key = std::to_string(address.index + 1);
+                    if ((*nested)->fields.find(index_key) == (*nested)->fields.end()) {
+                        LOG_DEBUG("DataBindings: Array index {} out of bounds in model '{}'",
+                                  address.index, model_name_);
+                        return Rml::DataVariable();
+                    }
+                }
+            }
+        }
+
         child_path.path.push_back(std::to_string(address.index + 1));
     }
 
@@ -227,10 +263,20 @@ bool DynamicTableDef::ConvertToVariant(const DynamicValue& value, Rml::Variant& 
             return true;
         }
         else if constexpr (std::is_same_v<T, int64_t>) {
+            // Check for potential truncation when converting int64_t to int
+            if (val > static_cast<int64_t>(INT_MAX) || val < static_cast<int64_t>(INT_MIN)) {
+                LOG_WARN("DataBindings: int64_t value {} exceeds int range, truncation will occur", val);
+            }
             variant = static_cast<int>(val);
             return true;
         }
         else if constexpr (std::is_same_v<T, double>) {
+            // Check for potential precision loss when converting double to float
+            if (std::abs(val) > static_cast<double>(FLT_MAX)) {
+                LOG_WARN("DataBindings: double value {} exceeds float range, precision loss will occur", val);
+            } else if (val != 0.0 && std::abs(val) < static_cast<double>(FLT_MIN)) {
+                LOG_WARN("DataBindings: double value {} below float minimum, may lose precision", val);
+            }
             variant = static_cast<float>(val);
             return true;
         }
@@ -277,21 +323,25 @@ void DynamicTableDef::RefreshCache()
 const DataPath* DynamicTableDef::GetPath(void* ptr)
 {
     if (ptr == nullptr) {
-        static DataPath root_path;
-        root_path.row_index = -1;
-        root_path.path.clear();
-        return &root_path;
+        // Allocate root path in arena to avoid static storage
+        auto root_path = std::make_unique<DataPath>();
+        root_path->row_index = -1;
+        const DataPath* result = root_path.get();
+        path_arena_.push_back(std::move(root_path));
+        return result;
     }
 
     intptr_t ptr_value = reinterpret_cast<intptr_t>(ptr);
 
     // Check if it's a simple row index (small positive integer)
-    // We encoded row indices as row_index + 1, so valid range is 1 to ~1000000
-    if (ptr_value > 0 && ptr_value < 1000000) {
-        static thread_local DataPath simple_path;
-        simple_path.row_index = static_cast<int>(ptr_value - 1);
-        simple_path.path.clear();
-        return &simple_path;
+    // We encoded row indices as row_index + 1, so valid range is 1 to MAX_SIMPLE_ROW_INDEX
+    if (ptr_value > 0 && ptr_value < MAX_SIMPLE_ROW_INDEX) {
+        // Allocate simple path in arena to avoid thread_local static storage
+        auto simple_path = std::make_unique<DataPath>();
+        simple_path->row_index = static_cast<int>(ptr_value - 1);
+        const DataPath* result = simple_path.get();
+        path_arena_.push_back(std::move(simple_path));
+        return result;
     }
 
     // Otherwise it's a heap-allocated path
@@ -382,10 +432,8 @@ Rml::DataVariable DynamicObjectDef::Child(void* ptr, const Rml::DataAddressEntry
             }
 
             // Return a pointer to the field name (we'll use this in Get())
-            // We need to allocate this string on the heap so it stays alive
-            // Store it in a static map to avoid memory leaks
-            static std::unordered_map<std::string, std::string> field_name_storage;
-            auto& stored_name = field_name_storage[field_name];
+            // Store in member variable to avoid unbounded static storage growth
+            auto& stored_name = field_name_storage_[field_name];
             stored_name = field_name;
 
             return Rml::DataVariable(this, reinterpret_cast<void*>(&stored_name));
@@ -429,10 +477,20 @@ bool DynamicObjectDef::ConvertToVariant(const DynamicValue& value, Rml::Variant&
             return true;
         }
         else if constexpr (std::is_same_v<T, int64_t>) {
+            // Check for potential truncation when converting int64_t to int
+            if (val > static_cast<int64_t>(INT_MAX) || val < static_cast<int64_t>(INT_MIN)) {
+                LOG_WARN("DataBindings: int64_t value {} exceeds int range, truncation will occur", val);
+            }
             variant = static_cast<int>(val);
             return true;
         }
         else if constexpr (std::is_same_v<T, double>) {
+            // Check for potential precision loss when converting double to float
+            if (std::abs(val) > static_cast<double>(FLT_MAX)) {
+                LOG_WARN("DataBindings: double value {} exceeds float range, precision loss will occur", val);
+            } else if (val != 0.0 && std::abs(val) < static_cast<double>(FLT_MIN)) {
+                LOG_WARN("DataBindings: double value {} below float minimum, may lose precision", val);
+            }
             variant = static_cast<float>(val);
             return true;
         }
@@ -461,4 +519,7 @@ void DynamicObjectDef::InvalidateCache()
 {
     // Clear the cached data snapshot
     cached_data_.reset();
+
+    // Clear field name storage to prevent unbounded growth
+    field_name_storage_.clear();
 }

@@ -34,10 +34,8 @@ void TextEditorRenderer::GenerateGeometry(Rml::RenderManager* render_manager, bo
         return;
     }
 
-    // Retry font initialization if not ready
+    // Check if font is ready by verifying we have valid metrics
     if (!font_ready_) {
-        layout_.SetFont("jetbrains mono", 14);
-        // Check if it succeeded by seeing if we have valid metrics
         if (layout_.GetCharWidth() > 0.0f && layout_.GetLineHeight() > 0.0f) {
             font_ready_ = true;
         }
@@ -77,7 +75,12 @@ void TextEditorRenderer::RenderAll(const Rml::Vector2f& absolute_offset, bool ed
 }
 
 void TextEditorRenderer::GenerateTextGeometry(Rml::RenderManager* render_manager) {
-    // Clear existing text geometries
+    // Release existing text geometries before clearing
+    for (auto& text_geom : text_geometries_) {
+        if (text_geom.geometry) {
+            text_geom.geometry.Release();
+        }
+    }
     text_geometries_.clear();
 
     auto font_engine = Rml::GetFontEngineInterface();
@@ -86,23 +89,24 @@ void TextEditorRenderer::GenerateTextGeometry(Rml::RenderManager* render_manager
         return;
     }
 
-    // Get font handle (must be lowercase to match RmlUi font system)
+    // Get font handle from layout configuration
+    // Must use exact same parameters as measurement to get same font handle
     Rml::FontFaceHandle font_handle = font_engine->GetFontFaceHandle(
-        "jetbrains mono",
-        Rml::Style::FontStyle::Normal,
-        Rml::Style::FontWeight::Normal,
-        14
+        layout_.GetFontFamily(),
+        layout_.GetFontStyle(),
+        layout_.GetFontWeight(),
+        layout_.GetFontSize()
     );
 
     if (!font_handle) {
+        LOG_ERROR("TextEditorRenderer: Failed to get font handle for '{}'", layout_.GetFontFamily());
         return;
     }
 
     // Get font metrics and validate they're ready
     const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
     if (metrics.ascent <= 0.0f || metrics.descent <= 0.0f || metrics.line_spacing <= 0.0f) {
-        // Font metrics invalid - font not fully initialized yet
-        LOG_WARN("TextEditorRenderer: Font metrics not ready (ascent={}, descent={}, line_spacing={}), retrying next frame",
+        LOG_ERROR("TextEditorRenderer: Invalid font metrics (ascent={}, descent={}, line_spacing={})",
                  metrics.ascent, metrics.descent, metrics.line_spacing);
         return;
     }
@@ -310,8 +314,7 @@ void TextEditorRenderer::GenerateSelectionGeometry(Rml::RenderManager* render_ma
         // First line
         std::string first_line = buffer_.GetLine(start.line);
         float x1 = static_cast<float>(start.column) * char_width;
-        // Include space for newline character (one position past the last character)
-        float x2 = static_cast<float>(first_line.size() + 1) * char_width;
+        float x2 = static_cast<float>(first_line.size()) * char_width;
         float y1 = static_cast<float>(start.line) * line_height;
         float y2 = y1 + line_height;
 
@@ -332,8 +335,7 @@ void TextEditorRenderer::GenerateSelectionGeometry(Rml::RenderManager* render_ma
         for (int line_num = start.line + 1; line_num < end.line; ++line_num) {
             std::string line = buffer_.GetLine(line_num);
             float x1_mid = 0.0f;
-            // Include space for newline character (one position past the last character)
-            float x2_mid = static_cast<float>(line.size() + 1) * char_width;
+            float x2_mid = static_cast<float>(line.size()) * char_width;
             float y1_mid = static_cast<float>(line_num) * line_height;
             float y2_mid = y1_mid + line_height;
 

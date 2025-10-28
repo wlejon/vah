@@ -47,9 +47,12 @@ void ElementCanvas::InitializeNanoVG()
     }
 
     // Load default font (Roboto) for text rendering
+    // Note: Font path is relative to application working directory (same as RmlUI font loading)
     int font_handle = nvgCreateFont(nvg_context_, "roboto", "ui/fonts/roboto-static/Roboto-Regular.ttf");
     if (font_handle == -1) {
-        LOG_WARN("Failed to load font 'roboto' from ui/fonts/roboto-static/Roboto-Regular.ttf");
+        LOG_WARN("Failed to load default font 'roboto' from ui/fonts/roboto-static/Roboto-Regular.ttf");
+    } else {
+        LOG_INFO("Loaded default NanoVG font 'roboto'");
     }
 
     LOG_INFO("NanoVG context created successfully");

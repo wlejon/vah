@@ -495,89 +495,94 @@ function startup()
             return
         end
 
-        -- Read and execute schema
-        local schema_sql, schema_err = fs.read_file("data/code_flows_schema.sql")
-        if schema_err ~= "" then
-            print("ERROR: Failed to read schema: " .. schema_err)
-            init_db:close()
-            return
-        end
-
-        local success, exec_error = init_db:execute(schema_sql)
-        if not success then
-            print("ERROR: Failed to create schema: " .. exec_error)
-            init_db:close()
-            return
-        end
-
-        -- Read and execute tetris population
-        local tetris_sql, tetris_err = fs.read_file("data/populate_tetris_flow.sql")
-        if tetris_err ~= "" then
-            print("ERROR: Failed to read tetris data: " .. tetris_err)
-            init_db:close()
-            return
-        end
-
-        print("Executing tetris population SQL...")
-
-        -- Split the SQL into statements (execute one big SQL doesn't always work properly)
-        -- Execute each section separately to ensure proper commits
-        local statements = {}
-        local current = ""
-        for line in tetris_sql:gmatch("[^\r\n]+") do
-            if line:match("^%s*%-%-") then
-                -- Skip comments
-            elseif line:match(";%s*$") then
-                -- End of statement
-                current = current .. line
-                table.insert(statements, current)
-                current = ""
-            else
-                current = current .. line .. "\n"
+        -- Use pcall to ensure cleanup on error
+        local init_success, init_result = pcall(function()
+            -- Read and execute schema
+            local schema_sql, schema_err = fs.read_file("data/code_flows_schema.sql")
+            if schema_err ~= "" then
+                error("Failed to read schema: " .. schema_err)
             end
-        end
 
-        -- Execute each statement
-        for i, stmt in ipairs(statements) do
-            if stmt:match("%S") then  -- Skip empty statements
-                success, exec_error = init_db:execute(stmt)
-                if not success then
-                    print("ERROR: Failed to execute statement " .. i .. ": " .. exec_error)
-                    print("Statement: " .. stmt:sub(1, 100))
-                    init_db:close()
-                    return
+            local success, exec_error = init_db:execute(schema_sql)
+            if not success then
+                error("Failed to create schema: " .. exec_error)
+            end
+
+            -- Read and execute tetris population
+            local tetris_sql, tetris_err = fs.read_file("data/populate_tetris_flow.sql")
+            if tetris_err ~= "" then
+                error("Failed to read tetris data: " .. tetris_err)
+            end
+
+            print("Executing tetris population SQL...")
+
+            -- Split the SQL into statements (execute one big SQL doesn't always work properly)
+            -- Execute each section separately to ensure proper commits
+            local statements = {}
+            local current = ""
+            for line in tetris_sql:gmatch("[^\r\n]+") do
+                if line:match("^%s*%-%-") then
+                    -- Skip comments
+                elseif line:match(";%s*$") then
+                    -- End of statement
+                    current = current .. line
+                    table.insert(statements, current)
+                    current = ""
+                else
+                    current = current .. line .. "\n"
                 end
             end
-        end
 
-        print("Tetris data populated (" .. #statements .. " statements)")
-
-        -- Verify data was inserted
-        local verify_result, verify_error = init_db:query("SELECT COUNT(*) as count FROM flows")
-        if verify_result and #verify_result > 0 then
-            print("Flows in database: " .. tostring(verify_result[1].count))
-
-            -- Also check if we can query by app_name
-            local test_result, test_error = init_db:query("SELECT id, app_name FROM flows WHERE app_name = 'tetris'")
-            if test_result and #test_result > 0 then
-                print("Found tetris flow with id: " .. tostring(test_result[1].id))
-            else
-                print("WARNING: Cannot find tetris by app_name: " .. tostring(test_error))
-                -- List all flows
-                local all_flows, _ = init_db:query("SELECT id, app_name FROM flows")
-                if all_flows then
-                    print("All flows in database:")
-                    for _, f in ipairs(all_flows) do
-                        print("  - id=" .. tostring(f.id) .. ", app_name=" .. tostring(f.app_name))
+            -- Execute each statement
+            for i, stmt in ipairs(statements) do
+                if stmt:match("%S") then  -- Skip empty statements
+                    local success, exec_error = init_db:execute(stmt)
+                    if not success then
+                        error("Failed to execute statement " .. i .. ": " .. exec_error .. "\nStatement: " .. stmt:sub(1, 100))
                     end
                 end
             end
-        else
-            print("WARNING: Could not verify flow count: " .. tostring(verify_error))
+
+            print("Tetris data populated (" .. #statements .. " statements)")
+
+            -- Verify data was inserted
+            local verify_result, verify_error = init_db:query("SELECT COUNT(*) as count FROM flows")
+            if verify_result and #verify_result > 0 then
+                print("Flows in database: " .. tostring(verify_result[1].count))
+
+                -- Also check if we can query by app_name
+                local test_result, test_error = init_db:query("SELECT id, app_name FROM flows WHERE app_name = 'tetris'")
+                if test_result and #test_result > 0 then
+                    print("Found tetris flow with id: " .. tostring(test_result[1].id))
+                else
+                    print("WARNING: Cannot find tetris by app_name: " .. tostring(test_error))
+                    -- List all flows
+                    local all_flows, _ = init_db:query("SELECT id, app_name FROM flows")
+                    if all_flows then
+                        print("All flows in database:")
+                        for _, f in ipairs(all_flows) do
+                            print("  - id=" .. tostring(f.id) .. ", app_name=" .. tostring(f.app_name))
+                        end
+                    end
+                end
+            else
+                print("WARNING: Could not verify flow count: " .. tostring(verify_error))
+            end
+
+            return init_db
+        end)
+
+        -- Check if initialization succeeded
+        if not init_success then
+            print("ERROR: Database initialization failed: " .. tostring(init_result))
+            if init_db then
+                init_db:close()
+            end
+            return
         end
 
-        -- Don't close! Keep using this database handle
-        database = init_db
+        -- Keep using this database handle
+        database = init_result
         print("Database initialized successfully")
     else
         -- Database already exists, open it

@@ -68,7 +68,11 @@ std::tuple<sol::object, std::string> ListDir(sol::this_state s, const std::strin
             if (entry.is_regular_file()) {
                 try {
                     item["size"] = static_cast<double>(entry.file_size());
+                } catch (const std::exception& e) {
+                    LOG_WARN("FileSystem: Failed to get file size for '{}': {}", entry.path().string(), e.what());
+                    item["size"] = 0.0;
                 } catch (...) {
+                    LOG_WARN("FileSystem: Failed to get file size for '{}': unknown error", entry.path().string());
                     item["size"] = 0.0;
                 }
             } else {
@@ -102,7 +106,11 @@ std::tuple<sol::object, std::string> Stat(sol::this_state s, const std::string& 
         if (fs::is_regular_file(path)) {
             try {
                 result["size"] = static_cast<double>(fs::file_size(path));
+            } catch (const std::exception& e) {
+                LOG_WARN("FileSystem: Failed to get file size for '{}': {}", path, e.what());
+                result["size"] = 0.0;
             } catch (...) {
+                LOG_WARN("FileSystem: Failed to get file size for '{}': unknown error", path);
                 result["size"] = 0.0;
             }
         } else {
@@ -117,7 +125,11 @@ std::tuple<sol::object, std::string> Stat(sol::this_state s, const std::string& 
             );
             auto time_since_epoch = sctp.time_since_epoch().count() / 1000000000.0;
             result["modified_time"] = time_since_epoch;
+        } catch (const std::exception& e) {
+            LOG_WARN("FileSystem: Failed to get modified time for '{}': {}", path, e.what());
+            result["modified_time"] = 0.0;
         } catch (...) {
+            LOG_WARN("FileSystem: Failed to get modified time for '{}': unknown error", path);
             result["modified_time"] = 0.0;
         }
 
@@ -133,7 +145,12 @@ bool Exists(const std::string& path) {
     try {
         return fs::exists(path);
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to check existence of '{}': {}", path, e.what());
+        return false;
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to check existence of '{}': unknown error", path);
         return false;
     }
 }
@@ -171,7 +188,12 @@ std::string GetCwd() {
     try {
         return fs::current_path().string();
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to get current working directory: {}", e.what());
+        return "";
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to get current working directory: unknown error");
         return "";
     }
 }
@@ -211,7 +233,11 @@ std::tuple<bool, std::string> Walk(const std::string& path, sol::function callba
                 if (entry.is_regular_file()) {
                     try {
                         size = entry.file_size();
+                    } catch (const std::exception& e) {
+                        LOG_WARN("FileSystem: Failed to get file size for '{}': {}", entry_path, e.what());
+                        size = 0;
                     } catch (...) {
+                        LOG_WARN("FileSystem: Failed to get file size for '{}': unknown error", entry_path);
                         size = 0;
                     }
                 }
@@ -226,8 +252,14 @@ std::tuple<bool, std::string> Walk(const std::string& path, sol::function callba
                     }
                 }
             }
-            catch (const std::exception&) {
+            catch (const std::exception& e) {
                 // Skip entries that cause errors (permissions, etc)
+                LOG_WARN("FileSystem: Skipping entry during walk: {}", e.what());
+                continue;
+            }
+            catch (...) {
+                // Skip entries that cause errors (permissions, etc)
+                LOG_WARN("FileSystem: Skipping entry during walk: unknown error");
                 continue;
             }
         }
@@ -255,7 +287,12 @@ std::string DirName(const std::string& path) {
     try {
         return fs::path(path).parent_path().string();
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to get dirname for '{}': {}", path, e.what());
+        return "";
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to get dirname for '{}': unknown error", path);
         return "";
     }
 }
@@ -265,7 +302,12 @@ std::string BaseName(const std::string& path) {
     try {
         return fs::path(path).filename().string();
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to get basename for '{}': {}", path, e.what());
+        return "";
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to get basename for '{}': unknown error", path);
         return "";
     }
 }
@@ -275,7 +317,12 @@ std::string Extension(const std::string& path) {
     try {
         return fs::path(path).extension().string();
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to get extension for '{}': {}", path, e.what());
+        return "";
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to get extension for '{}': unknown error", path);
         return "";
     }
 }
@@ -285,7 +332,12 @@ std::string Stem(const std::string& path) {
     try {
         return fs::path(path).stem().string();
     }
+    catch (const std::exception& e) {
+        LOG_WARN("FileSystem: Failed to get stem for '{}': {}", path, e.what());
+        return "";
+    }
     catch (...) {
+        LOG_WARN("FileSystem: Failed to get stem for '{}': unknown error", path);
         return "";
     }
 }

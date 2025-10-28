@@ -18,7 +18,8 @@ M.NODE_TYPES = {
 local function create_parser(tokens)
     return {
         tokens = tokens,
-        pos = 1
+        pos = 1,
+        errors = {}
     }
 end
 
@@ -43,7 +44,14 @@ end
 local function expect(parser, token_type)
     local token = peek(parser)
     if token.type ~= token_type then
-        error("Expected " .. token_type .. " but got " .. token.type)
+        table.insert(parser.errors, {
+            type = "unexpected_token",
+            message = "Expected " .. token_type .. " but got " .. token.type,
+            expected = token_type,
+            got = token.type
+        })
+        -- Return a dummy token to allow parsing to continue
+        return {type = token_type, value = ""}
     end
     return advance(parser)
 end
@@ -76,7 +84,13 @@ local function parse_if_directive(parser)
     -- Get "if" keyword
     local keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if keyword.value ~= "if" then
-        error("Expected 'if' keyword but got '" .. keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "unexpected_keyword",
+            message = "Expected 'if' keyword but got '" .. keyword.value .. "'",
+            expected = "if",
+            got = keyword.value
+        })
+        -- Continue parsing anyway
     end
 
     -- Get condition variable path
@@ -98,7 +112,12 @@ local function parse_if_directive(parser)
     expect(parser, lexer.TOKEN_TYPES.SLASH)
     local end_keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if end_keyword.value ~= "if" then
-        error("Expected '/if' but got '/" .. end_keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "mismatched_close",
+            message = "Expected '/if' but got '/" .. end_keyword.value .. "'",
+            expected = "if",
+            got = end_keyword.value
+        })
     end
     expect(parser, lexer.TOKEN_TYPES.CLOSE_BRACE)
 
@@ -116,7 +135,13 @@ local function parse_unless_directive(parser)
     -- Get "unless" keyword
     local keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if keyword.value ~= "unless" then
-        error("Expected 'unless' keyword but got '" .. keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "unexpected_keyword",
+            message = "Expected 'unless' keyword but got '" .. keyword.value .. "'",
+            expected = "unless",
+            got = keyword.value
+        })
+        -- Continue parsing anyway
     end
 
     -- Get condition variable path
@@ -138,7 +163,12 @@ local function parse_unless_directive(parser)
     expect(parser, lexer.TOKEN_TYPES.SLASH)
     local end_keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if end_keyword.value ~= "unless" then
-        error("Expected '/unless' but got '/" .. end_keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "mismatched_close",
+            message = "Expected '/unless' but got '/" .. end_keyword.value .. "'",
+            expected = "unless",
+            got = end_keyword.value
+        })
     end
     expect(parser, lexer.TOKEN_TYPES.CLOSE_BRACE)
 
@@ -156,7 +186,13 @@ local function parse_each_directive(parser)
     -- Get "each" keyword
     local keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if keyword.value ~= "each" then
-        error("Expected 'each' keyword but got '" .. keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "unexpected_keyword",
+            message = "Expected 'each' keyword but got '" .. keyword.value .. "'",
+            expected = "each",
+            got = keyword.value
+        })
+        -- Continue parsing anyway
     end
 
     -- Get collection variable path
@@ -178,7 +214,12 @@ local function parse_each_directive(parser)
     expect(parser, lexer.TOKEN_TYPES.SLASH)
     local end_keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
     if end_keyword.value ~= "each" then
-        error("Expected '/each' but got '/" .. end_keyword.value .. "'")
+        table.insert(parser.errors, {
+            type = "mismatched_close",
+            message = "Expected '/each' but got '/" .. end_keyword.value .. "'",
+            expected = "each",
+            got = end_keyword.value
+        })
     end
     expect(parser, lexer.TOKEN_TYPES.CLOSE_BRACE)
 
@@ -237,7 +278,12 @@ parse_nodes = function(parser, stop_condition)
                 elseif keyword_token.value == "each" then
                     table.insert(nodes, parse_each_directive(parser))
                 else
-                    error("Unknown directive: #" .. keyword_token.value)
+                    table.insert(parser.errors, {
+                        type = "unknown_directive",
+                        message = "Unknown directive: #" .. keyword_token.value,
+                        directive = keyword_token.value
+                    })
+                    -- Skip this directive and continue
                 end
 
             elseif next_token.type == lexer.TOKEN_TYPES.IDENTIFIER then
@@ -245,7 +291,12 @@ parse_nodes = function(parser, stop_condition)
                 table.insert(nodes, parse_variable_directive(parser))
 
             else
-                error("Unexpected token after {{: " .. next_token.type)
+                table.insert(parser.errors, {
+                    type = "unexpected_token",
+                    message = "Unexpected token after {{: " .. next_token.type,
+                    token_type = next_token.type
+                })
+                -- Skip this token and continue
             end
 
         else
@@ -258,6 +309,7 @@ parse_nodes = function(parser, stop_condition)
 end
 
 -- Main parse function
+-- @return AST root node, errors table
 function M.parse(tokens)
     local parser = create_parser(tokens)
     local nodes = parse_nodes(parser, nil)
@@ -265,7 +317,7 @@ function M.parse(tokens)
     return {
         type = M.NODE_TYPES.ROOT,
         children = nodes
-    }
+    }, parser.errors
 end
 
 return M

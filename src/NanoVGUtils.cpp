@@ -8,13 +8,9 @@ extern "C" {
 }
 
 namespace {
-    // Helper to get NVGcontext* from light userdata at stack position
-    NVGcontext* GetContext(lua_State* L, int idx) {
-        if (!lua_islightuserdata(L, idx)) {
-            luaL_error(L, "Expected NVGcontext (light userdata)");
-            return nullptr;
-        }
-        return static_cast<NVGcontext*>(lua_touserdata(L, idx));
+    // Internal helper - use NanoVGUtils::GetContext() instead
+    inline NVGcontext* GetContextInternal(lua_State* L, int idx) {
+        return NanoVGUtils::GetContext(L, idx);
     }
 
     // Helper to push a color table to the Lua stack
@@ -108,7 +104,7 @@ namespace {
     // ============================================================================
 
     int lua_nvgScissor(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         float x = static_cast<float>(luaL_checknumber(L, 2));
         float y = static_cast<float>(luaL_checknumber(L, 3));
         float w = static_cast<float>(luaL_checknumber(L, 4));
@@ -118,7 +114,7 @@ namespace {
     }
 
     int lua_nvgIntersectScissor(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         float x = static_cast<float>(luaL_checknumber(L, 2));
         float y = static_cast<float>(luaL_checknumber(L, 3));
         float w = static_cast<float>(luaL_checknumber(L, 4));
@@ -128,7 +124,7 @@ namespace {
     }
 
     int lua_nvgResetScissor(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         nvgResetScissor(ctx);
         return 0;
     }
@@ -138,14 +134,14 @@ namespace {
     // ============================================================================
 
     int lua_nvgGlobalCompositeOperation(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         int op = static_cast<int>(luaL_checkinteger(L, 2));
         nvgGlobalCompositeOperation(ctx, op);
         return 0;
     }
 
     int lua_nvgGlobalCompositeBlendFunc(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         int sfactor = static_cast<int>(luaL_checkinteger(L, 2));
         int dfactor = static_cast<int>(luaL_checkinteger(L, 3));
         nvgGlobalCompositeBlendFunc(ctx, sfactor, dfactor);
@@ -153,7 +149,7 @@ namespace {
     }
 
     int lua_nvgGlobalCompositeBlendFuncSeparate(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         int srcRGB = static_cast<int>(luaL_checkinteger(L, 2));
         int dstRGB = static_cast<int>(luaL_checkinteger(L, 3));
         int srcAlpha = static_cast<int>(luaL_checkinteger(L, 4));
@@ -185,7 +181,7 @@ namespace {
     // ============================================================================
 
     int lua_nvgShapeAntiAlias(lua_State* L) {
-        NVGcontext* ctx = GetContext(L, 1);
+        NVGcontext* ctx = GetContextInternal(L, 1);
         int enabled = lua_toboolean(L, 2);
         nvgShapeAntiAlias(ctx, enabled);
         return 0;
@@ -193,23 +189,62 @@ namespace {
 
 } // anonymous namespace
 
-// Public helper function implementation
+// Public helper function implementations
+
+NVGcontext* NanoVGUtils::GetContext(lua_State* L, int idx) {
+    if (!lua_islightuserdata(L, idx)) {
+        luaL_error(L, "Expected NVGcontext (light userdata)");
+        return nullptr;
+    }
+    return static_cast<NVGcontext*>(lua_touserdata(L, idx));
+}
+
 NVGcolor NanoVGUtils::TableToColor(lua_State* L, int idx) {
+    // Validate that we have a table
+    if (!lua_istable(L, idx)) {
+        luaL_error(L, "Expected color table, got %s", lua_typename(L, lua_type(L, idx)));
+        return nvgRGBA(0, 0, 0, 0);
+    }
+
     NVGcolor color;
 
+    // Extract and validate red component
     lua_rawgeti(L, idx, 1);
+    if (!lua_isnumber(L, -1)) {
+        luaL_error(L, "Color table element 1 (red) must be a number");
+        lua_pop(L, 1);
+        return nvgRGBA(0, 0, 0, 0);
+    }
     color.r = static_cast<float>(lua_tonumber(L, -1));
     lua_pop(L, 1);
 
+    // Extract and validate green component
     lua_rawgeti(L, idx, 2);
+    if (!lua_isnumber(L, -1)) {
+        luaL_error(L, "Color table element 2 (green) must be a number");
+        lua_pop(L, 1);
+        return nvgRGBA(0, 0, 0, 0);
+    }
     color.g = static_cast<float>(lua_tonumber(L, -1));
     lua_pop(L, 1);
 
+    // Extract and validate blue component
     lua_rawgeti(L, idx, 3);
+    if (!lua_isnumber(L, -1)) {
+        luaL_error(L, "Color table element 3 (blue) must be a number");
+        lua_pop(L, 1);
+        return nvgRGBA(0, 0, 0, 0);
+    }
     color.b = static_cast<float>(lua_tonumber(L, -1));
     lua_pop(L, 1);
 
+    // Extract and validate alpha component
     lua_rawgeti(L, idx, 4);
+    if (!lua_isnumber(L, -1)) {
+        luaL_error(L, "Color table element 4 (alpha) must be a number");
+        lua_pop(L, 1);
+        return nvgRGBA(0, 0, 0, 0);
+    }
     color.a = static_cast<float>(lua_tonumber(L, -1));
     lua_pop(L, 1);
 

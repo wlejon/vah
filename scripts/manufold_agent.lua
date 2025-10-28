@@ -333,6 +333,19 @@ local function parse_tool_calls(content)
     return adapter:parse_tool_calls(tokens)
 end
 
+-- Trim conversation history to prevent unbounded memory growth
+local function trim_conversation_history()
+    local max_messages = 50
+    if #agent_state.conversation_history > max_messages then
+        print("Trimming conversation history from " .. #agent_state.conversation_history .. " to " .. max_messages .. " messages")
+        local recent = {}
+        for i = #agent_state.conversation_history - max_messages + 1, #agent_state.conversation_history do
+            table.insert(recent, agent_state.conversation_history[i])
+        end
+        agent_state.conversation_history = recent
+    end
+end
+
 -- Send a message to the agent
 local function send_to_agent(user_message)
     -- Add user message to conversation
@@ -342,6 +355,9 @@ local function send_to_agent(user_message)
             content = user_message
         })
     end
+
+    -- Trim conversation history to prevent memory growth
+    trim_conversation_history()
 
     agent_state.is_thinking = true
     agent_state.current_response = ""
@@ -400,6 +416,12 @@ local function send_to_agent(user_message)
         print("Executing " .. #tool_calls .. " tool calls")
         local tool_results = {}
 
+        -- Define critical tools that should stop execution on failure
+        local critical_tools = {
+            execute_schema = true,
+            execute_parser = true
+        }
+
         for _, call in ipairs(tool_calls) do
             local result
 
@@ -425,6 +447,20 @@ local function send_to_agent(user_message)
                 print("Tool success: " .. result_preview .. (result_preview:len() >= 300 and "..." or ""))
             else
                 print("Tool error: " .. (result.error or "Unknown error"))
+            end
+
+            -- Check if this is a critical tool failure
+            if not result.success and critical_tools[call.name] then
+                print("Critical tool failure - stopping execution")
+                -- Add error context to results
+                table.insert(tool_results, {
+                    tool = "system",
+                    result = {
+                        success = false,
+                        error = "Execution stopped due to critical tool failure in " .. call.name
+                    }
+                })
+                break
             end
         end
 
@@ -591,9 +627,27 @@ local function on_approve_schema(payload)
     agent_state.current_state = WORKFLOW_STATES.TRANSFORMATION
     agent_state.status_message = get_status_for_state()
 
-    -- Create database path
+    -- Create database path with validation
     agent_state.session_id = "session_" .. os.time()
-    agent_state.db_path = "data/" .. agent_state.session_id .. ".db"
+
+    -- Ensure data directory exists
+    local data_dir = "data"
+    local dir_stat, dir_err = fs.stat(data_dir)
+    if not dir_stat or not dir_stat.is_dir then
+        print("Creating data directory: " .. data_dir)
+        local create_success, create_err = fs.create_dir(data_dir)
+        if not create_success then
+            print("WARNING: Failed to create data directory: " .. (create_err or "unknown error"))
+            -- Fallback to current directory
+            agent_state.db_path = agent_state.session_id .. ".db"
+        else
+            agent_state.db_path = data_dir .. "/" .. agent_state.session_id .. ".db"
+        end
+    else
+        agent_state.db_path = data_dir .. "/" .. agent_state.session_id .. ".db"
+    end
+
+    print("Database path: " .. agent_state.db_path)
 
     update_ui()
 

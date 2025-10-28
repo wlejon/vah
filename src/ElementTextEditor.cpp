@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <RmlUi/Core/ID.h>
 #include <SDL2/SDL.h>
 #include <chrono>
 
@@ -35,17 +36,56 @@ void ElementTextEditor::OnChildAdd(Rml::Element* element) {
     Rml::Element::OnChildAdd(element);
 
     if (element == this) {
-        // Initialize font (must be lowercase to match RmlUi font system)
-        layout_->SetFont("jetbrains mono", 14);
-
-        // Register for events
+        // Register for events FIRST - must happen even if font initialization fails
         AddEventListener(Rml::EventId::Mousedown, this);
         AddEventListener(Rml::EventId::Mousemove, this);
         AddEventListener(Rml::EventId::Mouseup, this);
         AddEventListener(Rml::EventId::Keydown, this);
-        // Listen for drag events since we have drag: drag; set
         AddEventListener(Rml::EventId::Dragend, this);
         AddEventListener(Rml::EventId::Textinput, this);
+
+        // Initialize font from computed styles
+        const auto& computed = GetComputedValues();
+        Rml::FontFaceHandle font_handle = computed.font_face_handle();
+        auto font_engine = Rml::GetFontEngineInterface();
+
+        if (!font_handle || !font_engine) {
+            LOG_ERROR("ElementTextEditor: Failed to get font handle or font engine");
+            return;
+        }
+
+        const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
+
+        // Measure a single character width
+        Rml::String test_string = "x";
+        Rml::String language = "en";
+        Rml::TextShapingContext context{language};
+        int char_advance = font_engine->GetStringWidth(font_handle, test_string, context);
+
+        if (char_advance <= 0) {
+            LOG_ERROR("ElementTextEditor: Invalid character width measurement: {}", char_advance);
+            return;
+        }
+
+        // Store the measurements in layout
+        layout_->SetFontMetrics(metrics.line_spacing, static_cast<float>(char_advance));
+
+        // Get font parameters for reference (used by renderer)
+        std::string font_family = "jetbrains mono";
+        if (auto p = GetProperty(Rml::PropertyId::FontFamily)) {
+            Rml::String rml_family = p->Get<Rml::String>();
+            if (!rml_family.empty()) {
+                font_family = std::string(rml_family);
+            }
+        }
+
+        // Get style and weight from computed values
+        Rml::Style::FontStyle font_style = computed.font_style();
+        Rml::Style::FontWeight font_weight = computed.font_weight();
+        int font_size = static_cast<int>(computed.font_size());
+
+        // Store font info in layout for renderer to use
+        layout_->SetFontInfo(font_family, font_style, font_weight, font_size);
     }
 }
 
@@ -113,12 +153,18 @@ void ElementTextEditor::ProcessEvent(Rml::Event& event) {
             renderer_->SetCursorPosition(input_->GetCursorPosition());
         }
 
-        // Stop propagation for keys we handle when editable
+        // Stop propagation for all editing and navigation keys when editable
         if (editable_ && (key == Rml::Input::KI_TAB ||
                           key == Rml::Input::KI_RETURN ||
                           key == Rml::Input::KI_NUMPADENTER ||
                           key == Rml::Input::KI_BACK ||
-                          key == Rml::Input::KI_DELETE)) {
+                          key == Rml::Input::KI_DELETE ||
+                          key == Rml::Input::KI_LEFT ||
+                          key == Rml::Input::KI_RIGHT ||
+                          key == Rml::Input::KI_UP ||
+                          key == Rml::Input::KI_DOWN ||
+                          key == Rml::Input::KI_HOME ||
+                          key == Rml::Input::KI_END)) {
             event.StopPropagation();
         }
     }
@@ -179,11 +225,9 @@ void ElementTextEditor::PasteFromClipboard() {
                 cursor = input_->GetCursorPosition();
             }
 
-            // Insert clipboard text at cursor
-            buffer_->InsertText(cursor, clipboard_text);
-
-            // Move cursor to end of inserted text
+            // Insert clipboard text character by character and update cursor position
             for (const char* p = clipboard_text; *p; ++p) {
+                buffer_->InsertChar(cursor, *p);
                 if (*p == '\n') {
                     cursor.line++;
                     cursor.column = 0;

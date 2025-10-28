@@ -24,7 +24,7 @@ public:
     ~CommandProcessor() = default;
 
     // Process a single command
-    void ProcessCommand(const Command& cmd);
+    void ProcessCommand(Command&& cmd);
 
 private:
     ThreadManager* thread_manager_;

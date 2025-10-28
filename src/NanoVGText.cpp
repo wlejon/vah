@@ -1,4 +1,5 @@
 #include "NanoVGText.h"
+#include "NanoVGUtils.h"
 #include "Logger.h"
 #include <nanovg.h>
 
@@ -8,13 +9,9 @@ extern "C" {
 }
 
 namespace {
-    // Helper to get NVGcontext* from light userdata at stack position
-    NVGcontext* GetContext(lua_State* L, int idx) {
-        if (!lua_islightuserdata(L, idx)) {
-            luaL_error(L, "Expected NVGcontext (light userdata)");
-            return nullptr;
-        }
-        return static_cast<NVGcontext*>(lua_touserdata(L, idx));
+    // Use shared GetContext from NanoVGUtils
+    inline NVGcontext* GetContext(lua_State* L, int idx) {
+        return NanoVGUtils::GetContext(L, idx);
     }
 
     // ============================================================================
@@ -26,6 +23,13 @@ namespace {
         const char* name = luaL_checkstring(L, 2);
         const char* filename = luaL_checkstring(L, 3);
         int handle = nvgCreateFont(ctx, name, filename);
+
+        // Return nil on failure instead of -1
+        if (handle == -1) {
+            lua_pushnil(L);
+            return 1;
+        }
+
         lua_pushinteger(L, handle);
         return 1;
     }
@@ -34,6 +38,13 @@ namespace {
         NVGcontext* ctx = GetContext(L, 1);
         const char* name = luaL_checkstring(L, 2);
         int handle = nvgFindFont(ctx, name);
+
+        // Return nil on failure instead of -1
+        if (handle == -1) {
+            lua_pushnil(L);
+            return 1;
+        }
+
         lua_pushinteger(L, handle);
         return 1;
     }

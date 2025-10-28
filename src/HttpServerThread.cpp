@@ -36,14 +36,33 @@ void HttpServerThread::Join() {
 }
 
 HttpResponse HttpServerThread::WaitForResponse(int request_id) {
+    // 30 second timeout to prevent DoS from slow/unresponsive Lua handlers
+    constexpr auto timeout_duration = std::chrono::seconds(30);
+    auto start_time = std::chrono::steady_clock::now();
+    auto last_cleanup = start_time;
+
     // Poll response queue and wait for our response
     while (!should_stop_) {
+        // Check if timeout elapsed
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = now - start_time;
+        if (elapsed >= timeout_duration) {
+            LOG_ERROR("HTTP request {} timed out after 30 seconds", request_id);
+            return {request_id, 504, "application/json", R"({"error": "Gateway Timeout"})"};
+        }
+
+        // Periodic cleanup of stale responses (every 5 seconds)
+        if (now - last_cleanup >= std::chrono::seconds(5)) {
+            CleanupStaleResponses();
+            last_cleanup = now;
+        }
+
         // Check completed responses
         {
             std::lock_guard<std::mutex> lock(pending_mutex_);
             auto it = completed_responses_.find(request_id);
             if (it != completed_responses_.end()) {
-                HttpResponse response = std::move(it->second);
+                HttpResponse response = std::move(it->second.response);
                 completed_responses_.erase(it);
                 return response;
             }
@@ -53,7 +72,10 @@ HttpResponse HttpServerThread::WaitForResponse(int request_id) {
         HttpResponse incoming_response;
         while (response_queue_.try_dequeue(incoming_response)) {
             std::lock_guard<std::mutex> lock(pending_mutex_);
-            completed_responses_[incoming_response.request_id] = std::move(incoming_response);
+            TimestampedResponse timestamped;
+            timestamped.response = std::move(incoming_response);
+            timestamped.timestamp = std::chrono::steady_clock::now();
+            completed_responses_[timestamped.response.request_id] = std::move(timestamped);
             pending_cv_.notify_all();
         }
 
@@ -61,8 +83,24 @@ HttpResponse HttpServerThread::WaitForResponse(int request_id) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    // Timeout or shutdown
-    return {request_id, 500, "application/json", R"({"error": "Server shutting down"})"};
+    // Server shutdown
+    return {request_id, 503, "application/json", R"({"error": "Service Unavailable"})"};
+}
+
+void HttpServerThread::CleanupStaleResponses() {
+    // Remove responses older than 60 seconds (twice the timeout)
+    constexpr auto max_age = std::chrono::seconds(60);
+    auto now = std::chrono::steady_clock::now();
+
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    for (auto it = completed_responses_.begin(); it != completed_responses_.end(); ) {
+        if (now - it->second.timestamp >= max_age) {
+            LOG_WARN("Cleaning up stale HTTP response for request {}", it->first);
+            it = completed_responses_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void HttpServerThread::SetupRoutes() {

@@ -4,6 +4,9 @@
 
 local M = {}
 
+-- Constants
+local MAX_HEADING_LEVEL = 6
+
 -- Token types
 M.TOKEN_TYPES = {
     -- Block-level tokens
@@ -130,7 +133,7 @@ local function next_block_token(lexer)
     -- Heading (must be at start of line)
     if at_line_start(lexer) and current(lexer) == '#' then
         local level = 0
-        while current(lexer) == '#' and level < 6 do
+        while current(lexer) == '#' and level < MAX_HEADING_LEVEL do
             level = level + 1
             advance(lexer)
         end

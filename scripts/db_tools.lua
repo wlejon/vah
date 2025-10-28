@@ -182,6 +182,30 @@ function db_tools.test_query(db, sql, params)
     }
 end
 
+-- Validate column names against schema to prevent SQL injection
+local function validate_column_names(db, table_name, columns)
+    -- Get table schema
+    local table_info, info_error = db:get_table_info(table_name)
+    if info_error ~= "" then
+        return false, "Failed to get table info: " .. info_error
+    end
+
+    -- Build set of valid column names
+    local valid_columns = {}
+    for _, col_info in ipairs(table_info or {}) do
+        valid_columns[col_info.name] = true
+    end
+
+    -- Check each column
+    for _, col_name in ipairs(columns) do
+        if not valid_columns[col_name] then
+            return false, "Invalid column name: " .. col_name
+        end
+    end
+
+    return true, ""
+end
+
 -- Find duplicate rows based on specified columns
 function db_tools.find_duplicates(db, table_name, columns)
     if not db or not db:is_open() then
@@ -194,6 +218,12 @@ function db_tools.find_duplicates(db, table_name, columns)
 
     if not columns or #columns == 0 then
         return nil, "No columns specified for duplicate check"
+    end
+
+    -- Validate column names against schema
+    local valid, error = validate_column_names(db, table_name, columns)
+    if not valid then
+        return nil, error
     end
 
     local col_list = table.concat(columns, ", ")
@@ -342,6 +372,7 @@ function db_tools.compare_schemas(schema1, schema2)
 end
 
 -- Export table data to Lua table format
+-- Default limit of 1000 rows to prevent memory issues with large tables
 function db_tools.export_table(db, table_name, limit)
     if not db or not db:is_open() then
         return nil, "Database not open"
@@ -351,8 +382,11 @@ function db_tools.export_table(db, table_name, limit)
         return nil, "Table '" .. table_name .. "' does not exist"
     end
 
+    -- Apply default limit if none provided
+    limit = limit or 1000
+
     local sql = "SELECT * FROM " .. table_name
-    if limit and limit > 0 then
+    if limit > 0 then
         sql = sql .. " LIMIT " .. limit
     end
 

@@ -199,6 +199,16 @@ local function handle_tag_close(parser, token)
     local closed_count = #parser.stack - index + 1
     for i = 1, closed_count do
         local closed = pop_element(parser)
+        -- Defensive check: ensure we got a valid element
+        if not closed then
+            table.insert(parser.errors, {
+                type = "stack_underflow",
+                message = "Internal error: stack underflow during tag close",
+                line = token.line,
+                col = token.col
+            })
+            break
+        end
         if i > 1 then
             table.insert(parser.errors, {
                 type = "unclosed_tag",
@@ -266,12 +276,17 @@ function M.parse(tokens)
     -- Close any remaining open tags
     while #parser.stack > 0 do
         local unclosed = pop_element(parser)
-        table.insert(parser.errors, {
-            type = "unclosed_tag",
-            message = string.format("Tag <%s> was not closed", unclosed.tag),
-            line = unclosed.line,
-            col = unclosed.col
-        })
+        if unclosed then
+            table.insert(parser.errors, {
+                type = "unclosed_tag",
+                message = string.format("Tag <%s> was not closed", unclosed.tag),
+                line = unclosed.line,
+                col = unclosed.col
+            })
+        else
+            -- Should never happen, but break to prevent infinite loop
+            break
+        end
     end
 
     return parser.root, parser.errors

@@ -47,12 +47,7 @@ local function build_nodes_from_server()
                     type_index = node_data.type_index,
                     name = node_type.name,
                     label = node_data.label,  -- Include custom label from data
-                    color = nvg.rgba(
-                        node_type.color_r or 128,
-                        node_type.color_g or 128,
-                        node_type.color_b or 128,
-                        node_type.color_a or 255
-                    ),
+                    color = node_module.create_color(node_type),
                     inputs = node_type.inputs or {},
                     outputs = node_type.outputs or {},
                 }
@@ -157,7 +152,7 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
     nvg.restore(nvg_ctx)
 
     -- Draw node creation menu (in screen space, but relative to canvas)
-    render.draw_node_menu(nvg_ctx, editor, colors, node_types)
+    render.draw_node_menu(nvg_ctx, editor, colors, node_types, x, y, w, h)
 
     -- Draw UI overlay (in screen space)
     nvg.fontSize(nvg_ctx, 12.0)

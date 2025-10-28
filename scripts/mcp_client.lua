@@ -2,7 +2,11 @@
 -- Model Context Protocol client application
 -- Connects to MCP server and provides UI for tool interaction
 
+-- Configuration constants
 local SERVER_URL = "http://127.0.0.1:8765/mcp"
+local HTTP_TIMEOUT = 30  -- HTTP request timeout in seconds
+local INITIALIZED_TIMEOUT = 5  -- Timeout for initialized notification
+
 local session_id = nil
 local client_status = "disconnected"  -- "disconnected", "connecting", "connected", "error"
 local error_message = ""
@@ -82,7 +86,7 @@ function send_request(method, params, callback)
     local response, err = http.post(SERVER_URL, {
         headers = headers,
         body = body,
-        timeout = 30
+        timeout = HTTP_TIMEOUT
     })
 
     if err ~= "" then
@@ -184,7 +188,7 @@ function connect_to_server()
         http.post(SERVER_URL, {
             headers = headers,
             body = json.encode(notification),
-            timeout = 5
+            timeout = INITIALIZED_TIMEOUT
         })
 
         client_status = "connected"
@@ -206,13 +210,18 @@ function disconnect_from_server()
     print("Disconnecting from MCP server...")
 
     if session_id then
-        -- Send DELETE request to terminate session
-        local headers = {
-            ["Mcp-Session-Id"] = session_id
-        }
-
-        -- Note: http.delete is not implemented, so we'll just clear local state
-        -- In a full implementation, we'd send a DELETE request here
+        -- NOTE: HTTP DELETE not implemented in C++ bindings
+        -- The MCP server supports DELETE /mcp to terminate sessions (see mcp_server.lua:handle_mcp_delete)
+        -- However, the Lua http module only provides http.post and http.get
+        --
+        -- WORKAROUND: Sessions will expire on the server after SESSION_TIMEOUT (1 hour of inactivity)
+        -- The server also has a MAX_SESSIONS limit and will evict oldest sessions if needed
+        --
+        -- TO FIX: Add http.delete() or generic http.request(method, url, options) to C++ HttpClient bindings
+        --
+        -- Expected implementation:
+        -- local headers = { ["Mcp-Session-Id"] = session_id }
+        -- http.delete(SERVER_URL, { headers = headers })
     end
 
     session_id = nil

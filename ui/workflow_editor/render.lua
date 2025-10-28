@@ -21,59 +21,75 @@ function M.draw_grid(nvg_ctx, editor, colors, canvas_x, canvas_y, canvas_w, canv
     local grid_spacing = editor.grid_size
     local accent_spacing = editor.grid_size * 5
 
-    -- Draw fine grid
-    nvg.strokeColor(nvg_ctx, colors.grid)
-    nvg.strokeWidth(nvg_ctx, 1.0 / editor.zoom)
+    -- Optimize grid rendering at low zoom levels
+    -- Calculate potential line count
+    local num_lines_x = (world_x2 - world_x1) / grid_spacing
+    local num_lines_y = (world_y2 - world_y1) / grid_spacing
+    local total_lines = num_lines_x + num_lines_y
 
-    local start_x = math.floor(world_x1 / grid_spacing) * grid_spacing
-    local start_y = math.floor(world_y1 / grid_spacing) * grid_spacing
-
-    local gx = start_x
-    while gx <= world_x2 do
-        if math.abs(gx % accent_spacing) > 0.1 then
-            nvg.beginPath(nvg_ctx)
-            nvg.moveTo(nvg_ctx, gx, world_y1)
-            nvg.lineTo(nvg_ctx, gx, world_y2)
-            nvg.stroke(nvg_ctx)
-        end
-        gx = gx + grid_spacing
+    -- Skip grid entirely if too many lines (zoomed out very far)
+    if total_lines > 400 then
+        nvg.restore(nvg_ctx)
+        return
     end
 
-    local gy = start_y
-    while gy <= world_y2 do
-        if math.abs(gy % accent_spacing) > 0.1 then
-            nvg.beginPath(nvg_ctx)
-            nvg.moveTo(nvg_ctx, world_x1, gy)
-            nvg.lineTo(nvg_ctx, world_x2, gy)
-            nvg.stroke(nvg_ctx)
+    -- At low zoom, only show accent grid
+    local show_fine_grid = editor.zoom >= 0.5
+
+    -- Draw fine grid (only if zoom is high enough)
+    if show_fine_grid then
+        nvg.strokeColor(nvg_ctx, colors.grid)
+        nvg.strokeWidth(nvg_ctx, 1.0 / editor.zoom)
+
+        local start_x = math.floor(world_x1 / grid_spacing) * grid_spacing
+        local start_y = math.floor(world_y1 / grid_spacing) * grid_spacing
+
+        local gx = start_x
+        while gx <= world_x2 do
+            if math.abs(gx % accent_spacing) > 0.1 then
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, gx, world_y1)
+                nvg.lineTo(nvg_ctx, gx, world_y2)
+                nvg.stroke(nvg_ctx)
+            end
+            gx = gx + grid_spacing
         end
-        gy = gy + grid_spacing
+
+        local gy = start_y
+        while gy <= world_y2 do
+            if math.abs(gy % accent_spacing) > 0.1 then
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, world_x1, gy)
+                nvg.lineTo(nvg_ctx, world_x2, gy)
+                nvg.stroke(nvg_ctx)
+            end
+            gy = gy + grid_spacing
+        end
     end
 
     -- Draw accent grid
     nvg.strokeColor(nvg_ctx, colors.grid_accent)
     nvg.strokeWidth(nvg_ctx, 1.5 / editor.zoom)
 
-    gx = start_x
+    local start_x = math.floor(world_x1 / accent_spacing) * accent_spacing
+    local start_y = math.floor(world_y1 / accent_spacing) * accent_spacing
+
+    local gx = start_x
     while gx <= world_x2 do
-        if math.abs(gx % accent_spacing) < 0.1 then
-            nvg.beginPath(nvg_ctx)
-            nvg.moveTo(nvg_ctx, gx, world_y1)
-            nvg.lineTo(nvg_ctx, gx, world_y2)
-            nvg.stroke(nvg_ctx)
-        end
-        gx = gx + grid_spacing
+        nvg.beginPath(nvg_ctx)
+        nvg.moveTo(nvg_ctx, gx, world_y1)
+        nvg.lineTo(nvg_ctx, gx, world_y2)
+        nvg.stroke(nvg_ctx)
+        gx = gx + accent_spacing
     end
 
-    gy = start_y
+    local gy = start_y
     while gy <= world_y2 do
-        if math.abs(gy % accent_spacing) < 0.1 then
-            nvg.beginPath(nvg_ctx)
-            nvg.moveTo(nvg_ctx, world_x1, gy)
-            nvg.lineTo(nvg_ctx, world_x2, gy)
-            nvg.stroke(nvg_ctx)
-        end
-        gy = gy + grid_spacing
+        nvg.beginPath(nvg_ctx)
+        nvg.moveTo(nvg_ctx, world_x1, gy)
+        nvg.lineTo(nvg_ctx, world_x2, gy)
+        nvg.stroke(nvg_ctx)
+        gy = gy + accent_spacing
     end
 
     nvg.restore(nvg_ctx)
@@ -274,7 +290,7 @@ function M.draw_nodes(nvg_ctx, editor, colors)
 end
 
 -- Draw node creation menu
-function M.draw_node_menu(nvg_ctx, editor, colors, node_types)
+function M.draw_node_menu(nvg_ctx, editor, colors, node_types, canvas_x, canvas_y, canvas_w, canvas_h)
     if not editor.show_node_menu then
         return
     end
@@ -286,6 +302,21 @@ function M.draw_node_menu(nvg_ctx, editor, colors, node_types)
     -- Menu position is in canvas-relative coordinates
     local menu_x = editor.canvas_x + editor.node_menu_x
     local menu_y = editor.canvas_y + editor.node_menu_y
+
+    -- Constrain menu to stay within canvas bounds
+    local padding = 5
+    if menu_x + menu_width > canvas_x + canvas_w then
+        menu_x = canvas_x + canvas_w - menu_width - padding
+    end
+    if menu_x < canvas_x + padding then
+        menu_x = canvas_x + padding
+    end
+    if menu_y + menu_height > canvas_y + canvas_h then
+        menu_y = canvas_y + canvas_h - menu_height - padding
+    end
+    if menu_y < canvas_y + padding then
+        menu_y = canvas_y + padding
+    end
 
     -- Menu background
     nvg.beginPath(nvg_ctx)
@@ -326,12 +357,7 @@ function M.draw_node_menu(nvg_ctx, editor, colors, node_types)
         end
 
         -- Color indicator
-        local node_color = nvg.rgba(
-            node_type.color_r or 128,
-            node_type.color_g or 128,
-            node_type.color_b or 128,
-            node_type.color_a or 255
-        )
+        local node_color = node_module.create_color(node_type)
         nvg.beginPath(nvg_ctx)
         nvg.circle(nvg_ctx, menu_x + 15, item_y + item_height / 2, 6)
         nvg.fillColor(nvg_ctx, node_color)

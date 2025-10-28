@@ -3,6 +3,7 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <memory>
 #include <fstream>
+#include <filesystem>
 
 class Logger {
 private:
@@ -12,6 +13,9 @@ public:
     static void Initialize() {
         if (!instance) {
             try {
+                // Ensure logs directory exists
+                std::filesystem::create_directories("logs");
+
                 // Truncate the log file from previous run
                 std::ofstream("logs/log.txt", std::ios::trunc).close();
 

@@ -1,6 +1,13 @@
 -- HTTP SSE Server Example
 -- Demonstrates streaming events via Server-Sent Events
 
+-- Configuration constants
+local SERVER_HOST = "127.0.0.1"
+local SERVER_PORT = 8080
+local STREAM_EVENT_COUNT = 30  -- Number of events to send in the stream
+local STREAM_EVENT_DELAY = 1  -- Seconds between stream events
+local UI_STARTUP_DELAY = 0.1  -- Seconds to wait for UI data binding
+
 local server = nil
 local message_count = 0
 local server_running = false
@@ -22,7 +29,7 @@ function startup()
 
     -- Wait briefly for client thread to bind its initial model
     -- (prevents race condition where UI loads before client model exists)
-    sleep(0.1)
+    sleep(UI_STARTUP_DELAY)
 
     -- Load UI
     ui.load_document("ui/http_demo.rml", true, "http_demo")
@@ -47,7 +54,7 @@ function startup()
             stream = function(send)
                 -- Send events with delay
                 -- This blocks on the server thread (which is this LuaThread)
-                for i = 1, 30 do
+                for i = 1, STREAM_EVENT_COUNT do
                     local data = json.encode({
                         count = i,
                         timestamp = os.time(),
@@ -64,8 +71,8 @@ function startup()
                     server_data.messages = message_count
                     update_model()
 
-                    -- Sleep for 1 second
-                    sleep(1)
+                    -- Sleep between events
+                    sleep(STREAM_EVENT_DELAY)
                 end
 
                 -- Send completion event
@@ -76,12 +83,12 @@ function startup()
     end)
 
     -- Update UI before blocking
-    server_data.status = "Status: Listening on http://127.0.0.1:8080"
+    server_data.status = string.format("Status: Listening on http://%s:%d", SERVER_HOST, SERVER_PORT)
     update_model()
 
     -- Start server (this blocks until server is stopped)
     print("Calling server:listen() - this will block...")
-    local success, err = server:listen("127.0.0.1", 8080)
+    local success, err = server:listen(SERVER_HOST, SERVER_PORT)
 
     -- This is only reached when server stops
     print("Server listen() returned: success=" .. tostring(success))

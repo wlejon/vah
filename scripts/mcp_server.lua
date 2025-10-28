@@ -5,9 +5,15 @@
 -- Load configuration
 local config = require("mcp_config")
 
+-- Configuration constants
+local SESSION_TIMEOUT = 3600  -- Session timeout in seconds (1 hour)
+local MAX_SESSIONS = 100  -- Maximum number of concurrent sessions
+local MAX_RECENT_ACTIONS = 10  -- Maximum number of recent actions to track per session
+local SESSION_CLEANUP_INTERVAL = 60  -- Seconds between session cleanup checks
+
 local sessions = {}
-local next_session_id = 1
 local server_status = "stopped"  -- "stopped", "running"
+local time_since_cleanup = 0.0  -- Track time since last session cleanup
 
 -- Server capabilities (from config)
 local capabilities = config.capabilities
@@ -65,11 +71,20 @@ function update_ui_state()
     })
 end
 
--- Generate session ID
+-- Generate cryptographically random session ID
 function generate_session_id()
-    local id = "session-" .. next_session_id
-    next_session_id = next_session_id + 1
-    return id
+    -- Generate a random session ID using timestamp and random components
+    -- Format: session-<timestamp>-<random>
+    local timestamp = os.time()
+    local random_part = ""
+
+    -- Generate random hex string (16 characters = 64 bits of randomness)
+    -- Use math.random which is seeded from os.time and process ID
+    for i = 1, 16 do
+        random_part = random_part .. string.format("%x", math.random(0, 15))
+    end
+
+    return string.format("session-%d-%s", timestamp, random_part)
 end
 
 -- Register a tool definition
@@ -148,9 +163,74 @@ function add_recent_action(session, action_text)
         timestamp = os.time()
     })
 
-    -- Keep only last 10 actions
-    if #session.recent_actions > 10 then
+    -- Keep only last N actions
+    if #session.recent_actions > MAX_RECENT_ACTIONS then
         table.remove(session.recent_actions, 1)
+    end
+
+    -- Update last activity timestamp
+    session.last_activity = os.time()
+end
+
+-- Clean up expired sessions
+function cleanup_expired_sessions()
+    local current_time = os.time()
+    local expired_sessions = {}
+
+    -- Find expired sessions
+    for session_id, session in pairs(sessions) do
+        local last_activity = session.last_activity or session.created_at
+        if current_time - last_activity > SESSION_TIMEOUT then
+            table.insert(expired_sessions, session_id)
+        end
+    end
+
+    -- Remove expired sessions
+    for _, session_id in ipairs(expired_sessions) do
+        sessions[session_id] = nil
+        print("Session expired: " .. session_id)
+    end
+
+    if #expired_sessions > 0 then
+        print(string.format("Cleaned up %d expired session(s)", #expired_sessions))
+    end
+end
+
+-- Check if we've reached max sessions limit
+function check_session_limit()
+    local count = 0
+    for _ in pairs(sessions) do
+        count = count + 1
+    end
+
+    if count >= MAX_SESSIONS then
+        -- Clean up expired sessions first
+        cleanup_expired_sessions()
+
+        -- Recount
+        count = 0
+        for _ in pairs(sessions) do
+            count = count + 1
+        end
+
+        -- If still at limit, remove oldest session
+        if count >= MAX_SESSIONS then
+            local oldest_id = nil
+            local oldest_time = math.huge
+
+            for session_id, session in pairs(sessions) do
+                local last_activity = session.last_activity or session.created_at
+                if last_activity < oldest_time then
+                    oldest_time = last_activity
+                    oldest_id = session_id
+                end
+            end
+
+            if oldest_id then
+                sessions[oldest_id] = nil
+                print("Removed oldest session to make room: " .. oldest_id)
+            end
+        end
     end
 end
 
@@ -195,12 +275,17 @@ function handle_initialize(message, session_id)
         )
     end
 
+    -- Check session limit before creating new session
+    check_session_limit()
+
     -- Create session with navigation context
+    local current_time = os.time()
     local session = {
         client_capabilities = params.capabilities or {},
         client_info = params.clientInfo or {},
         initialized = false,
-        created_at = os.time(),
+        created_at = current_time,
+        last_activity = current_time,
         current_context = {
             type = nil,
             view = nil,
@@ -285,7 +370,12 @@ function handle_tools_call(message, session)
     local success, result = pcall(tool.handler, arguments, session)
 
     if not success then
-        return json_rpc_error(message.id, -32603, "Tool execution error: " .. tostring(result))
+        -- Include detailed error context in the error response
+        return json_rpc_error(message.id, -32603, "Tool execution error", {
+            message = tostring(result),
+            tool = tool_name,
+            arguments = arguments
+        })
     end
 
     return json_rpc_success(message.id, {
@@ -301,6 +391,11 @@ end
 -- Handle JSON-RPC request
 function handle_request(message, session)
     local method = message.method
+
+    -- Update session activity
+    if session then
+        session.last_activity = os.time()
+    end
 
     if method == "tools/list" then
         return handle_tools_list(message, session)
@@ -323,6 +418,13 @@ function handle_notification(message, session)
     end
 end
 
+-- Validate JSON-RPC request ID
+function validate_request_id(id)
+    -- JSON-RPC 2.0 spec: id MUST be a String, Number, or NULL value
+    local id_type = type(id)
+    return id_type == "string" or id_type == "number" or id == nil
+end
+
 -- Handle MCP POST request
 function handle_mcp_post(body, headers)
     -- Parse JSON-RPC message
@@ -333,6 +435,17 @@ function handle_mcp_post(body, headers)
 
     if not parse_success or not message then
         local err_response = json_rpc_error(nil, -32700, "Parse error")
+        return {
+            status = 400,
+            content_type = "application/json",
+            body = json.encode(err_response),
+            session_id = nil
+        }
+    end
+
+    -- Validate request ID if present (requests have IDs, notifications don't)
+    if message.id ~= nil and not validate_request_id(message.id) then
+        local err_response = json_rpc_error(nil, -32600, "Invalid Request: ID must be string, number, or null")
         return {
             status = 400,
             content_type = "application/json",
@@ -619,8 +732,14 @@ function startup()
 end
 
 function update(dt)
-    -- Nothing to do in update loop
-    -- Server handles requests on its own
+    -- Periodically clean up expired sessions
+    if server_status == "running" then
+        time_since_cleanup = time_since_cleanup + dt
+        if time_since_cleanup >= SESSION_CLEANUP_INTERVAL then
+            cleanup_expired_sessions()
+            time_since_cleanup = 0.0
+        end
+    end
 end
 
 function shutdown()

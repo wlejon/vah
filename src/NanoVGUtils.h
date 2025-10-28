@@ -20,4 +20,7 @@ public:
 
     // Shared helper function to convert Lua color table to NVGcolor
     static NVGcolor TableToColor(lua_State* L, int idx);
+
+    // Shared helper function to get NVGcontext from light userdata at stack position
+    static NVGcontext* GetContext(lua_State* L, int idx);
 };

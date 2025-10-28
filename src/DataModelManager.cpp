@@ -59,6 +59,7 @@ void DataModelManager::UpdateModel(const std::string& model_name, DynamicTable&&
     } else {
         // Model already exists - invalidate cache and mark dirty to trigger re-render
         // Invalidate cache first so the next render picks up the new data
+        // This clears both the cached data snapshot and the path arena
         auto def_it = data_model_defs_.find(model_name);
         if (def_it != data_model_defs_.end()) {
             def_it->second->InvalidateCache();
@@ -106,6 +107,8 @@ void DataModelManager::UpdateObject(const std::string& object_name, DynamicRow&&
         }
     } else {
         // Object already exists - invalidate cache and mark dirty to trigger re-render
+        // Invalidate cache first so the next render picks up the new data
+        // This clears both the cached data snapshot and field name storage
         auto def_it = data_object_defs_.find(object_name);
         if (def_it != data_object_defs_.end()) {
             def_it->second->InvalidateCache();

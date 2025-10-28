@@ -97,6 +97,10 @@ private:
     // For objects, we store a single row (the object's fields)
     std::shared_ptr<const DynamicRow> cached_data_;
 
+    // Storage for field name strings (pointers returned to RmlUi must remain valid)
+    // Cleared on cache invalidation to prevent unbounded growth
+    std::unordered_map<std::string, std::string> field_name_storage_;
+
     // Helper: Get the value at a specific field
     const DynamicValue* GetField(const std::string& field_name);
 

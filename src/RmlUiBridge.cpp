@@ -6,6 +6,7 @@
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
+#include <cerrno>
 
 // Global references for lua callbacks (accessible from main.cpp and other modules)
 RmlUiBridge* g_bridge = nullptr;
@@ -135,13 +136,15 @@ namespace {
                         for (const auto& [key, nested_val] : v->fields) {
                             // Check if key is a number (array index)
                             char* end;
+                            errno = 0;
                             long idx = strtol(key.c_str(), &end, 10);
-                            if (*end == '\0' && idx > 0) {
+                            // Valid conversion if: entire string consumed, no overflow/underflow, and positive
+                            if (*end == '\0' && errno == 0 && idx > 0) {
                                 // It's an array index (Lua uses 1-based)
                                 push_value(nested_val);
                                 lua_rawseti(L, -2, idx);
                             } else {
-                                // It's a string key
+                                // It's a string key (or invalid number - treat as string)
                                 lua_pushstring(L, key.c_str());
                                 push_value(nested_val);
                                 lua_settable(L, -3);

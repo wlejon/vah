@@ -4,8 +4,62 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 namespace SqliteBindings {
+
+// Base64 encoding for BLOB data
+std::string Base64Encode(const unsigned char* data, size_t len) {
+    static const char base64_chars[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"
+        "0123456789+/";
+
+    std::string result;
+    result.reserve(((len + 2) / 3) * 4);
+
+    for (size_t i = 0; i < len; i += 3) {
+        unsigned int val = (data[i] << 16);
+        if (i + 1 < len) val |= (data[i + 1] << 8);
+        if (i + 2 < len) val |= data[i + 2];
+
+        result.push_back(base64_chars[(val >> 18) & 0x3F]);
+        result.push_back(base64_chars[(val >> 12) & 0x3F]);
+        result.push_back((i + 1 < len) ? base64_chars[(val >> 6) & 0x3F] : '=');
+        result.push_back((i + 2 < len) ? base64_chars[val & 0x3F] : '=');
+    }
+
+    return result;
+}
+
+// Helper function to quote SQL identifiers safely
+std::string QuoteIdentifier(const std::string& name) {
+    // Double-quote the identifier and escape any internal double-quotes
+    std::string quoted = "\"";
+    for (char c : name) {
+        if (c == '"') {
+            quoted += "\"\"";  // Escape quotes by doubling them
+        } else {
+            quoted += c;
+        }
+    }
+    quoted += "\"";
+    return quoted;
+}
+
+// Helper function to validate SQL identifiers (for extra safety)
+bool IsValidSQLiteIdentifier(const std::string& name) {
+    if (name.empty() || name.size() > 128) return false;
+    // Allow alphanumeric, underscore, and some common characters
+    // Reject anything that looks suspicious
+    for (char c : name) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-' && c != '.') {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Database handle wrapper for RAII
 class Database {
@@ -24,7 +78,7 @@ public:
         int rc = sqlite3_open(path.c_str(), &db_);
         if (rc != SQLITE_OK) {
             std::string error = sqlite3_errmsg(db_);
-            sqlite3_close(db_);
+            sqlite3_close_v2(db_);
             db_ = nullptr;
             return {false, "Failed to open database: " + error};
         }
@@ -34,7 +88,9 @@ public:
 
     void Close() {
         if (db_) {
-            sqlite3_close(db_);
+            // Use sqlite3_close_v2() which waits for pending statements to finalize
+            // This prevents resource leaks if statements are still active
+            sqlite3_close_v2(db_);
             db_ = nullptr;
         }
     }
@@ -101,7 +157,16 @@ public:
                 }
                 default: {
                     sqlite3_finalize(stmt);
-                    return {sol::nil, "Unsupported parameter type at index " + std::to_string(param_index)};
+                    std::string type_name;
+                    switch (arg_type) {
+                        case sol::type::function: type_name = "function"; break;
+                        case sol::type::userdata: type_name = "userdata"; break;
+                        case sol::type::lightuserdata: type_name = "lightuserdata"; break;
+                        case sol::type::thread: type_name = "thread"; break;
+                        case sol::type::table: type_name = "table"; break;
+                        default: type_name = "unknown"; break;
+                    }
+                    return {sol::nil, "Unsupported parameter type '" + type_name + "' at index " + std::to_string(param_index)};
                 }
             }
 
@@ -138,10 +203,21 @@ public:
                     case SQLITE_NULL:
                         row[col_names[i]] = sol::nil;
                         break;
-                    case SQLITE_BLOB:
-                        // For now, skip blobs or convert to hex string
-                        row[col_names[i]] = sol::nil;
+                    case SQLITE_BLOB: {
+                        // Convert BLOB to base64 string
+                        const void* blob_data = sqlite3_column_blob(stmt, i);
+                        int blob_size = sqlite3_column_bytes(stmt, i);
+                        if (blob_data && blob_size > 0) {
+                            std::string base64 = Base64Encode(
+                                static_cast<const unsigned char*>(blob_data),
+                                static_cast<size_t>(blob_size)
+                            );
+                            row[col_names[i]] = base64;
+                        } else {
+                            row[col_names[i]] = sol::nil;
+                        }
                         break;
+                    }
                 }
             }
 
@@ -202,7 +278,16 @@ public:
                 }
                 default: {
                     sqlite3_finalize(stmt);
-                    return {sol::nil, "Unsupported parameter type at index " + std::to_string(param_index)};
+                    std::string type_name;
+                    switch (arg_type) {
+                        case sol::type::function: type_name = "function"; break;
+                        case sol::type::userdata: type_name = "userdata"; break;
+                        case sol::type::lightuserdata: type_name = "lightuserdata"; break;
+                        case sol::type::thread: type_name = "thread"; break;
+                        case sol::type::table: type_name = "table"; break;
+                        default: type_name = "unknown"; break;
+                    }
+                    return {sol::nil, "Unsupported parameter type '" + type_name + "' at index " + std::to_string(param_index)};
                 }
             }
 
@@ -238,9 +323,21 @@ public:
                     case SQLITE_NULL:
                         row[col_names[i]] = sol::nil;
                         break;
-                    case SQLITE_BLOB:
-                        row[col_names[i]] = sol::nil;
+                    case SQLITE_BLOB: {
+                        // Convert BLOB to base64 string
+                        const void* blob_data = sqlite3_column_blob(stmt, i);
+                        int blob_size = sqlite3_column_bytes(stmt, i);
+                        if (blob_data && blob_size > 0) {
+                            std::string base64 = Base64Encode(
+                                static_cast<const unsigned char*>(blob_data),
+                                static_cast<size_t>(blob_size)
+                            );
+                            row[col_names[i]] = base64;
+                        } else {
+                            row[col_names[i]] = sol::nil;
+                        }
                         break;
+                    }
                 }
             }
 
@@ -330,11 +427,20 @@ public:
             return {0, "Database not open"};
         }
 
-        // Build column list
+        // Validate table name
+        if (!IsValidSQLiteIdentifier(table)) {
+            return {0, "Invalid table name"};
+        }
+
+        // Build column list and validate column names
         std::vector<std::string> col_names;
         for (const auto& [key, value] : columns) {
             if (value.is<std::string>()) {
-                col_names.push_back(value.as<std::string>());
+                std::string col_name = value.as<std::string>();
+                if (!IsValidSQLiteIdentifier(col_name)) {
+                    return {0, "Invalid column name: " + col_name};
+                }
+                col_names.push_back(col_name);
             }
         }
 
@@ -342,11 +448,11 @@ public:
             return {0, "No columns specified"};
         }
 
-        // Build INSERT statement
-        std::string sql = "INSERT INTO " + table + " (";
+        // Build INSERT statement with properly quoted identifiers
+        std::string sql = "INSERT INTO " + QuoteIdentifier(table) + " (";
         for (size_t i = 0; i < col_names.size(); i++) {
             if (i > 0) sql += ", ";
-            sql += col_names[i];
+            sql += QuoteIdentifier(col_names[i]);
         }
         sql += ") VALUES (";
         for (size_t i = 0; i < col_names.size(); i++) {
@@ -420,8 +526,13 @@ public:
             return {sol::nil, "Database not open"};
         }
 
-        // Execute PRAGMA directly
-        std::string sql = "PRAGMA table_info(" + table_name + ")";
+        // Validate and quote the table name to prevent SQL injection
+        if (!IsValidSQLiteIdentifier(table_name)) {
+            return {sol::nil, "Invalid table name"};
+        }
+
+        // Execute PRAGMA with properly quoted identifier
+        std::string sql = "PRAGMA table_info(" + QuoteIdentifier(table_name) + ")";
 
         sqlite3_stmt* stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);

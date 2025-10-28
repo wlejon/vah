@@ -94,6 +94,10 @@ std::string TextBuffer::GetTextRange(const Position& start, const Position& end)
     }
 
     // Multiple lines
+    // Newline insertion logic: Each line is joined with '\n' between them.
+    // - First line and middle lines get a trailing '\n'
+    // - Last line does NOT get a trailing '\n' (it represents the end of selection)
+    // This preserves the text structure without adding an extra newline at the end.
     std::string result;
 
     // First line
@@ -257,6 +261,8 @@ TextBuffer::Position TextBuffer::ClampPosition(const Position& pos) const {
 }
 
 bool TextBuffer::IsValidPosition(const Position& pos) const {
+    // Check lower bounds only - does NOT validate column <= line.size()
+    // For safe position handling that clamps to valid ranges, use ClampPosition() instead
     if (pos.line < 0 || pos.line >= GetLineCount()) {
         return false;
     }

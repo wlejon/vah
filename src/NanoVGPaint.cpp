@@ -10,14 +10,34 @@ extern "C" {
 
 namespace {
     const char* PAINT_METATABLE = "NVGpaint";
+    const char* IMAGE_METATABLE = "NVGimage";
 
-    // Helper to get NVGcontext* from light userdata at stack position
-    NVGcontext* GetContext(lua_State* L, int idx) {
-        if (!lua_islightuserdata(L, idx)) {
-            luaL_error(L, "Expected NVGcontext (light userdata)");
-            return nullptr;
+    // Structure to hold image handle and context (must match NanoVGImage.cpp)
+    struct NVGImageHandle {
+        int handle;
+        NVGcontext* ctx;
+    };
+
+    // Use shared GetContext from NanoVGUtils
+    inline NVGcontext* GetContext(lua_State* L, int idx) {
+        return NanoVGUtils::GetContext(L, idx);
+    }
+
+    // Helper to extract image handle from userdata or integer
+    int GetImageHandle(lua_State* L, int idx) {
+        // Check if it's a userdata with our metatable
+        if (lua_isuserdata(L, idx)) {
+            NVGImageHandle* img = static_cast<NVGImageHandle*>(luaL_checkudata(L, idx, IMAGE_METATABLE));
+            return img->handle;
         }
-        return static_cast<NVGcontext*>(lua_touserdata(L, idx));
+        // Fallback: accept raw integer for backwards compatibility
+        else if (lua_isinteger(L, idx)) {
+            return static_cast<int>(lua_tointeger(L, idx));
+        }
+        else {
+            luaL_error(L, "Expected image handle (userdata or integer)");
+            return -1;
+        }
     }
 
     // Helper to create a paint userdata and set its metatable
@@ -104,7 +124,7 @@ namespace {
         float ex = static_cast<float>(luaL_checknumber(L, 4));
         float ey = static_cast<float>(luaL_checknumber(L, 5));
         float angle = static_cast<float>(luaL_checknumber(L, 6));
-        int image = static_cast<int>(luaL_checkinteger(L, 7));
+        int image = GetImageHandle(L, 7);  // Accept both userdata and integer
         float alpha = static_cast<float>(luaL_checknumber(L, 8));
 
         NVGpaint paint = nvgImagePattern(ctx, ox, oy, ex, ey, angle, image, alpha);

@@ -5,6 +5,11 @@ local FileInspector = {}
 
 -- Detect file format from content
 local function detect_format(content, extension)
+    -- Normalize extension to lowercase
+    if extension then
+        extension = extension:lower()
+    end
+
     -- Try JSON
     if extension == ".json" then
         local success, _ = pcall(json.decode, content)

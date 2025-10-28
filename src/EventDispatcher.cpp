@@ -1,6 +1,5 @@
 #include "EventDispatcher.h"
 #include "Logger.h"
-#include <cassert>
 
 // All EventDispatcher methods run on the main thread only - no locking needed
 // The concurrent queues themselves provide lock-free communication to Lua threads
@@ -54,9 +53,9 @@ void EventDispatcher::UnregisterDocument(const std::string& document_id) {
 void EventDispatcher::RegisterGlobalEvent(const std::string& event_name, int thread_id) {
     auto it = global_events_.find(event_name);
     if (it != global_events_.end()) {
-        LOG_ERROR("EventDispatcher: Global event '{}' already registered by thread {}, cannot register for thread {}",
+        LOG_ERROR("EventDispatcher: Global event '{}' already registered by thread {}, cannot register for thread {}. Registration ignored.",
                   event_name, it->second, thread_id);
-        assert(false && "Global event already registered by another thread");
+        // Don't overwrite existing registration - first registration wins
         return;
     }
 

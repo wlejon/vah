@@ -26,24 +26,47 @@ json LuaToJson(const sol::object& obj) {
     else if (obj.is<sol::table>()) {
         sol::table tbl = obj.as<sol::table>();
 
-        // Check if it's an array (sequential integer keys starting from 1)
-        bool is_array = true;
-        size_t expected_key = 1;
+        // Check if it's an array by verifying all keys are sequential integers starting from 1
+        // We need to count the elements and verify keys 1..N exist (regardless of iteration order)
         size_t count = 0;
+        bool has_non_integer_key = false;
+        int max_key = 0;
 
+        // First pass: count elements and check for non-integer keys
         for (const auto& pair : tbl) {
             count++;
-            if (!pair.first.is<int>() || pair.first.as<int>() != static_cast<int>(expected_key)) {
-                is_array = false;
+            if (!pair.first.is<int>()) {
+                has_non_integer_key = true;
                 break;
             }
-            expected_key++;
+            int key = pair.first.as<int>();
+            if (key > max_key) {
+                max_key = key;
+            }
         }
 
-        if (is_array && count > 0) {
+        // It's an array if:
+        // 1. All keys are integers
+        // 2. Keys form a sequence 1..N without gaps (count == max_key)
+        // 3. There's at least one element
+        bool is_array = !has_non_integer_key && count > 0 && count == static_cast<size_t>(max_key);
+
+        // Verify no gaps if it looks like an array
+        if (is_array) {
+            for (size_t i = 1; i <= count; i++) {
+                sol::optional<sol::object> val = tbl[i];
+                if (!val) {
+                    is_array = false;
+                    break;
+                }
+            }
+        }
+
+        if (is_array) {
             json arr = json::array();
-            for (const auto& pair : tbl) {
-                arr.push_back(LuaToJson(pair.second));
+            // Access elements in order by index
+            for (size_t i = 1; i <= count; i++) {
+                arr.push_back(LuaToJson(tbl[i]));
             }
             return arr;
         }

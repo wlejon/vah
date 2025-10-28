@@ -2,6 +2,11 @@
 -- First native Lua plugin for vah
 -- Provides a notification system with SQL backend and data binding frontend
 
+-- Configuration constants
+local REFRESH_INTERVAL = 0.5  -- Seconds between notification refresh (to remove expired ones)
+local MAX_RECENT_ACTIONS = 10  -- Maximum number of recent actions to track
+local DEFAULT_TTL = 5.0  -- Default time-to-live for notifications in seconds
+
 local database = nil
 local notifications = {}
 local ui_state = {
@@ -50,6 +55,27 @@ function init_database()
     if not success then
         print("Error creating notifications table: " .. exec_error)
         return false
+    end
+
+    -- Create indexes for common queries
+    -- Index for load query: WHERE dismissed = 0 AND (ttl = 0 OR (timestamp + ttl) > ?) ORDER BY timestamp DESC
+    local idx_success, idx_error = database:execute([[
+        CREATE INDEX IF NOT EXISTS idx_notifications_active
+        ON notifications (dismissed, ttl, timestamp DESC)
+    ]])
+
+    if not idx_success then
+        print("Warning: Failed to create index idx_notifications_active: " .. idx_error)
+    end
+
+    -- Index for cleanup query: WHERE dismissed = 1 OR (ttl > 0 AND (timestamp + ttl) <= ?)
+    local idx2_success, idx2_error = database:execute([[
+        CREATE INDEX IF NOT EXISTS idx_notifications_cleanup
+        ON notifications (dismissed, ttl, timestamp)
+    ]])
+
+    if not idx2_success then
+        print("Warning: Failed to create index idx_notifications_cleanup: " .. idx2_error)
     end
 
     return true
@@ -151,7 +177,7 @@ function add_notification(notif)
     local expandable = notif.expandable and 1 or 0
     local expanded_content = notif.expanded_content or ""
     local content_format = notif.content_format or "text"  -- "text" or "markup"
-    local ttl = notif.ttl or 5.0
+    local ttl = notif.ttl or DEFAULT_TTL
     local actions_json = encode_actions(notif.actions)
     local timestamp = os.time()
 
@@ -255,9 +281,10 @@ function handle_action(notification_id, action_event)
     -- Mark as read when action is taken
     mark_read(notification_id)
 
-    -- TODO: Dispatch the action event globally
-    -- For now, just print it
-    print("Would dispatch event: " .. action_event)
+    -- Dispatch the action event globally
+    event.trigger_global(action_event, {
+        notification_id = notification_id
+    })
 end
 
 -- Helper functions for common notification types
@@ -267,7 +294,7 @@ local function success(title, message)
         title = title,
         message = message or "",
         dismissible = true,
-        ttl = 5.0
+        ttl = DEFAULT_TTL
     })
 end
 
@@ -287,7 +314,7 @@ local function info(title, message)
         title = title,
         message = message or "",
         dismissible = true,
-        ttl = 5.0
+        ttl = DEFAULT_TTL
     })
 end
 
@@ -464,9 +491,9 @@ end
 
 -- Update loop
 function update(dt)
-    -- Refresh notifications every 0.5 seconds to remove expired ones
+    -- Refresh notifications periodically to remove expired ones
     time_since_refresh = time_since_refresh + dt
-    if time_since_refresh >= 0.5 then
+    if time_since_refresh >= REFRESH_INTERVAL then
         load_notifications()
         time_since_refresh = 0.0
     end

@@ -8,6 +8,11 @@
 
 namespace HttpBindings {
 
+// HTTP timeout constants
+constexpr int DEFAULT_CONNECTION_TIMEOUT = 30;  // 30 seconds
+constexpr int DEFAULT_READ_TIMEOUT = 30;         // 30 seconds
+constexpr int STREAMING_READ_TIMEOUT = 300;      // 5 minutes for long streams
+
 // URL parsing helper
 struct URLParts {
     std::string scheme;
@@ -29,6 +34,13 @@ URLParts ParseURL(const std::string& url) {
         parts.port = matches[3].matched ? std::stoi(matches[3].str()) :
                      (parts.scheme == "https" ? 443 : 80);
         parts.path = matches[4].matched ? matches[4].str() : "/";
+
+        // Check for HTTPS support
+        if (parts.scheme == "https") {
+            #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+                throw std::runtime_error("HTTPS not supported in this build (OpenSSL support required)");
+            #endif
+        }
     } else {
         throw std::runtime_error("Invalid URL format");
     }
@@ -38,6 +50,7 @@ URLParts ParseURL(const std::string& url) {
 
 // Parse SSE stream and invoke Lua callback for each event
 bool ParseSSEStream(
+    const std::string& scheme,
     const std::string& host,
     int port,
     const std::string& path,
@@ -46,18 +59,38 @@ bool ParseSSEStream(
     sol::optional<sol::function> on_error,
     LuaThread* thread)
 {
-    httplib::Client client(host, port);
-    client.set_connection_timeout(30);
-    client.set_read_timeout(300);  // 5 minutes for long streams
+    // Create appropriate client based on scheme
+    std::unique_ptr<httplib::Client> client;
+    #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+        if (scheme == "https") {
+            client = std::make_unique<httplib::SSLClient>(host, port);
+        } else {
+            client = std::make_unique<httplib::Client>(host, port);
+        }
+    #else
+        client = std::make_unique<httplib::Client>(host, port);
+    #endif
+
+    client->set_connection_timeout(DEFAULT_CONNECTION_TIMEOUT);
+    client->set_read_timeout(STREAMING_READ_TIMEOUT);
 
     std::string event_type;
     std::string event_data;
     std::string buffer;
+    const size_t MAX_BUFFER_SIZE = 10 * 1024 * 1024;  // 10MB limit to prevent unbounded growth
 
-    auto res = client.Get(path, headers,
+    auto res = client->Get(path, headers,
         [&](const char* data, size_t len) {
             // Check if thread is stopping (abort the stream)
             if (thread && thread->ShouldStop()) {
+                return false;
+            }
+
+            // Check buffer size to prevent unbounded memory growth
+            if (buffer.size() + len > MAX_BUFFER_SIZE) {
+                if (on_error) {
+                    (*on_error)("Buffer size exceeded maximum limit (10MB)");
+                }
                 return false;
             }
 
@@ -149,7 +182,7 @@ std::tuple<sol::object, std::string> Get(
 
         // Parse config
         httplib::Headers headers;
-        int timeout = 30;
+        int timeout = DEFAULT_READ_TIMEOUT;
         sol::optional<sol::function> on_event;
         sol::optional<sol::function> on_error;
 
@@ -185,6 +218,7 @@ std::tuple<sol::object, std::string> Get(
             LuaThread* thread = static_cast<LuaThread*>(ptr);
 
             bool success = ParseSSEStream(
+                url_parts.scheme,
                 url_parts.host,
                 url_parts.port,
                 url_parts.path,
@@ -202,10 +236,19 @@ std::tuple<sol::object, std::string> Get(
         }
 
         // Non-streaming mode
-        httplib::Client client(url_parts.host, url_parts.port);
-        client.set_connection_timeout(timeout);
+        std::unique_ptr<httplib::Client> client;
+        #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+            if (url_parts.scheme == "https") {
+                client = std::make_unique<httplib::SSLClient>(url_parts.host, url_parts.port);
+            } else {
+                client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+            }
+        #else
+            client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+        #endif
+        client->set_connection_timeout(timeout);
 
-        auto res = client.Get(url_parts.path, headers);
+        auto res = client->Get(url_parts.path, headers);
 
         if (!res) {
             return {sol::nil, "HTTP request failed: " + httplib::to_string(res.error())};
@@ -244,7 +287,7 @@ std::tuple<sol::object, std::string> Post(
         httplib::Headers headers;
         std::string body;
         std::string content_type = "application/json";
-        int timeout = 30;
+        int timeout = DEFAULT_READ_TIMEOUT;
         sol::optional<sol::function> on_event;
         sol::optional<sol::function> on_error;
 
@@ -284,18 +327,37 @@ std::tuple<sol::object, std::string> Post(
             void* ptr = lua.registry()["__luathread_ptr"];
             LuaThread* thread = static_cast<LuaThread*>(ptr);
 
-            httplib::Client client(url_parts.host, url_parts.port);
-            client.set_connection_timeout(30);
-            client.set_read_timeout(timeout);
+            // Create appropriate client based on scheme
+            std::unique_ptr<httplib::Client> client;
+            #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+                if (url_parts.scheme == "https") {
+                    client = std::make_unique<httplib::SSLClient>(url_parts.host, url_parts.port);
+                } else {
+                    client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+                }
+            #else
+                client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+            #endif
+            client->set_connection_timeout(DEFAULT_CONNECTION_TIMEOUT);
+            client->set_read_timeout(timeout);
 
             std::string event_type;
             std::string event_data;
             std::string buffer;
+            const size_t MAX_BUFFER_SIZE = 10 * 1024 * 1024;  // 10MB limit to prevent unbounded growth
 
-            auto res = client.Post(url_parts.path, headers, body, content_type,
+            auto res = client->Post(url_parts.path, headers, body, content_type,
                 [&](const char* data, size_t len) {
                     // Check if thread is stopping (abort the stream)
                     if (thread && thread->ShouldStop()) {
+                        return false;
+                    }
+
+                    // Check buffer size to prevent unbounded memory growth
+                    if (buffer.size() + len > MAX_BUFFER_SIZE) {
+                        if (on_error) {
+                            (*on_error)("Buffer size exceeded maximum limit (10MB)");
+                        }
                         return false;
                     }
 
@@ -375,10 +437,19 @@ std::tuple<sol::object, std::string> Post(
         }
 
         // Non-streaming mode
-        httplib::Client client(url_parts.host, url_parts.port);
-        client.set_connection_timeout(timeout);
+        std::unique_ptr<httplib::Client> client;
+        #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+            if (url_parts.scheme == "https") {
+                client = std::make_unique<httplib::SSLClient>(url_parts.host, url_parts.port);
+            } else {
+                client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+            }
+        #else
+            client = std::make_unique<httplib::Client>(url_parts.host, url_parts.port);
+        #endif
+        client->set_connection_timeout(timeout);
 
-        auto res = client.Post(url_parts.path, headers, body, content_type);
+        auto res = client->Post(url_parts.path, headers, body, content_type);
 
         if (!res) {
             return {sol::nil, "HTTP request failed: " + httplib::to_string(res.error())};
@@ -510,6 +581,17 @@ public:
             server_->Get(pattern, cpp_handler);
         } else if (method == "POST") {
             server_->Post(pattern, cpp_handler);
+        } else if (method == "PUT") {
+            server_->Put(pattern, cpp_handler);
+        } else if (method == "DELETE") {
+            server_->Delete(pattern, cpp_handler);
+        } else if (method == "PATCH") {
+            server_->Patch(pattern, cpp_handler);
+        } else if (method == "OPTIONS") {
+            server_->Options(pattern, cpp_handler);
+        } else {
+            LOG_ERROR("Unsupported HTTP method: {}", method);
+            throw std::runtime_error("Unsupported HTTP method: " + method);
         }
     }
 

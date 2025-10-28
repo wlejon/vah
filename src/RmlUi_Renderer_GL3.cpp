@@ -1196,7 +1196,7 @@ void RenderInterface_GL3::RenderToClipMask(Rml::ClipMaskOperation operation, Rml
 }
 
 // Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
-#pragma pack(1)
+#pragma pack(push, 1)
 struct TGAHeader {
 	char idLength;
 	char colourMapType;
@@ -1212,7 +1212,7 @@ struct TGAHeader {
 	char imageDescriptor;
 };
 // Restore packing
-#pragma pack()
+#pragma pack(pop)
 
 Rml::TextureHandle RenderInterface_GL3::LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source)
 {
@@ -2088,6 +2088,7 @@ void RenderInterface_GL3::RenderLayerStack::PopLayer()
 {
 	if (layers_size == 0) {
 		// Defensive: Don't pop if there are no layers
+		Rml::Log::Message(Rml::Log::LT_WARNING, "Attempted to pop layer from empty layer stack. This may indicate a logic error.");
 		return;
 	}
 	layers_size -= 1;
@@ -2104,6 +2105,7 @@ const Gfx::FramebufferData& RenderInterface_GL3::RenderLayerStack::GetTopLayer()
 	if (layers_size == 0) {
 		// Return a dummy framebuffer when there are no layers
 		// This can happen when a document has no renderable content (e.g., all data-if conditions fail)
+		Rml::Log::Message(Rml::Log::LT_WARNING, "Accessing top layer from empty layer stack. Returning dummy framebuffer. This may be normal if document has no renderable content.");
 		static Gfx::FramebufferData empty_fb{};
 		return empty_fb;
 	}

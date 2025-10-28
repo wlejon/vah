@@ -3,6 +3,16 @@
 
 local M = {}
 
+-- Convert node type color components to nvg color
+function M.create_color(node_type)
+    return nvg.rgba(
+        node_type.color_r or 128,
+        node_type.color_g or 128,
+        node_type.color_b or 128,
+        node_type.color_a or 255
+    )
+end
+
 -- Create a new node
 function M.create(editor, node_types, x, y, node_type_index)
     local node_type = node_types[node_type_index]
@@ -11,12 +21,7 @@ function M.create(editor, node_types, x, y, node_type_index)
     end
 
     -- Convert color from r,g,b,a components to nvg.rgba
-    local color = nvg.rgba(
-        node_type.color_r or 128,
-        node_type.color_g or 128,
-        node_type.color_b or 128,
-        node_type.color_a or 255
-    )
+    local color = M.create_color(node_type)
 
     local node = {
         id = editor.next_node_id,
@@ -114,18 +119,31 @@ end
 
 -- Update existing nodes to match new type definitions
 function M.update_from_types(editor, node_types)
+    if not node_types or type(node_types) ~= "table" then
+        print("[Workflow] Invalid node_types provided to update_from_types")
+        return
+    end
+
     for _, node in ipairs(editor.nodes) do
-        if node.type_index and node.type_index <= #node_types then
-            local node_type = node_types[node.type_index]
+        if not node.type_index then
+            print("[Workflow] Node missing type_index: " .. (node.id or "unknown"))
+            goto continue
+        end
+
+        if node.type_index > #node_types then
+            print("[Workflow] Node type_index " .. node.type_index .. " out of range (max: " .. #node_types .. ")")
+            goto continue
+        end
+
+        local node_type = node_types[node.type_index]
+        if not node_type then
+            print("[Workflow] Node type at index " .. node.type_index .. " is nil")
+            goto continue
+        end
 
             -- Update node name and color
             node.name = node_type.name
-            node.color = nvg.rgba(
-                node_type.color_r or 128,
-                node_type.color_g or 128,
-                node_type.color_b or 128,
-                node_type.color_a or 255
-            )
+            node.color = M.create_color(node_type)
 
             -- Update inputs
             local old_input_count = #node.inputs
@@ -160,7 +178,8 @@ function M.update_from_types(editor, node_types)
                     end
                 end
             end
-        end
+
+        ::continue::
     end
 end
 

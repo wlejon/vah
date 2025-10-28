@@ -22,6 +22,12 @@ struct HttpResponse {
     std::unordered_map<std::string, std::string> headers;
 };
 
+// Internal structure for tracking response timestamps
+struct TimestampedResponse {
+    HttpResponse response;
+    std::chrono::steady_clock::time_point timestamp;
+};
+
 class HttpServerThread {
 public:
     HttpServerThread(const std::string& host, int port,
@@ -47,6 +53,7 @@ private:
     void ThreadMain();
     void SetupRoutes();
     HttpResponse WaitForResponse(int request_id);
+    void CleanupStaleResponses();
 
     std::string host_;
     int port_;
@@ -63,5 +70,5 @@ private:
     std::atomic<int> next_request_id_;
     std::mutex pending_mutex_;
     std::condition_variable pending_cv_;
-    std::unordered_map<int, HttpResponse> completed_responses_;
+    std::unordered_map<int, TimestampedResponse> completed_responses_;
 };

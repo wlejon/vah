@@ -1,8 +1,8 @@
 #include "NanoVGBindings.h"
+#include "NanoVGUtils.h"
 #include "NanoVGPaint.h"
 #include "NanoVGText.h"
 #include "NanoVGImage.h"
-#include "NanoVGUtils.h"
 #include "Logger.h"
 #include <nanovg.h>
 
@@ -12,13 +12,9 @@ extern "C" {
 }
 
 namespace {
-    // Helper to get NVGcontext* from light userdata at stack position
-    NVGcontext* GetContext(lua_State* L, int idx) {
-        if (!lua_islightuserdata(L, idx)) {
-            luaL_error(L, "Expected NVGcontext (light userdata)");
-            return nullptr;
-        }
-        return static_cast<NVGcontext*>(lua_touserdata(L, idx));
+    // Use shared GetContext from NanoVGUtils
+    inline NVGcontext* GetContext(lua_State* L, int idx) {
+        return NanoVGUtils::GetContext(L, idx);
     }
 
     // ============================================================================

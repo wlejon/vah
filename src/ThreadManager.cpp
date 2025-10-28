@@ -3,6 +3,7 @@
 #include "EventDispatcher.h"
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 namespace {
     // Escape a string for Lua (handle quotes and special characters)
@@ -17,8 +18,19 @@ namespace {
         return result;
     }
 
+    // Forward declaration for cycle detection version
+    void SerializeLuaValueImpl(std::ostream& out, const sol::object& obj, int indent_level,
+                               std::unordered_set<const void*>& visited);
+
     // Convert sol::object to Lua code
     void SerializeLuaValue(std::ostream& out, const sol::object& obj, int indent_level = 0) {
+        std::unordered_set<const void*> visited;
+        SerializeLuaValueImpl(out, obj, indent_level, visited);
+    }
+
+    // Internal implementation with cycle detection
+    void SerializeLuaValueImpl(std::ostream& out, const sol::object& obj, int indent_level,
+                               std::unordered_set<const void*>& visited) {
         std::string indent(indent_level * 2, ' ');
 
         if (!obj.valid() || obj.is<sol::nil_t>()) {
@@ -49,6 +61,18 @@ namespace {
             case sol::type::table: {
                 sol::table tbl = obj.as<sol::table>();
 
+                // Cycle detection: check if we've seen this table before
+                const void* table_ptr = tbl.pointer();
+                if (visited.find(table_ptr) != visited.end()) {
+                    // Cyclic reference detected - output nil to prevent infinite recursion
+                    out << "nil -- cyclic reference detected";
+                    LOG_WARN("Cyclic reference detected in Lua table during serialization");
+                    return;
+                }
+
+                // Mark this table as visited
+                visited.insert(table_ptr);
+
                 // Check if it's an array (consecutive integer keys starting from 1)
                 bool is_array = true;
                 size_t expected_index = 1;
@@ -72,7 +96,7 @@ namespace {
                         // Array-style
                         for (const auto& [key, value] : tbl) {
                             out << indent << "  ";
-                            SerializeLuaValue(out, value, indent_level + 1);
+                            SerializeLuaValueImpl(out, value, indent_level + 1, visited);
                             out << ",\n";
                         }
                     } else {
@@ -102,7 +126,7 @@ namespace {
                             }
 
                             // Write value
-                            SerializeLuaValue(out, value, indent_level + 1);
+                            SerializeLuaValueImpl(out, value, indent_level + 1, visited);
                             out << ",\n";
                         }
                     }
@@ -111,6 +135,9 @@ namespace {
                 }
 
                 out << "}";
+
+                // Remove from visited set when we're done (to allow same table in different branches)
+                visited.erase(table_ptr);
                 break;
             }
 

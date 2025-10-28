@@ -323,10 +323,14 @@ void TextEditorInput::OnTextInput(const std::string& text, bool editable) {
         selection_.ClearSelection();
     }
 
-    // Insert text at cursor
+    // Insert text character by character and update cursor position
+    // Note: For ASCII text, each char is one byte. Cursor column represents byte offset.
     for (char c : text) {
-        if (c >= 32 && c != 127) {  // Printable characters only (not tab, not DEL)
-            buffer_.InsertChar(cursor_pos_, c);
+        buffer_.InsertChar(cursor_pos_, c);
+        if (c == '\n') {
+            cursor_pos_.line++;
+            cursor_pos_.column = 0;
+        } else {
             cursor_pos_.column++;
         }
     }

@@ -3,6 +3,11 @@
 
 local csv_importer = {}
 
+-- Constants
+local DEFAULT_BATCH_SIZE = 1000
+local DEFAULT_DELIMITER_DETECTION_LINES = 10
+local DEFAULT_SCHEMA_SAMPLE_SIZE = 100
+
 -- RFC 4180 compliant CSV parser
 -- Handles quoted fields, embedded commas, newlines, and escaped quotes
 function csv_importer.parse_line(line, delimiter)
@@ -127,7 +132,7 @@ end
 
 -- Detect delimiter by analyzing first few lines
 function csv_importer.detect_delimiter(content, max_lines)
-    max_lines = max_lines or 10
+    max_lines = max_lines or DEFAULT_DELIMITER_DETECTION_LINES
     local delimiters = {",", ";", "\t", "|"}
     local scores = {}
 
@@ -192,7 +197,7 @@ end
 
 -- Infer schema from CSV data
 function csv_importer.infer_schema(parsed_csv, sample_size)
-    sample_size = sample_size or math.min(100, #parsed_csv.rows)
+    sample_size = sample_size or math.min(DEFAULT_SCHEMA_SAMPLE_SIZE, #parsed_csv.rows)
 
     if not parsed_csv.headers then
         return nil, "Cannot infer schema without headers"
@@ -269,13 +274,51 @@ function csv_importer.infer_schema(parsed_csv, sample_size)
     return schema
 end
 
+-- Sanitize SQL identifier (table or column name)
+-- Ensures identifier is safe from SQL injection
+function csv_importer.sanitize_identifier(identifier)
+    if not identifier or identifier == "" then
+        return nil, "Identifier cannot be empty"
+    end
+
+    -- Remove all non-alphanumeric and non-underscore characters
+    local sanitized = identifier:gsub("[^%w_]", "_")
+
+    -- Ensure it doesn't start with a digit
+    if sanitized:match("^%d") then
+        sanitized = "_" .. sanitized
+    end
+
+    -- Ensure it's not empty after sanitization
+    if sanitized == "" or sanitized == "_" then
+        return nil, "Identifier produces invalid SQL name after sanitization"
+    end
+
+    -- Check against SQL reserved words (basic list)
+    local reserved = {
+        select = true, insert = true, update = true, delete = true, drop = true,
+        create = true, alter = true, table = true, database = true, index = true,
+        view = true, trigger = true, from = true, where = true, join = true,
+        union = true, order = true, group = true, having = true, limit = true
+    }
+
+    if reserved[sanitized:lower()] then
+        sanitized = sanitized .. "_column"
+    end
+
+    return sanitized, nil
+end
+
 -- Generate SQLite CREATE TABLE statement
 function csv_importer.generate_create_table(table_name, schema, options)
     options = options or {}
     local add_id = options.add_id ~= false  -- Default true
 
-    -- Sanitize table name
-    local safe_table_name = table_name:gsub("[^%w_]", "_")
+    -- Sanitize table name with validation
+    local safe_table_name, err = csv_importer.sanitize_identifier(table_name)
+    if not safe_table_name then
+        return nil, nil, "Invalid table name: " .. err
+    end
 
     local columns = {}
 
@@ -291,8 +334,11 @@ function csv_importer.generate_create_table(table_name, schema, options)
     table.sort(sorted_columns, function(a, b) return a.index < b.index end)
 
     for _, col in ipairs(sorted_columns) do
-        -- Sanitize column name
-        local safe_name = col.name:gsub("[^%w_]", "_")
+        -- Sanitize column name with validation
+        local safe_name, err = csv_importer.sanitize_identifier(col.name)
+        if not safe_name then
+            return nil, nil, "Invalid column name '" .. col.name .. "': " .. err
+        end
 
         local def = "    " .. safe_name .. " " .. col.type
 
@@ -347,13 +393,16 @@ end
 -- Import CSV into SQLite database
 function csv_importer.import_to_sqlite(database, table_name, parsed_csv, schema, options)
     options = options or {}
-    local batch_size = options.batch_size or 1000
+    local batch_size = options.batch_size or DEFAULT_BATCH_SIZE
     local create_table = options.create_table ~= false  -- Default true
     local add_id = options.add_id ~= false  -- Default true
 
     -- Create table if needed
     if create_table then
-        local create_sql, safe_table_name = csv_importer.generate_create_table(table_name, schema, {add_id = add_id})
+        local create_sql, safe_table_name, err = csv_importer.generate_create_table(table_name, schema, {add_id = add_id})
+        if not create_sql then
+            return false, err or "Failed to generate CREATE TABLE statement"
+        end
         table_name = safe_table_name
 
         local success, error = database:execute(create_sql)
@@ -369,10 +418,20 @@ function csv_importer.import_to_sqlite(database, table_name, parsed_csv, schema,
     end
     table.sort(columns, function(a, b) return a.index < b.index end)
 
-    local safe_table_name = table_name:gsub("[^%w_]", "_")
+    -- Sanitize table name
+    local safe_table_name, err = csv_importer.sanitize_identifier(table_name)
+    if not safe_table_name then
+        return false, "Invalid table name: " .. err
+    end
+
+    -- Sanitize column names
     local column_names = {}
     for _, col in ipairs(columns) do
-        table.insert(column_names, col.name:gsub("[^%w_]", "_"))
+        local safe_name, err = csv_importer.sanitize_identifier(col.name)
+        if not safe_name then
+            return false, "Invalid column name '" .. col.name .. "': " .. err
+        end
+        table.insert(column_names, safe_name)
     end
 
     -- Begin transaction

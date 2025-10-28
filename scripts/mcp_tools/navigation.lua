@@ -3,6 +3,9 @@
 
 local M = {}
 
+-- Configuration constants
+local DEFAULT_PAGE_LIMIT = 10  -- Default number of items per page for list queries
+
 -- Template renderer
 local renderer = require("template_renderer")
 
@@ -47,7 +50,7 @@ local function tool_list(args, session)
     local type_name = args.type
     local context = args.context or {}
     local page = args.page or 1
-    local limit = args.limit or 10
+    local limit = args.limit or DEFAULT_PAGE_LIMIT
 
     if not type_name then
         return "Error: Missing required parameter 'type'"

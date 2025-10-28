@@ -50,9 +50,9 @@ public:
 
     // Getters
     int GetId() const { return id_; }
-    State GetState() const { return state_.load(); }
-    bool IsRunning() const { return state_.load() == State::Running; }
-    bool ShouldStop() const { return should_stop_.load(); }
+    State GetState() const { return state_.load(std::memory_order_acquire); }
+    bool IsRunning() const { return state_.load(std::memory_order_acquire) == State::Running; }
+    bool ShouldStop() const { return should_stop_.load(std::memory_order_acquire); }
     std::string GetError() const { return error_message_; }
     std::string GetScriptPath() const { return script_path_; }
     double GetUptime() const;  // Returns uptime in seconds
@@ -67,14 +67,11 @@ public:
     moodycamel::ConcurrentQueue<Response>* GetResponseQueue() { return response_queue_.get(); }
 
     // HTTP server management (for stopping blocking server on shutdown)
-    void SetActiveHttpServer(httplib::Server* server) { active_http_server_.store(server, std::memory_order_release); }
-    void ClearActiveHttpServer() { active_http_server_.store(nullptr, std::memory_order_release); }
+    void SetActiveHttpServer(httplib::Server* server);
+    void ClearActiveHttpServer();
 
     // Wait for thread to finish
     void Join();
-
-    // Manually process pending responses (for busy-wait scenarios)
-    void ProcessPendingResponses();
 
 private:
     void ThreadMain();
@@ -97,12 +94,12 @@ private:
     std::unique_ptr<moodycamel::ConcurrentQueue<Response>> response_queue_;
 
     struct PendingRequest {
-        int request_id;
+        uint64_t request_id;
         sol::function callback;
         std::string operation;
     };
-    std::unordered_map<int, PendingRequest> pending_requests_;
-    int next_request_id_;
+    std::unordered_map<uint64_t, PendingRequest> pending_requests_;
+    uint64_t next_request_id_;
 
     int parent_thread_id_;
     int parent_request_id_;
@@ -112,5 +109,7 @@ private:
     std::string error_message_;
 
     // Active HTTP server (if any) for this thread - used to stop blocking listen() during shutdown
-    std::atomic<httplib::Server*> active_http_server_;
+    // Using mutex instead of atomic to safely handle server pointer lifecycle
+    std::mutex http_server_mutex_;
+    httplib::Server* active_http_server_;
 };

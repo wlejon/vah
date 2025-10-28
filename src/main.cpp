@@ -47,15 +47,17 @@ public:
 
         // Check if it's an RML, RCSS, or LUA file
         std::string lower_filename = filename;
-        std::transform(lower_filename.begin(), lower_filename.end(), lower_filename.begin(), ::tolower);
+        std::transform(lower_filename.begin(), lower_filename.end(), lower_filename.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
 
         if (lower_filename.ends_with(".rml") || lower_filename.ends_with(".rcss") || lower_filename.ends_with(".lua")) {
-            std::string full_path = dir + filename;
-            LOG_INFO("UI file changed, reloading: {}", full_path);
+            // Use std::filesystem::path for proper path construction
+            std::filesystem::path full_path = std::filesystem::path(dir) / filename;
+            LOG_INFO("UI file changed, reloading: {}", full_path.string());
 
             // Push file changed command for RML, RCSS, and Lua
             Commands::FileChanged cmd;
-            cmd.path = full_path;
+            cmd.path = full_path.string();
             cmd.event_type = "modified";
             command_queue_->enqueue(std::move(cmd));
         }
@@ -324,7 +326,6 @@ public:
 
     void Run() {
         running_ = true;
-        uint64_t frame_number = 0;
 
         while (running_) {
             // Process commands from previous frame FIRST
@@ -339,8 +340,6 @@ public:
 
             // Render the frame
             Render();
-
-            frame_number++;
         }
     }
 
@@ -429,13 +428,57 @@ private:
                 case SDL_MOUSEWHEEL:
                     rml_context_->ProcessMouseWheel(static_cast<float>(-event.wheel.y), 0);
                     break;
-                case SDL_TEXTINPUT:
-                    for (char* c = event.text.text; *c; c++) {
-                        if ((*c & 0x80) == 0) {
-                            rml_context_->ProcessTextInput(static_cast<Rml::Character>(*c));
+                case SDL_TEXTINPUT: {
+                    // SDL_TEXTINPUT provides UTF-8 encoded text
+                    // We need to decode UTF-8 to Unicode code points for RmlUI
+                    const char* text = event.text.text;
+                    while (*text) {
+                        unsigned char byte = static_cast<unsigned char>(*text);
+                        Rml::Character codepoint = static_cast<Rml::Character>(0);
+                        int bytes_to_read = 0;
+
+                        // Determine the number of bytes in this UTF-8 sequence
+                        if ((byte & 0x80) == 0) {
+                            // 1-byte character (ASCII): 0xxxxxxx
+                            codepoint = static_cast<Rml::Character>(byte);
+                            bytes_to_read = 0;
+                        } else if ((byte & 0xE0) == 0xC0) {
+                            // 2-byte character: 110xxxxx 10xxxxxx
+                            codepoint = static_cast<Rml::Character>(byte & 0x1F);
+                            bytes_to_read = 1;
+                        } else if ((byte & 0xF0) == 0xE0) {
+                            // 3-byte character: 1110xxxx 10xxxxxx 10xxxxxx
+                            codepoint = static_cast<Rml::Character>(byte & 0x0F);
+                            bytes_to_read = 2;
+                        } else if ((byte & 0xF8) == 0xF0) {
+                            // 4-byte character: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+                            codepoint = static_cast<Rml::Character>(byte & 0x07);
+                            bytes_to_read = 3;
+                        } else {
+                            // Invalid UTF-8 sequence, skip this byte
+                            text++;
+                            continue;
+                        }
+
+                        // Read continuation bytes
+                        text++;
+                        bool valid = true;
+                        for (int i = 0; i < bytes_to_read; i++) {
+                            if (*text == '\0' || (static_cast<unsigned char>(*text) & 0xC0) != 0x80) {
+                                // Invalid continuation byte
+                                valid = false;
+                                break;
+                            }
+                            codepoint = static_cast<Rml::Character>((static_cast<char32_t>(codepoint) << 6) | (static_cast<unsigned char>(*text) & 0x3F));
+                            text++;
+                        }
+
+                        if (valid) {
+                            rml_context_->ProcessTextInput(codepoint);
                         }
                     }
                     break;
+                }
                 case SDL_KEYDOWN:
                 case SDL_KEYUP: {
                     // Convert SDL key to RmlUI KeyIdentifier
@@ -578,8 +621,10 @@ private:
                 case SDL_DROPFILE:
                     // Handle file/folder drag and drop
                     if (event.drop.file) {
-                        std::string dropped_path(event.drop.file);
-                        SDL_free(event.drop.file);
+                        // Use smart pointer to ensure SDL_free is called even if exception occurs
+                        struct SDL_Free { void operator()(char* p) { SDL_free(p); } };
+                        std::unique_ptr<char, SDL_Free> file_ptr(event.drop.file);
+                        std::string dropped_path(file_ptr.get());
 
                         LOG_INFO("Drop detected: {}", dropped_path);
 
@@ -657,19 +702,20 @@ private:
         if (!first_time_data_commands.empty()) {
             LOG_INFO("Processing {} first-time data model registrations", first_time_data_commands.size());
         }
-        for (const auto& cmd : first_time_data_commands) {
-            command_processor_->ProcessCommand(cmd);
+        for (auto& cmd : first_time_data_commands) {
+            command_processor_->ProcessCommand(std::move(cmd));
         }
 
         // STEP 2: Process other commands (LoadUIDocument, etc.)
-        for (const auto& cmd : other_commands) {
+        for (auto& cmd : other_commands) {
             // Handle FileChanged specially (needs custom path processing logic)
             if (std::holds_alternative<Commands::FileChanged>(cmd)) {
                 const auto& command = std::get<Commands::FileChanged>(cmd);
 
                 if (command.event_type == "modified" && document_manager_) {
                     std::string lower_path = command.path;
-                    std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
+                    std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(),
+                                   [](unsigned char c) { return std::tolower(c); });
 
                     // Normalize path separators to forward slashes
                     std::string normalized_path = command.path;
@@ -687,13 +733,13 @@ private:
                 }
             } else {
                 // Delegate all other commands to CommandProcessor
-                command_processor_->ProcessCommand(cmd);
+                command_processor_->ProcessCommand(std::move(cmd));
             }
         }
 
         // STEP 3: Process coalesced data model updates (only latest per model)
         for (auto& [model_name, update_cmd] : latest_data_updates) {
-            command_processor_->ProcessCommand(update_cmd);
+            command_processor_->ProcessCommand(std::move(update_cmd));
         }
     }
 
@@ -765,6 +811,7 @@ int main(int argc, char* argv[]) {
     catch (const std::exception& e) {
         std::cerr << "Runtime error: " << e.what() << std::endl;
         LOG_CRITICAL("Runtime error: {}", e.what());
+        engine.Shutdown();  // Ensure cleanup even on exception
         return -1;
     }
 

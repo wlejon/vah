@@ -245,42 +245,36 @@ function ParserExecutor.execute_parser(parser_id, file_paths, db_path, dry_run)
                             table.concat(placeholders, ", ")
                         )
 
-                        -- Prepare statement
-                        for _, row in ipairs(rows_to_insert) do
-                            local values = {}
-                            for _, col in ipairs(columns) do
-                                table.insert(values, row[col])
-                            end
+                        -- Prepare statement once
+                        local stmt, stmt_err = db:prepare(insert_sql)
+                        if not stmt then
+                            table.insert(sandbox._errors, {
+                                line = 0,
+                                error = "Failed to prepare statement: " .. (stmt_err or "unknown error"),
+                                context = insert_sql
+                            })
+                        else
+                            -- Execute prepared statement for each row
+                            for _, row in ipairs(rows_to_insert) do
+                                local values = {}
+                                for _, col in ipairs(columns) do
+                                    table.insert(values, row[col])
+                                end
 
-                            -- Execute insert (simplified - in real implementation use prepared statements)
-                            local values_str = {}
-                            for _, val in ipairs(values) do
-                                if type(val) == "string" then
-                                    table.insert(values_str, "'" .. val:gsub("'", "''") .. "'")
-                                elseif val == nil then
-                                    table.insert(values_str, "NULL")
+                                local insert_success, insert_err = stmt:execute(unpack(values))
+                                if insert_success then
+                                    sandbox._rows_inserted = sandbox._rows_inserted + 1
                                 else
-                                    table.insert(values_str, tostring(val))
+                                    table.insert(sandbox._errors, {
+                                        line = 0,
+                                        error = "Insert failed: " .. (insert_err or "unknown error"),
+                                        context = "Row values: " .. json.encode(values)
+                                    })
                                 end
                             end
 
-                            local final_sql = string.format(
-                                "INSERT INTO %s (%s) VALUES (%s)",
-                                parser.target_table,
-                                table.concat(columns, ", "),
-                                table.concat(values_str, ", ")
-                            )
-
-                            local insert_success, insert_err = db:execute(final_sql)
-                            if insert_success then
-                                sandbox._rows_inserted = sandbox._rows_inserted + 1
-                            else
-                                table.insert(sandbox._errors, {
-                                    line = 0,
-                                    error = "Insert failed: " .. (insert_err or "unknown error"),
-                                    context = final_sql
-                                })
-                            end
+                            -- Finalize statement
+                            stmt:finalize()
                         end
                     end
                 else

@@ -62,7 +62,12 @@ public:
     void JoinLines(int line);
 
     // Position validation
+    // ClampPosition: Clamps position to valid buffer bounds (line and column ranges)
+    // Use this when you need to ensure a position is safe to use for operations
     Position ClampPosition(const Position& pos) const;
+
+    // IsValidPosition: Checks if position has valid lower bounds only (line >= 0, column >= 0)
+    // Does NOT check upper bounds - use ClampPosition for safe position handling
     bool IsValidPosition(const Position& pos) const;
 
 private:

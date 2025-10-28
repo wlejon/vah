@@ -5,23 +5,59 @@ local M = {}
 
 -- Database handle (exposed for queries)
 M.db_handle = nil
-local db_handle = nil
+
+-- Input validation helpers
+local function validate_color_value(value, name)
+    if type(value) ~= "number" then
+        return false, name .. " must be a number"
+    end
+    if value < 0 or value > 255 then
+        return false, name .. " must be between 0 and 255"
+    end
+    return true, ""
+end
+
+local function validate_positive_integer(value, name)
+    if type(value) ~= "number" then
+        return false, name .. " must be a number"
+    end
+    if value < 0 or value ~= math.floor(value) then
+        return false, name .. " must be a positive integer"
+    end
+    return true, ""
+end
+
+local function validate_string(value, name)
+    if type(value) ~= "string" then
+        return false, name .. " must be a string"
+    end
+    if #value == 0 then
+        return false, name .. " cannot be empty"
+    end
+    return true, ""
+end
+
+local function validate_port_type(value)
+    if value ~= "input" and value ~= "output" then
+        return false, "port_type must be 'input' or 'output'"
+    end
+    return true, ""
+end
 
 -- Initialize database and create tables
 function M.init()
     -- Open/create database
     local db, error = db.open("data/workflow.db")
     if error ~= "" then
-        print("Error opening workflow database: " .. error)
+        print("M.init: Error opening workflow database: " .. error)
         return false
     end
 
-    db_handle = db
     M.db_handle = db
     print("Workflow database opened successfully")
 
     -- Create node_types table
-    local success, exec_error = db_handle:execute([[
+    local success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS node_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
@@ -39,7 +75,7 @@ function M.init()
     end
 
     -- Create node_type_ports table (for inputs and outputs)
-    success, exec_error = db_handle:execute([[
+    success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS node_type_ports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_type_id INTEGER NOT NULL,
@@ -56,7 +92,7 @@ function M.init()
     end
 
     -- Create workflows table
-    success, exec_error = db_handle:execute([[
+    success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS workflows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -71,7 +107,7 @@ function M.init()
     end
 
     -- Create workflow_nodes table
-    success, exec_error = db_handle:execute([[
+    success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS workflow_nodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             workflow_id INTEGER NOT NULL,
@@ -90,7 +126,7 @@ function M.init()
     end
 
     -- Create workflow_connections table
-    success, exec_error = db_handle:execute([[
+    success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS workflow_connections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             workflow_id INTEGER NOT NULL,
@@ -108,7 +144,7 @@ function M.init()
     end
 
     -- Check if we need to add sample data
-    local count_result, count_error = db_handle:query("SELECT COUNT(*) as count FROM node_types")
+    local count_result, count_error = M.db_handle:query("SELECT COUNT(*) as count FROM node_types")
     if count_error ~= "" then
         print("Error checking node_types count: " .. count_error)
         return false
@@ -118,6 +154,39 @@ function M.init()
         print("Adding default node types...")
         M.add_default_node_types()
     end
+
+    -- Create indexes for performance optimization
+    -- Index on node_type_ports for foreign key lookups
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_node_type_ports_type_id
+        ON node_type_ports(node_type_id)
+    ]])
+
+    -- Indexes on workflow_nodes for foreign key lookups
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_workflow_nodes_workflow_id
+        ON workflow_nodes(workflow_id)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_workflow_nodes_type_id
+        ON workflow_nodes(node_type_id)
+    ]])
+
+    -- Indexes on workflow_connections for foreign key lookups
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_workflow_connections_workflow_id
+        ON workflow_connections(workflow_id)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_workflow_connections_from_node
+        ON workflow_connections(from_node)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_workflow_connections_to_node
+        ON workflow_connections(to_node)
+    ]])
+
+    print("Database indexes created")
 
     return true
 end
@@ -182,46 +251,97 @@ end
 
 -- Create a new node type
 function M.create_node_type(name, r, g, b, a)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.create_node_type: Database not initialized")
         return nil
     end
 
-    -- Escape single quotes
-    local escaped_name = name:gsub("'", "''")
+    -- Validate inputs
+    local valid, err = validate_string(name, "name")
+    if not valid then
+        print("M.create_node_type: " .. err)
+        return nil
+    end
 
-    local sql = string.format([[
+    valid, err = validate_color_value(r, "color_r")
+    if not valid then
+        print("M.create_node_type: " .. err)
+        return nil
+    end
+
+    valid, err = validate_color_value(g, "color_g")
+    if not valid then
+        print("M.create_node_type: " .. err)
+        return nil
+    end
+
+    valid, err = validate_color_value(b, "color_b")
+    if not valid then
+        print("M.create_node_type: " .. err)
+        return nil
+    end
+
+    a = a or 255
+    valid, err = validate_color_value(a, "color_a")
+    if not valid then
+        print("M.create_node_type: " .. err)
+        return nil
+    end
+
+    local sql = [[
         INSERT INTO node_types (name, color_r, color_g, color_b, color_a)
-        VALUES ('%s', %d, %d, %d, %d)
-    ]], escaped_name, r, g, b, a or 255)
+        VALUES (?, ?, ?, ?, ?)
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, name, r, g, b, a)
     if not success then
-        print("Error creating node type: " .. error)
+        print("M.create_node_type: Error creating node type '" .. tostring(name) .. "': " .. error)
         return nil
     end
 
-    return db_handle:last_insert_rowid()
+    return M.db_handle:last_insert_rowid()
 end
 
 -- Add a port to a node type
 function M.add_port(node_type_id, port_name, port_type, port_order)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.add_port: Database not initialized")
         return false
     end
 
-    -- Escape single quotes
-    local escaped_name = port_name:gsub("'", "''")
+    -- Validate inputs
+    local valid, err = validate_positive_integer(node_type_id, "node_type_id")
+    if not valid then
+        print("M.add_port: " .. err)
+        return false
+    end
 
-    local sql = string.format([[
+    valid, err = validate_string(port_name, "port_name")
+    if not valid then
+        print("M.add_port: " .. err)
+        return false
+    end
+
+    valid, err = validate_port_type(port_type)
+    if not valid then
+        print("M.add_port: " .. err)
+        return false
+    end
+
+    valid, err = validate_positive_integer(port_order, "port_order")
+    if not valid then
+        print("M.add_port: " .. err)
+        return false
+    end
+
+    local sql = [[
         INSERT INTO node_type_ports (node_type_id, port_name, port_type, port_order)
-        VALUES (%d, '%s', '%s', %d)
-    ]], node_type_id, escaped_name, port_type, port_order)
+        VALUES (?, ?, ?, ?)
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, node_type_id, port_name, port_type, port_order)
     if not success then
-        print("Error adding port: " .. error)
+        print("M.add_port: Error adding port '" .. tostring(port_name) .. "' to node type " .. tostring(node_type_id) .. ": " .. error)
         return false
     end
 
@@ -230,20 +350,22 @@ end
 
 -- Load all node types from database
 function M.load_node_types()
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.load_node_types: Database not initialized")
         return {}
     end
 
-    -- Query all node types
-    local results, error = db_handle:query([[
-        SELECT id, name, color_r, color_g, color_b, color_a
-        FROM node_types
-        ORDER BY name
+    -- Query all node types with ports in a single JOIN query to avoid N+1 pattern
+    local results, error = M.db_handle:query([[
+        SELECT nt.id, nt.name, nt.color_r, nt.color_g, nt.color_b, nt.color_a,
+               p.port_name, p.port_type, p.port_order
+        FROM node_types nt
+        LEFT JOIN node_type_ports p ON p.node_type_id = nt.id
+        ORDER BY nt.name, p.port_type, p.port_order
     ]])
 
     if error ~= "" then
-        print("Error loading node types: " .. error)
+        print("M.load_node_types: Error loading node types: " .. error)
         return {}
     end
 
@@ -251,40 +373,36 @@ function M.load_node_types()
         return {}
     end
 
-    -- Build node type array
+    -- Build node type array from joined results
     local node_types = {}
+    local node_type_map = {}
 
-    for _, node_type_row in ipairs(results) do
-        local node_type = {
-            id = node_type_row.id,
-            name = node_type_row.name,
-            color_r = node_type_row.color_r,
-            color_g = node_type_row.color_g,
-            color_b = node_type_row.color_b,
-            color_a = node_type_row.color_a,
-            inputs = {},
-            outputs = {}
-        }
-
-        -- Load ports for this node type
-        local ports, port_error = db_handle:query(string.format([[
-            SELECT port_name, port_type, port_order
-            FROM node_type_ports
-            WHERE node_type_id = %d
-            ORDER BY port_order
-        ]], node_type_row.id))
-
-        if port_error == "" and ports then
-            for _, port in ipairs(ports) do
-                if port.port_type == "input" then
-                    table.insert(node_type.inputs, port.port_name)
-                elseif port.port_type == "output" then
-                    table.insert(node_type.outputs, port.port_name)
-                end
-            end
+    for _, row in ipairs(results) do
+        -- Create or find the node type entry
+        local node_type = node_type_map[row.id]
+        if not node_type then
+            node_type = {
+                id = row.id,
+                name = row.name,
+                color_r = row.color_r,
+                color_g = row.color_g,
+                color_b = row.color_b,
+                color_a = row.color_a,
+                inputs = {},
+                outputs = {}
+            }
+            node_type_map[row.id] = node_type
+            table.insert(node_types, node_type)
         end
 
-        table.insert(node_types, node_type)
+        -- Add port if present (LEFT JOIN may have null port data)
+        if row.port_name then
+            if row.port_type == "input" then
+                table.insert(node_type.inputs, row.port_name)
+            elseif row.port_type == "output" then
+                table.insert(node_type.outputs, row.port_name)
+            end
+        end
     end
 
     return node_types
@@ -292,22 +410,58 @@ end
 
 -- Update a node type
 function M.update_node_type(id, name, r, g, b, a)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.update_node_type: Database not initialized")
         return false
     end
 
-    local escaped_name = name:gsub("'", "''")
+    -- Validate inputs
+    local valid, err = validate_positive_integer(id, "id")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
 
-    local sql = string.format([[
+    valid, err = validate_string(name, "name")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
+
+    valid, err = validate_color_value(r, "color_r")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
+
+    valid, err = validate_color_value(g, "color_g")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
+
+    valid, err = validate_color_value(b, "color_b")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
+
+    a = a or 255
+    valid, err = validate_color_value(a, "color_a")
+    if not valid then
+        print("M.update_node_type: " .. err)
+        return false
+    end
+
+    local sql = [[
         UPDATE node_types
-        SET name = '%s', color_r = %d, color_g = %d, color_b = %d, color_a = %d
-        WHERE id = %d
-    ]], escaped_name, r, g, b, a or 255, id)
+        SET name = ?, color_r = ?, color_g = ?, color_b = ?, color_a = ?
+        WHERE id = ?
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, name, r, g, b, a, id)
     if not success then
-        print("Error updating node type: " .. error)
+        print("M.update_node_type: Error updating node type " .. tostring(id) .. ": " .. error)
         return false
     end
 
@@ -316,16 +470,23 @@ end
 
 -- Delete a node type and its ports
 function M.delete_node_type(id)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.delete_node_type: Database not initialized")
         return false
     end
 
-    local sql = string.format("DELETE FROM node_types WHERE id = %d", id)
-    local success, error = db_handle:execute(sql)
+    -- Validate input
+    local valid, err = validate_positive_integer(id, "id")
+    if not valid then
+        print("M.delete_node_type: " .. err)
+        return false
+    end
+
+    local sql = "DELETE FROM node_types WHERE id = ?"
+    local success, error = M.db_handle:execute(sql, id)
 
     if not success then
-        print("Error deleting node type: " .. error)
+        print("M.delete_node_type: Error deleting node type " .. tostring(id) .. ": " .. error)
         return false
     end
 
@@ -334,16 +495,23 @@ end
 
 -- Delete all ports for a node type
 function M.delete_ports(node_type_id)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.delete_ports: Database not initialized")
         return false
     end
 
-    local sql = string.format("DELETE FROM node_type_ports WHERE node_type_id = %d", node_type_id)
-    local success, error = db_handle:execute(sql)
+    -- Validate input
+    local valid, err = validate_positive_integer(node_type_id, "node_type_id")
+    if not valid then
+        print("M.delete_ports: " .. err)
+        return false
+    end
+
+    local sql = "DELETE FROM node_type_ports WHERE node_type_id = ?"
+    local success, error = M.db_handle:execute(sql, node_type_id)
 
     if not success then
-        print("Error deleting ports: " .. error)
+        print("M.delete_ports: Error deleting ports for node type " .. tostring(node_type_id) .. ": " .. error)
         return false
     end
 
@@ -352,9 +520,9 @@ end
 
 -- Close database
 function M.close()
-    if db_handle then
-        db_handle:close()
-        db_handle = nil
+    if M.db_handle then
+        M.db_handle:close()
+        M.db_handle = nil
         M.db_handle = nil
     end
 end
@@ -365,42 +533,40 @@ end
 
 -- Create a new workflow
 function M.create_workflow(name)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.create_workflow: Database not initialized")
         return nil
     end
 
-    local escaped_name = name:gsub("'", "''")
-
-    local sql = string.format([[
+    local sql = [[
         INSERT INTO workflows (name)
-        VALUES ('%s')
-    ]], escaped_name)
+        VALUES (?)
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, name)
     if not success then
-        print("Error creating workflow: " .. error)
+        print("M.create_workflow: Error creating workflow '" .. tostring(name) .. "': " .. error)
         return nil
     end
 
-    return db_handle:last_insert_rowid()
+    return M.db_handle:last_insert_rowid()
 end
 
 -- Get all workflows
 function M.get_workflows()
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.get_workflows: Database not initialized")
         return {}
     end
 
-    local results, error = db_handle:query([[
+    local results, error = M.db_handle:query([[
         SELECT id, name, created_at, updated_at
         FROM workflows
         ORDER BY updated_at DESC
     ]])
 
     if error ~= "" then
-        print("Error loading workflows: " .. error)
+        print("M.get_workflows: Error loading workflows: " .. error)
         return {}
     end
 
@@ -409,22 +575,20 @@ end
 
 -- Update workflow name
 function M.update_workflow(id, name)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.update_workflow: Database not initialized")
         return false
     end
 
-    local escaped_name = name:gsub("'", "''")
-
-    local sql = string.format([[
+    local sql = [[
         UPDATE workflows
-        SET name = '%s', updated_at = CURRENT_TIMESTAMP
-        WHERE id = %d
-    ]], escaped_name, id)
+        SET name = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, name, id)
     if not success then
-        print("Error updating workflow: " .. error)
+        print("M.update_workflow: Error updating workflow " .. tostring(id) .. ": " .. error)
         return false
     end
 
@@ -433,16 +597,16 @@ end
 
 -- Delete a workflow
 function M.delete_workflow(id)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.delete_workflow: Database not initialized")
         return false
     end
 
-    local sql = string.format("DELETE FROM workflows WHERE id = %d", id)
-    local success, error = db_handle:execute(sql)
+    local sql = "DELETE FROM workflows WHERE id = ?"
+    local success, error = M.db_handle:execute(sql, id)
 
     if not success then
-        print("Error deleting workflow: " .. error)
+        print("M.delete_workflow: Error deleting workflow " .. tostring(id) .. ": " .. error)
         return false
     end
 
@@ -451,191 +615,248 @@ end
 
 -- Save workflow state (nodes and connections)
 function M.save_workflow(workflow_id, nodes, connections)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.save_workflow: Database not initialized")
+        return false
+    end
+
+    -- Use transaction for atomicity and performance
+    local success, error = M.db_handle:execute("BEGIN TRANSACTION")
+    if not success then
+        print("M.save_workflow: Error beginning transaction: " .. error)
         return false
     end
 
     -- Clear existing nodes and connections for this workflow
-    db_handle:execute(string.format("DELETE FROM workflow_nodes WHERE workflow_id = %d", workflow_id))
-    db_handle:execute(string.format("DELETE FROM workflow_connections WHERE workflow_id = %d", workflow_id))
+    success, error = M.db_handle:execute("DELETE FROM workflow_nodes WHERE workflow_id = ?", workflow_id)
+    if not success then
+        print("M.save_workflow: Error deleting workflow nodes: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
+
+    success, error = M.db_handle:execute("DELETE FROM workflow_connections WHERE workflow_id = ?", workflow_id)
+    if not success then
+        print("M.save_workflow: Error deleting workflow connections: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
 
     -- Save nodes
     for _, node in ipairs(nodes) do
-        local sql = string.format([[
+        local sql = [[
             INSERT INTO workflow_nodes (workflow_id, node_id, node_type_id, x, y)
-            VALUES (%d, %d, %d, %f, %f)
-        ]], workflow_id, node.id, node.type_index, node.x, node.y)
+            VALUES (?, ?, ?, ?, ?)
+        ]]
 
-        local success, error = db_handle:execute(sql)
+        success, error = M.db_handle:execute(sql, workflow_id, node.id, node.type_index, node.x, node.y)
         if not success then
-            print("Error saving workflow node: " .. error)
+            print("M.save_workflow: Error saving workflow node " .. tostring(node.id) .. ": " .. error)
+            M.db_handle:execute("ROLLBACK")
             return false
         end
     end
 
     -- Save connections
     for _, conn in ipairs(connections) do
-        local sql = string.format([[
+        local sql = [[
             INSERT INTO workflow_connections (workflow_id, from_node, from_port, to_node, to_port)
-            VALUES (%d, %d, %d, %d, %d)
-        ]], workflow_id, conn.from_node, conn.from_port, conn.to_node, conn.to_port)
+            VALUES (?, ?, ?, ?, ?)
+        ]]
 
-        local success, error = db_handle:execute(sql)
+        success, error = M.db_handle:execute(sql, workflow_id, conn.from_node, conn.from_port, conn.to_node, conn.to_port)
         if not success then
-            print("Error saving workflow connection: " .. error)
+            print("M.save_workflow: Error saving workflow connection: " .. error)
+            M.db_handle:execute("ROLLBACK")
             return false
         end
     end
 
     -- Update timestamp
-    db_handle:execute(string.format([[
-        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
-    ]], workflow_id))
+    success, error = M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+    if not success then
+        print("M.save_workflow: Error updating workflow timestamp: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
+
+    -- Commit transaction
+    success, error = M.db_handle:execute("COMMIT")
+    if not success then
+        print("M.save_workflow: Error committing transaction: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
 
     return true
 end
 
 -- Add a single node to a workflow
 function M.add_node(workflow_id, node_id, node_type_id, x, y)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.add_node: Database not initialized")
         return false
     end
 
-    local sql = string.format([[
+    local sql = [[
         INSERT INTO workflow_nodes (workflow_id, node_id, node_type_id, x, y)
-        VALUES (%d, %d, %d, %f, %f)
-    ]], workflow_id, node_id, node_type_id, x, y)
+        VALUES (?, ?, ?, ?, ?)
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, workflow_id, node_id, node_type_id, x, y)
     if not success then
-        print("Error adding workflow node: " .. error)
+        print("M.add_node: Error adding workflow node " .. tostring(node_id) .. ": " .. error)
         return false
     end
 
     -- Update workflow timestamp
-    db_handle:execute(string.format([[
-        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
-    ]], workflow_id))
+    success, error = M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+    if not success then
+        print("M.add_node: Error updating workflow timestamp: " .. error)
+    end
 
     return true
 end
 
 -- Update a node's position
 function M.update_node_position(workflow_id, node_id, x, y)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.update_node_position: Database not initialized")
         return false
     end
 
-    local sql = string.format([[
+    local sql = [[
         UPDATE workflow_nodes
-        SET x = %f, y = %f
-        WHERE workflow_id = %d AND node_id = %d
-    ]], x, y, workflow_id, node_id)
+        SET x = ?, y = ?
+        WHERE workflow_id = ? AND node_id = ?
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, x, y, workflow_id, node_id)
     if not success then
-        print("Error updating node position: " .. error)
+        print("M.update_node_position: Error updating node " .. tostring(node_id) .. " position: " .. error)
         return false
     end
 
     -- Update workflow timestamp
-    db_handle:execute(string.format([[
-        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
-    ]], workflow_id))
+    success, error = M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+    if not success then
+        print("M.update_node_position: Error updating workflow timestamp: " .. error)
+    end
 
     return true
 end
 
 -- Delete a node from a workflow
 function M.delete_node(workflow_id, node_id)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.delete_node: Database not initialized")
+        return false
+    end
+
+    -- Use transaction for atomicity
+    local success, error = M.db_handle:execute("BEGIN TRANSACTION")
+    if not success then
+        print("M.delete_node: Error beginning transaction: " .. error)
         return false
     end
 
     -- Delete the node
-    local sql = string.format([[
-        DELETE FROM workflow_nodes WHERE workflow_id = %d AND node_id = %d
-    ]], workflow_id, node_id)
+    local sql = "DELETE FROM workflow_nodes WHERE workflow_id = ? AND node_id = ?"
 
-    local success, error = db_handle:execute(sql)
+    success, error = M.db_handle:execute(sql, workflow_id, node_id)
     if not success then
-        print("Error deleting workflow node: " .. error)
+        print("M.delete_node: Error deleting workflow node " .. tostring(node_id) .. ": " .. error)
+        M.db_handle:execute("ROLLBACK")
         return false
     end
 
     -- Delete connections involving this node
-    db_handle:execute(string.format([[
-        DELETE FROM workflow_connections WHERE workflow_id = %d AND (from_node = %d OR to_node = %d)
-    ]], workflow_id, node_id, node_id))
+    success, error = M.db_handle:execute(
+        "DELETE FROM workflow_connections WHERE workflow_id = ? AND (from_node = ? OR to_node = ?)",
+        workflow_id, node_id, node_id
+    )
+    if not success then
+        print("M.delete_node: Error deleting connections for node " .. tostring(node_id) .. ": " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
 
     -- Update workflow timestamp
-    db_handle:execute(string.format([[
-        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
-    ]], workflow_id))
+    success, error = M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+    if not success then
+        print("M.delete_node: Error updating workflow timestamp: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
+
+    -- Commit transaction
+    success, error = M.db_handle:execute("COMMIT")
+    if not success then
+        print("M.delete_node: Error committing transaction: " .. error)
+        M.db_handle:execute("ROLLBACK")
+        return false
+    end
 
     return true
 end
 
 -- Add a connection to a workflow
 function M.add_connection(workflow_id, from_node, from_port, to_node, to_port)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.add_connection: Database not initialized")
         return false
     end
 
-    local sql = string.format([[
+    local sql = [[
         INSERT INTO workflow_connections (workflow_id, from_node, from_port, to_node, to_port)
-        VALUES (%d, %d, %d, %d, %d)
-    ]], workflow_id, from_node, from_port, to_node, to_port)
+        VALUES (?, ?, ?, ?, ?)
+    ]]
 
-    local success, error = db_handle:execute(sql)
+    local success, error = M.db_handle:execute(sql, workflow_id, from_node, from_port, to_node, to_port)
     if not success then
-        print("Error adding workflow connection: " .. error)
+        print("M.add_connection: Error adding workflow connection: " .. error)
         return false
     end
 
     -- Update workflow timestamp
-    db_handle:execute(string.format([[
-        UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = %d
-    ]], workflow_id))
+    success, error = M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+    if not success then
+        print("M.add_connection: Error updating workflow timestamp: " .. error)
+    end
 
     return true
 end
 
 -- Load workflow state (nodes and connections)
 function M.load_workflow(workflow_id)
-    if not db_handle then
-        print("Database not initialized")
+    if not M.db_handle then
+        print("M.load_workflow: Database not initialized")
         return nil, nil
     end
 
     -- Load nodes
-    local nodes_result, nodes_error = db_handle:query(string.format([[
+    local nodes_result, nodes_error = M.db_handle:query([[
         SELECT node_id, node_type_id, x, y
         FROM workflow_nodes
-        WHERE workflow_id = %d
+        WHERE workflow_id = ?
         ORDER BY id
-    ]], workflow_id))
+    ]], workflow_id)
 
     if nodes_error ~= "" then
-        print("Error loading workflow nodes: " .. nodes_error)
+        print("M.load_workflow: Error loading workflow nodes for workflow " .. tostring(workflow_id) .. ": " .. nodes_error)
         return nil, nil
     end
 
     -- Load connections
-    local conns_result, conns_error = db_handle:query(string.format([[
+    local conns_result, conns_error = M.db_handle:query([[
         SELECT from_node, from_port, to_node, to_port
         FROM workflow_connections
-        WHERE workflow_id = %d
+        WHERE workflow_id = ?
         ORDER BY id
-    ]], workflow_id))
+    ]], workflow_id)
 
     if conns_error ~= "" then
-        print("Error loading workflow connections: " .. conns_error)
+        print("M.load_workflow: Error loading workflow connections for workflow " .. tostring(workflow_id) .. ": " .. conns_error)
         return nil, nil
     end
 

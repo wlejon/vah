@@ -23,7 +23,7 @@ CommandProcessor::CommandProcessor(
 {
 }
 
-void CommandProcessor::ProcessCommand(const Command& cmd) {
+void CommandProcessor::ProcessCommand(Command&& cmd) {
     std::visit([this](auto&& command) {
         using T = std::decay_t<decltype(command)>;
 
@@ -126,10 +126,10 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
             document_manager_->TextEditorRedo(command.element_id);
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
-            data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));
+            data_model_manager_->UpdateModel(command.model_name, std::move(command.data));
         }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataObject>) {
-            data_model_manager_->UpdateObject(command.object_name, std::move(const_cast<DynamicRow&>(command.data)));
+            data_model_manager_->UpdateObject(command.object_name, std::move(command.data));
         }
         else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
             document_manager_->ReloadDocument(command.document_id);
@@ -317,5 +317,5 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)
         // are now handled by the Lua notification system, not here
 
-    }, cmd);
+    }, std::move(cmd));
 }

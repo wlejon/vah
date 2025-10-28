@@ -180,24 +180,37 @@ void LuaThread::Start() {
 }
 
 void LuaThread::Stop() {
-    should_stop_ = true;
-    state_ = State::Stopping;
+    should_stop_.store(true, std::memory_order_release);
+    state_.store(State::Stopping, std::memory_order_release);
 
-    // Stop any HTTP server running on this thread (lock-free)
-    httplib::Server* server = active_http_server_.load(std::memory_order_acquire);
-    if (server) {
-        server->stop();  // Thread-safe call to unblock listen()
+    // Stop any HTTP server running on this thread
+    // Use mutex to safely access server pointer and prevent use-after-free
+    {
+        std::lock_guard<std::mutex> lock(http_server_mutex_);
+        if (active_http_server_) {
+            active_http_server_->stop();  // Thread-safe call to unblock listen()
+        }
     }
 }
 
+void LuaThread::SetActiveHttpServer(httplib::Server* server) {
+    std::lock_guard<std::mutex> lock(http_server_mutex_);
+    active_http_server_ = server;
+}
+
+void LuaThread::ClearActiveHttpServer() {
+    std::lock_guard<std::mutex> lock(http_server_mutex_);
+    active_http_server_ = nullptr;
+}
+
 void LuaThread::Pause() {
-    is_paused_ = true;
-    state_ = State::Paused;
+    is_paused_.store(true, std::memory_order_release);
+    state_.store(State::Paused, std::memory_order_release);
 }
 
 void LuaThread::Resume() {
-    is_paused_ = false;
-    state_ = State::Running;
+    is_paused_.store(false, std::memory_order_release);
+    state_.store(State::Running, std::memory_order_release);
 }
 
 void LuaThread::SetParent(int parent_id, int parent_request_id) {
@@ -217,9 +230,6 @@ void LuaThread::Join() {
     }
 }
 
-void LuaThread::ProcessPendingResponses() {
-    ProcessResponses();
-}
 
 sol::object LuaThread::CallSaveHook() {
     if (!lua_) return sol::nil;
@@ -297,6 +307,12 @@ void LuaThread::ProcessResponses() {
             } catch (const sol::error& e) {
                 LOG_ERROR("Lua thread {} error in callback for request {}: {}",
                          id_, response.request_id, e.what());
+            } catch (const std::exception& e) {
+                LOG_ERROR("Lua thread {} C++ exception in callback for request {}: {}",
+                         id_, response.request_id, e.what());
+            } catch (...) {
+                LOG_ERROR("Lua thread {} unknown exception in callback for request {}",
+                         id_, response.request_id);
             }
 
             // Remove from pending requests
@@ -325,7 +341,7 @@ void LuaThread::ThreadMain() {
             sol::error err = result;
             error_message_ = err.what();
             LOG_ERROR("Lua thread {} error loading script '{}': {}", id_, script_path_, error_message_);
-            state_ = State::Error;
+            state_.store(State::Error, std::memory_order_release);
             return;
         }
 
@@ -337,12 +353,12 @@ void LuaThread::ThreadMain() {
                 sol::error err = startup_result;
                 error_message_ = err.what();
                 LOG_ERROR("Lua thread {} error in startup(): {}", id_, error_message_);
-                state_ = State::Error;
+                state_.store(State::Error, std::memory_order_release);
                 return;
             }
         }
 
-        state_ = State::Running;
+        state_.store(State::Running, std::memory_order_release);
         LOG_INFO("Lua thread {} running", id_);
 
         // 30hz update loop (33.33ms per frame)
@@ -351,13 +367,13 @@ void LuaThread::ThreadMain() {
 
         sol::optional<sol::function> update_fn = (*lua_)["update"];
 
-        while (!should_stop_) {
+        while (!should_stop_.load(std::memory_order_acquire)) {
             // Handle pause
-            while (is_paused_ && !should_stop_) {
+            while (is_paused_.load(std::memory_order_acquire) && !should_stop_.load(std::memory_order_acquire)) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
 
-            if (should_stop_) break;
+            if (should_stop_.load(std::memory_order_acquire)) break;
 
             ProcessResponses();
 
@@ -386,6 +402,12 @@ void LuaThread::ThreadMain() {
                         } catch (const sol::error& e) {
                             LOG_ERROR("Lua thread {} error in event handler for '{}': {}",
                                      id_, ui_event.name, e.what());
+                        } catch (const std::exception& e) {
+                            LOG_ERROR("Lua thread {} C++ exception in event handler for '{}': {}",
+                                     id_, ui_event.name, e.what());
+                        } catch (...) {
+                            LOG_ERROR("Lua thread {} unknown exception in event handler for '{}'",
+                                     id_, ui_event.name);
                         }
                     }
                 }
@@ -399,7 +421,7 @@ void LuaThread::ThreadMain() {
                     sol::error err = update_result;
                     error_message_ = err.what();
                     LOG_ERROR("Lua thread {} error in update(): {}", id_, error_message_);
-                    state_ = State::Error;
+                    state_.store(State::Error, std::memory_order_release);
                     return;
                 }
             }
@@ -419,13 +441,13 @@ void LuaThread::ThreadMain() {
             }
         }
 
-        state_ = State::Stopped;
+        state_.store(State::Stopped, std::memory_order_release);
         LOG_INFO("Lua thread {} finished normally", id_);
 
     } catch (const std::exception& e) {
         error_message_ = e.what();
         LOG_ERROR("Lua thread {} exception: {}", id_, error_message_);
-        state_ = State::Error;
+        state_.store(State::Error, std::memory_order_release);
     }
 }
 
@@ -676,7 +698,7 @@ void LuaThread::SetupLuaBindings() {
 
     // Document query operations
     ui_table["list_documents"] = [this](sol::function callback) {
-        int request_id = next_request_id_++;
+        uint64_t request_id = next_request_id_++;
 
         // Store callback for when response arrives
         pending_requests_[request_id] = {request_id, callback, "ui.list_documents"};
@@ -689,7 +711,7 @@ void LuaThread::SetupLuaBindings() {
     };
 
     ui_table["get_document_info"] = [this](const std::string& document_id, sol::function callback) {
-        int request_id = next_request_id_++;
+        uint64_t request_id = next_request_id_++;
 
         // Store callback for when response arrives
         pending_requests_[request_id] = {request_id, callback, "ui.get_document_info"};
@@ -738,7 +760,7 @@ void LuaThread::SetupLuaBindings() {
     auto thread_table = lua_->create_table();
 
     thread_table["list"] = [this](sol::function callback) {
-        int request_id = next_request_id_++;
+        uint64_t request_id = next_request_id_++;
 
         // Store callback for when response arrives
         pending_requests_[request_id] = {request_id, callback, "thread.list"};
@@ -751,7 +773,7 @@ void LuaThread::SetupLuaBindings() {
     };
 
     thread_table["get_info"] = [this](int thread_id, sol::function callback) {
-        int request_id = next_request_id_++;
+        uint64_t request_id = next_request_id_++;
 
         // Store callback for when response arrives
         pending_requests_[request_id] = {request_id, callback, "thread.get_info"};
@@ -777,7 +799,7 @@ void LuaThread::SetupLuaBindings() {
 
     // Bind process_responses function (for manual response processing during busy-wait)
     (*lua_)["process_responses"] = [this]() {
-        ProcessPendingResponses();
+        ProcessResponses();
     };
 
     // Override print to send to main thread via command queue

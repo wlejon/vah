@@ -96,15 +96,85 @@ end
 local function decode_entities(text)
     if not text then return "" end
 
-    -- Named entities
-    text = text:gsub('&lt;', '<')
-    text = text:gsub('&gt;', '>')
-    text = text:gsub('&amp;', '&')
-    text = text:gsub('&quot;', '"')
-    text = text:gsub('&apos;', "'")
-    text = text:gsub('&nbsp;', ' ')
+    -- Common HTML5 named entities (expanded from 6 to 50+ most common)
+    local named_entities = {
+        -- Basic entities
+        ['lt'] = '<',
+        ['gt'] = '>',
+        ['amp'] = '&',
+        ['quot'] = '"',
+        ['apos'] = "'",
+        ['nbsp'] = ' ',
 
-    -- Numeric entities
+        -- Common punctuation and symbols
+        ['mdash'] = '—',
+        ['ndash'] = '–',
+        ['copy'] = '©',
+        ['reg'] = '®',
+        ['trade'] = '™',
+        ['hellip'] = '…',
+        ['lsquo'] = ''',
+        ['rsquo'] = ''',
+        ['ldquo'] = '"',
+        ['rdquo'] = '"',
+        ['bull'] = '•',
+        ['middot'] = '·',
+        ['deg'] = '°',
+        ['prime'] = '′',
+        ['Prime'] = '″',
+        ['sect'] = '§',
+        ['para'] = '¶',
+        ['dagger'] = '†',
+        ['Dagger'] = '‡',
+
+        -- Mathematical symbols
+        ['times'] = '×',
+        ['divide'] = '÷',
+        ['plusmn'] = '±',
+        ['minus'] = '−',
+        ['sup1'] = '¹',
+        ['sup2'] = '²',
+        ['sup3'] = '³',
+        ['frac14'] = '¼',
+        ['frac12'] = '½',
+        ['frac34'] = '¾',
+
+        -- Currency
+        ['cent'] = '¢',
+        ['pound'] = '£',
+        ['yen'] = '¥',
+        ['euro'] = '€',
+        ['curren'] = '¤',
+
+        -- Accented characters (common)
+        ['Agrave'] = 'À', ['Aacute'] = 'Á', ['Acirc'] = 'Â', ['Atilde'] = 'Ã',
+        ['Auml'] = 'Ä', ['Aring'] = 'Å', ['AElig'] = 'Æ',
+        ['Ccedil'] = 'Ç',
+        ['Egrave'] = 'È', ['Eacute'] = 'É', ['Ecirc'] = 'Ê', ['Euml'] = 'Ë',
+        ['Igrave'] = 'Ì', ['Iacute'] = 'Í', ['Icirc'] = 'Î', ['Iuml'] = 'Ï',
+        ['Ntilde'] = 'Ñ',
+        ['Ograve'] = 'Ò', ['Oacute'] = 'Ó', ['Ocirc'] = 'Ô', ['Otilde'] = 'Õ',
+        ['Ouml'] = 'Ö', ['Oslash'] = 'Ø',
+        ['Ugrave'] = 'Ù', ['Uacute'] = 'Ú', ['Ucirc'] = 'Û', ['Uuml'] = 'Ü',
+        ['Yacute'] = 'Ý',
+        ['agrave'] = 'à', ['aacute'] = 'á', ['acirc'] = 'â', ['atilde'] = 'ã',
+        ['auml'] = 'ä', ['aring'] = 'å', ['aelig'] = 'æ',
+        ['ccedil'] = 'ç',
+        ['egrave'] = 'è', ['eacute'] = 'é', ['ecirc'] = 'ê', ['euml'] = 'ë',
+        ['igrave'] = 'ì', ['iacute'] = 'í', ['icirc'] = 'î', ['iuml'] = 'ï',
+        ['ntilde'] = 'ñ',
+        ['ograve'] = 'ò', ['oacute'] = 'ó', ['ocirc'] = 'ô', ['otilde'] = 'õ',
+        ['ouml'] = 'ö', ['oslash'] = 'ø',
+        ['ugrave'] = 'ù', ['uacute'] = 'ú', ['ucirc'] = 'û', ['uuml'] = 'ü',
+        ['yacute'] = 'ý', ['yuml'] = 'ÿ'
+    }
+
+    -- Replace named entities
+    text = text:gsub('&([%w]+);', function(entity)
+        return named_entities[entity] or ('&' .. entity .. ';')
+    end)
+
+    -- Numeric entities (decimal)
     text = text:gsub('&#(%d+);', function(n)
         local num = tonumber(n)
         if num and num < 256 then
@@ -113,6 +183,7 @@ local function decode_entities(text)
         return '&#' .. n .. ';'
     end)
 
+    -- Numeric entities (hexadecimal)
     text = text:gsub('&#x(%x+);', function(n)
         local num = tonumber(n, 16)
         if num and num < 256 then

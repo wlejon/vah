@@ -47,12 +47,6 @@ public:
     // Cleanup
     void UnloadAllDocuments();
 
-    // Access tracked document (for hot reload update)
-    void UpdateTrackedDocument(Rml::ElementDocument* old_doc, Rml::ElementDocument* new_doc);
-
-    // Check and reset the document changed flag
-    bool GetAndClearDocumentChangedFlag();
-
     // Query document information (for MCP API)
     struct DocumentInfo {
         std::string document_id;
@@ -72,9 +66,9 @@ private:
     EventDispatcher* event_dispatcher_;
     std::unordered_map<std::string, Rml::ElementDocument*> loaded_documents_;
 
-    // Flag to track if documents changed this frame
-    bool document_changed_this_frame_ = false;
-
     // Helper to find element by ID across all documents
     Rml::Element* FindElementById(const std::string& element_id);
+
+    // Helper to reload all documents (used by hot reload handlers)
+    void ReloadAllDocuments();
 };

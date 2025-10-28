@@ -9,23 +9,26 @@
 class RmlUiSystemInterface : public Rml::SystemInterface {
 public:
     RmlUiSystemInterface() {
-        // Create SDL cursor map
-        cursor_map_[""] = SDL_SYSTEM_CURSOR_ARROW;  // Default
-        cursor_map_["arrow"] = SDL_SYSTEM_CURSOR_ARROW;
-        cursor_map_["pointer"] = SDL_SYSTEM_CURSOR_HAND;
-        cursor_map_["text"] = SDL_SYSTEM_CURSOR_IBEAM;
-        cursor_map_["move"] = SDL_SYSTEM_CURSOR_SIZEALL;
-        cursor_map_["resize"] = SDL_SYSTEM_CURSOR_SIZENWSE;
-        cursor_map_["wait"] = SDL_SYSTEM_CURSOR_WAIT;
-        cursor_map_["crosshair"] = SDL_SYSTEM_CURSOR_CROSSHAIR;
-        cursor_map_["progress"] = SDL_SYSTEM_CURSOR_WAITARROW;
+        // Create SDL cursor type map
+        cursor_type_map_[""] = SDL_SYSTEM_CURSOR_ARROW;  // Default
+        cursor_type_map_["arrow"] = SDL_SYSTEM_CURSOR_ARROW;
+        cursor_type_map_["pointer"] = SDL_SYSTEM_CURSOR_HAND;
+        cursor_type_map_["text"] = SDL_SYSTEM_CURSOR_IBEAM;
+        cursor_type_map_["move"] = SDL_SYSTEM_CURSOR_SIZEALL;
+        cursor_type_map_["resize"] = SDL_SYSTEM_CURSOR_SIZENWSE;
+        cursor_type_map_["wait"] = SDL_SYSTEM_CURSOR_WAIT;
+        cursor_type_map_["crosshair"] = SDL_SYSTEM_CURSOR_CROSSHAIR;
+        cursor_type_map_["progress"] = SDL_SYSTEM_CURSOR_WAITARROW;
 
-        current_cursor_ = nullptr;
+        current_cursor_name_ = "";
     }
 
     ~RmlUiSystemInterface() {
-        if (current_cursor_) {
-            SDL_FreeCursor(current_cursor_);
+        // Free all cached cursors
+        for (auto& [name, cursor] : cursor_cache_) {
+            if (cursor) {
+                SDL_FreeCursor(cursor);
+            }
         }
     }
 
@@ -65,25 +68,32 @@ public:
             return;
         }
 
-        // Find the SDL cursor type
-        auto it = cursor_map_.find(cursor_name);
-        SDL_SystemCursor sdl_cursor_type = (it != cursor_map_.end())
-            ? it->second
-            : SDL_SYSTEM_CURSOR_ARROW;
+        // Check if cursor is already cached
+        auto cache_it = cursor_cache_.find(cursor_name);
+        SDL_Cursor* cursor = nullptr;
 
-        // Free the old cursor if it exists
-        if (current_cursor_) {
-            SDL_FreeCursor(current_cursor_);
+        if (cache_it != cursor_cache_.end()) {
+            // Use cached cursor
+            cursor = cache_it->second;
+        } else {
+            // Find the SDL cursor type
+            auto type_it = cursor_type_map_.find(cursor_name);
+            SDL_SystemCursor sdl_cursor_type = (type_it != cursor_type_map_.end())
+                ? type_it->second
+                : SDL_SYSTEM_CURSOR_ARROW;
+
+            // Create and cache the new cursor
+            cursor = SDL_CreateSystemCursor(sdl_cursor_type);
+            cursor_cache_[cursor_name] = cursor;
         }
 
-        // Create and set the new cursor
-        current_cursor_ = SDL_CreateSystemCursor(sdl_cursor_type);
-        SDL_SetCursor(current_cursor_);
+        // Set the cursor
+        SDL_SetCursor(cursor);
         current_cursor_name_ = cursor_name;
     }
 
 private:
-    std::unordered_map<Rml::String, SDL_SystemCursor> cursor_map_;
-    SDL_Cursor* current_cursor_;
+    std::unordered_map<Rml::String, SDL_SystemCursor> cursor_type_map_;
+    std::unordered_map<Rml::String, SDL_Cursor*> cursor_cache_;
     Rml::String current_cursor_name_;
 };

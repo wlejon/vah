@@ -212,23 +212,23 @@ namespace Commands {
     // Query commands (request/response pattern)
     struct QueryThreadList {
         int requesting_thread_id;
-        int request_id;
+        uint64_t request_id;
     };
 
     struct QueryThreadInfo {
         int requesting_thread_id;
-        int request_id;
+        uint64_t request_id;
         int thread_id;
     };
 
     struct QueryDocumentList {
         int requesting_thread_id;
-        int request_id;
+        uint64_t request_id;
     };
 
     struct QueryDocumentInfo {
         int requesting_thread_id;
-        int request_id;
+        uint64_t request_id;
         std::string document_id;
     };
 
@@ -304,10 +304,10 @@ using Command = std::variant<
 // THREADING: PayloadMap is thread-safe and can cross thread boundaries
 // The receiving Lua thread converts PayloadMap to a Lua table
 struct Response {
-    int request_id;
+    uint64_t request_id;
     PayloadMap data;         // Thread-safe data that can cross lua_State boundaries
     std::string error;       // Empty if success
 
-    Response(int id, PayloadMap&& d, const std::string& e = "")
+    Response(uint64_t id, PayloadMap&& d, const std::string& e = "")
         : request_id(id), data(std::move(d)), error(e) {}
 };

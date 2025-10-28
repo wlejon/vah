@@ -4,6 +4,19 @@
 local parser = require("template_parser")
 local M = {}
 
+-- HTML escape function for XSS protection
+local function escape_html(value)
+    if type(value) ~= "string" then
+        return value
+    end
+    local result = value:gsub("&", "&amp;")
+    result = result:gsub("<", "&lt;")
+    result = result:gsub(">", "&gt;")
+    result = result:gsub('"', "&quot;")
+    result = result:gsub("'", "&#39;")
+    return result
+end
+
 -- Resolve variable path in context
 local function resolve_path(path, context)
     if not path or #path == 0 then
@@ -70,37 +83,47 @@ end
 local render_node
 
 -- Render multiple nodes
-local function render_nodes(nodes, context)
+local function render_nodes(nodes, context, options)
     local output = {}
     for _, node in ipairs(nodes) do
-        table.insert(output, render_node(node, context))
+        table.insert(output, render_node(node, context, options))
     end
     return table.concat(output)
 end
 
 -- Render a single node
-render_node = function(node, context)
+-- @param node The AST node to render
+-- @param context The data context
+-- @param options Rendering options (e.g., {escape_html = true})
+render_node = function(node, context, options)
+    options = options or {}
+
     if node.type == parser.NODE_TYPES.ROOT then
-        return render_nodes(node.children, context)
+        return render_nodes(node.children, context, options)
 
     elseif node.type == parser.NODE_TYPES.TEXT then
         return node.value
 
     elseif node.type == parser.NODE_TYPES.VARIABLE then
         local value = resolve_path(node.path, context)
-        return to_string(value)
+        local str_value = to_string(value)
+        -- Apply HTML escaping if enabled
+        if options.escape_html then
+            str_value = escape_html(str_value)
+        end
+        return str_value
 
     elseif node.type == parser.NODE_TYPES.IF then
         local value = resolve_path(node.condition, context)
         if is_truthy(value) then
-            return render_nodes(node.body, context)
+            return render_nodes(node.body, context, options)
         end
         return ""
 
     elseif node.type == parser.NODE_TYPES.UNLESS then
         local value = resolve_path(node.condition, context)
         if not is_truthy(value) then
-            return render_nodes(node.body, context)
+            return render_nodes(node.body, context, options)
         end
         return ""
 
@@ -138,7 +161,7 @@ render_node = function(node, context)
                 iter_context["@first"] = (i == 1)
                 iter_context["@last"] = (i == #collection)
 
-                local rendered = render_nodes(node.body, iter_context)
+                local rendered = render_nodes(node.body, iter_context, options)
 
                 -- Trim leading newline from each iteration to avoid double newlines
                 rendered = rendered:gsub("^[\r\n]+", "")
@@ -168,7 +191,7 @@ render_node = function(node, context)
                 iter_context["@first"] = (idx == 1)
                 iter_context["@last"] = (idx == #keys)
 
-                local rendered = render_nodes(node.body, iter_context)
+                local rendered = render_nodes(node.body, iter_context, options)
 
                 -- Trim leading newline from each iteration to avoid double newlines
                 rendered = rendered:gsub("^[\r\n]+", "")
@@ -184,22 +207,27 @@ render_node = function(node, context)
 end
 
 -- Main render function
-function M.render(template, data)
+-- @param template The template string
+-- @param data The data context
+-- @param options Rendering options: {escape_html = boolean}
+-- @return rendered string, errors table
+function M.render(template, data, options)
     if not template or template == "" then
-        return ""
+        return "", {}
     end
 
     data = data or {}
+    options = options or {}
 
     -- Lex
     local lexer = require("template_lexer")
     local tokens = lexer.tokenize(template)
 
     -- Parse
-    local ast = parser.parse(tokens)
+    local ast, parse_errors = parser.parse(tokens)
 
-    -- Render
-    return render_node(ast, data)
+    -- Render (even if there are errors, try to render what we can)
+    return render_node(ast, data, options), parse_errors
 end
 
 return M

@@ -17,9 +17,8 @@ std::shared_ptr<const DynamicTable> DataStore::GetModel(const std::string& name)
         return it->second;
     }
     LOG_WARN("DataStore: Model '{}' not found, returning empty table", name);
-    // Return empty table wrapped in shared_ptr
-    static auto empty = std::make_shared<DynamicTable>();
-    return empty;
+    // Return empty table wrapped in shared_ptr (new instance each time for safety)
+    return std::make_shared<DynamicTable>();
 }
 
 bool DataStore::HasModel(const std::string& name) const {
@@ -46,9 +45,8 @@ std::shared_ptr<const DynamicRow> DataStore::GetObject(const std::string& name) 
         return it->second;
     }
     LOG_WARN("DataStore: Object '{}' not found, returning empty object", name);
-    // Return empty object wrapped in shared_ptr
-    static auto empty = std::make_shared<DynamicRow>();
-    return empty;
+    // Return empty object wrapped in shared_ptr (new instance each time for safety)
+    return std::make_shared<DynamicRow>();
 }
 
 bool DataStore::HasObject(const std::string& name) const {

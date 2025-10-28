@@ -1,6 +1,10 @@
 -- HTTP SSE Client Example
 -- Demonstrates receiving streaming events
 
+-- Configuration constants
+local SERVER_STARTUP_DELAY = 3  -- Seconds to wait for server to start
+local SERVER_URL = "http://127.0.0.1:8080/events"
+
 local client_data = {
     status = "Status: Waiting for connection...",
     messages = 0,
@@ -21,17 +25,17 @@ function startup()
     update_model()
 
     -- Wait for server to start accepting connections
-    print("Waiting 3 seconds for server to start...")
-    sleep(3)
+    print(string.format("Waiting %d seconds for server to start...", SERVER_STARTUP_DELAY))
+    sleep(SERVER_STARTUP_DELAY)
 
     client_data.status = "Status: Connecting..."
     update_model()
     print("Client attempting connection...")
 
     -- Connect to SSE stream
-    print("Connecting to http://127.0.0.1:8080/events")
+    print("Connecting to " .. SERVER_URL)
 
-    http.get("http://127.0.0.1:8080/events", {
+    http.get(SERVER_URL, {
         on_event = function(event_type, data)
             message_count = message_count + 1
             client_data.messages = message_count

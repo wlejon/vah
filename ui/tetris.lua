@@ -268,6 +268,10 @@ end
 
 -- Calculate ghost piece position (where piece will land)
 local function get_ghost_position()
+    if not game.current_piece then
+        return game.current_y or 0
+    end
+
     local ghost_y = game.current_y
     while is_valid_position(game.current_piece, game.current_x, ghost_y + 1) do
         ghost_y = ghost_y + 1

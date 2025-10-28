@@ -4,6 +4,8 @@
 #include "EventDispatcher.h"
 #include "Logger.h"
 #include <algorithm>
+#include <filesystem>
+#include <vector>
 #include <RmlUi/Lua/Interpreter.h>
 #include <SDL2/SDL.h>
 
@@ -19,15 +21,14 @@ DocumentManager::DocumentManager(Rml::Context* context, RmlUiBridge* rmlui_bridg
 {
 }
 
-bool DocumentManager::GetAndClearDocumentChangedFlag() {
-    bool changed = document_changed_this_frame_;
-    document_changed_this_frame_ = false;
-    return changed;
-}
-
 void DocumentManager::LoadDocument(const std::string& document_path, bool show, const std::string& document_id) {
     if (!context_) {
         LOG_WARN("Cannot load document: context is null");
+        // Dispatch error event to the requesting thread
+        if (event_dispatcher_ && !document_id.empty()) {
+            event_dispatcher_->DispatchEvent(document_id, "document_load_failed",
+                {{"error", "Context is null"}, {"path", document_path}});
+        }
         return;
     }
 
@@ -63,6 +64,11 @@ void DocumentManager::LoadDocument(const std::string& document_path, bool show, 
         LOG_INFO("Loaded UI document: {}", document_path);
     } else {
         LOG_WARN("Failed to load UI document: {}", document_path);
+        // Dispatch error event to the requesting thread
+        if (event_dispatcher_ && !document_id.empty()) {
+            event_dispatcher_->DispatchEvent(document_id, "document_load_failed",
+                {{"error", "Failed to load document"}, {"path", document_path}});
+        }
     }
 }
 
@@ -70,7 +76,9 @@ void DocumentManager::ShowDocument(const std::string& document_id) {
     auto it = loaded_documents_.find(document_id);
     if (it != loaded_documents_.end()) {
         it->second->Show();
-        context_->Update();
+        if (context_) {
+            context_->Update();
+        }
 
         // Set this as the current document in RmlUiBridge
         if (rmlui_bridge_) {
@@ -87,7 +95,9 @@ void DocumentManager::HideDocument(const std::string& document_id) {
     auto it = loaded_documents_.find(document_id);
     if (it != loaded_documents_.end()) {
         it->second->Hide();
-        context_->Update();
+        if (context_) {
+            context_->Update();
+        }
         LOG_INFO("Hiding document: {}", document_id);
     } else {
         LOG_WARN("Document not found: {}", document_id);
@@ -372,6 +382,16 @@ bool DocumentManager::GetTextEditorModified(const std::string& element_id) {
 void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
     if (!context_) return;
 
+    // Convert the changed file path to an absolute path for reliable comparison
+    std::filesystem::path changed_path;
+    try {
+        changed_path = std::filesystem::absolute(normalized_path);
+    } catch (const std::filesystem::filesystem_error& e) {
+        LOG_WARN("Failed to convert path to absolute: {} - {}", normalized_path, e.what());
+        // Fall back to using the normalized_path as-is
+        changed_path = normalized_path;
+    }
+
     // Iterate through ALL documents in context (not just tracked ones)
     int num_docs = context_->GetNumDocuments();
     for (int i = 0; i < num_docs; i++) {
@@ -380,12 +400,18 @@ void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
 
         std::string src = doc->GetSourceURL();
 
-        // Check if the changed file matches this document
-        // Compare with both absolute and relative paths
-        if (src == normalized_path ||
-            normalized_path.ends_with(src) ||
-            src.ends_with(normalized_path)) {
+        // Try to match the document path with the changed file
+        bool matches = false;
+        try {
+            std::filesystem::path doc_path = std::filesystem::absolute(src);
+            // Use filesystem::equivalent for reliable comparison
+            matches = std::filesystem::equivalent(changed_path, doc_path);
+        } catch (const std::filesystem::filesystem_error&) {
+            // If paths don't exist or can't be compared, fall back to string comparison
+            matches = (src == normalized_path);
+        }
 
+        if (matches) {
             LOG_INFO("Auto-reloading document: {}", src);
             bool was_visible = doc->IsVisible();
 
@@ -410,7 +436,9 @@ void DocumentManager::HandleRmlFileChanged(const std::string& normalized_path) {
             }
 
             // Force context update to rebind data models
-            context_->Update();
+            if (context_) {
+                context_->Update();
+            }
 
             // Notify owning thread that document was reloaded
             if (event_dispatcher_ && !reloaded_doc_id.empty()) {
@@ -428,47 +456,8 @@ void DocumentManager::HandleRcssFileChanged() {
     // Clear the stylesheet cache so RmlUi reloads the CSS
     Rml::Factory::ClearStyleSheetCache();
 
-    int num_docs = context_->GetNumDocuments();
-    for (int i = 0; i < num_docs; i++) {
-        auto doc = context_->GetDocument(i);
-        if (!doc) continue;
-
-        // Skip debugger documents - they don't have file sources and shouldn't be reloaded
-        if (doc->GetId().find("rmlui-debug-") == 0) {
-            continue;
-        }
-
-        std::string src = doc->GetSourceURL();
-        bool was_visible = doc->IsVisible();
-
-        doc->Close();
-        auto new_doc = context_->LoadDocument(src.c_str());
-
-        // Update tracked documents
-        std::string reloaded_doc_id;
-        for (auto& [doc_id, tracked_doc] : loaded_documents_) {
-            if (tracked_doc == doc) {
-                loaded_documents_[doc_id] = new_doc;
-                if (new_doc) {
-                    new_doc->SetId(doc_id.c_str());
-                }
-                reloaded_doc_id = doc_id;
-                break;
-            }
-        }
-
-        if (new_doc && was_visible) {
-            new_doc->Show();
-        }
-
-        // Notify owning thread that document was reloaded
-        if (event_dispatcher_ && !reloaded_doc_id.empty()) {
-            event_dispatcher_->DispatchEvent(reloaded_doc_id, "document_reloaded", {});
-        }
-    }
-
-    // Force context update to rebind data models
-    context_->Update();
+    // Reload all documents to apply new styles
+    ReloadAllDocuments();
 }
 
 void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
@@ -481,29 +470,71 @@ void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
         return;
     }
 
-    // Extract module name from path (e.g., "ui/canvas_test.lua" -> "canvas_test")
-    std::string module_name;
-    size_t last_slash = normalized_path.find_last_of("/\\");
-    size_t last_dot = normalized_path.find_last_of(".");
+    // Extract module name candidates from path
+    // For "ui/canvas.test.lua", we want to try: "canvas.test", "canvas", and "ui.canvas.test"
+    std::vector<std::string> module_candidates;
 
-    if (last_slash != std::string::npos && last_dot != std::string::npos && last_dot > last_slash) {
-        module_name = normalized_path.substr(last_slash + 1, last_dot - last_slash - 1);
-    } else if (last_dot != std::string::npos) {
-        module_name = normalized_path.substr(0, last_dot);
+    size_t last_slash = normalized_path.find_last_of("/\\");
+    std::string filename;
+    std::string path_prefix;
+
+    if (last_slash != std::string::npos) {
+        filename = normalized_path.substr(last_slash + 1);
+        path_prefix = normalized_path.substr(0, last_slash);
     } else {
-        module_name = normalized_path;
+        filename = normalized_path;
     }
 
-    LOG_INFO("Clearing Lua cache for module: {}", module_name);
+    // Remove .lua extension if present
+    if (filename.ends_with(".lua")) {
+        filename = filename.substr(0, filename.length() - 4);
+    }
 
-    // Clear package.loaded[module_name]
+    // Add the filename without path as first candidate (most common case)
+    module_candidates.push_back(filename);
+
+    // If filename has dots, also try without the last part (e.g., "canvas.test" -> "canvas")
+    size_t last_dot = filename.find_last_of(".");
+    if (last_dot != std::string::npos) {
+        module_candidates.push_back(filename.substr(0, last_dot));
+    }
+
+    // If there was a path, also try path.filename (e.g., "ui.canvas.test")
+    if (!path_prefix.empty()) {
+        std::string path_as_module = path_prefix;
+        std::replace(path_as_module.begin(), path_as_module.end(), '/', '.');
+        std::replace(path_as_module.begin(), path_as_module.end(), '\\', '.');
+        module_candidates.push_back(path_as_module + "." + filename);
+    }
+
+    LOG_INFO("Clearing Lua cache for file: {}", normalized_path);
+
+    // Clear package.loaded for all module candidates
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "loaded");
-    lua_pushnil(L);
-    lua_setfield(L, -2, module_name.c_str());
+
+    for (const auto& module_name : module_candidates) {
+        lua_pushnil(L);
+        lua_setfield(L, -2, module_name.c_str());
+        LOG_INFO("  Cleared module: {}", module_name);
+    }
+
     lua_pop(L, 2); // pop loaded and package tables
 
     // Reload all documents to re-execute their <script> tags
+    ReloadAllDocuments();
+}
+
+void DocumentManager::UnloadAllDocuments() {
+    loaded_documents_.clear();
+    if (context_) {
+        context_->UnloadAllDocuments();
+    }
+}
+
+void DocumentManager::ReloadAllDocuments() {
+    if (!context_) return;
+
     int num_docs = context_->GetNumDocuments();
     for (int i = 0; i < num_docs; i++) {
         auto doc = context_->GetDocument(i);
@@ -544,22 +575,8 @@ void DocumentManager::HandleLuaFileChanged(const std::string& normalized_path) {
     }
 
     // Force context update to rebind data models
-    context_->Update();
-}
-
-void DocumentManager::UnloadAllDocuments() {
-    loaded_documents_.clear();
     if (context_) {
-        context_->UnloadAllDocuments();
-    }
-}
-
-void DocumentManager::UpdateTrackedDocument(Rml::ElementDocument* old_doc, Rml::ElementDocument* new_doc) {
-    for (auto& [doc_id, tracked_doc] : loaded_documents_) {
-        if (tracked_doc == old_doc) {
-            loaded_documents_[doc_id] = new_doc;
-            break;
-        }
+        context_->Update();
     }
 }
 

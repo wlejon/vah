@@ -74,7 +74,10 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
             for i = #editor.nodes, 1, -1 do
                 local node = editor.nodes[i]
                 if node_module.is_point_inside(editor, node, world_x, world_y) then
-                    editor.dragging_node = node
+                    -- Store potential drag node (won't start dragging until threshold is met)
+                    editor.potential_drag_node = node
+                    editor.potential_drag_start_x = world_x
+                    editor.potential_drag_start_y = world_y
                     editor.selected_node = node.id
                     editor.mouse_drag_start_x = world_x - node.x
                     editor.mouse_drag_start_y = world_y - node.y
@@ -87,6 +90,9 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
 
         elseif not button_down and was_down then
             -- Left button release
+
+            -- Clear potential drag node
+            editor.potential_drag_node = nil
 
             -- If we were dragging a node, update DataStore immediately and trigger server event
             if editor.dragging_node then
@@ -203,6 +209,20 @@ function M.handle_move(editor, mouse_x, mouse_y, canvas_x, canvas_y, button_left
 
     -- Handle dragging if left button is pressed
     if button_left then
+        -- Check if we have a potential drag that should be promoted to actual drag
+        if editor.potential_drag_node and not editor.dragging_node then
+            local DRAG_THRESHOLD = 3  -- pixels in world space
+            local dx = world_x - editor.potential_drag_start_x
+            local dy = world_y - editor.potential_drag_start_y
+            local distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance > DRAG_THRESHOLD then
+                -- Threshold exceeded, start dragging
+                editor.dragging_node = editor.potential_drag_node
+                editor.potential_drag_node = nil
+            end
+        end
+
         if editor.dragging_node then
             editor.dragging_node.x = world_x - editor.mouse_drag_start_x
             editor.dragging_node.y = world_y - editor.mouse_drag_start_y

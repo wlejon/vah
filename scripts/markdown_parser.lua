@@ -119,14 +119,15 @@ end
 
 -- Parse markdown to RML
 -- @param markdown The markdown text
--- @return RML string
+-- @return RML string, warnings table
 function M.to_rml(markdown)
     if not markdown or markdown == "" then
-        return ""
+        return "", {}
     end
 
     local tokens = lexer.tokenize(markdown)
     local rml_parts = {}
+    local warnings = {}
     local in_list = false
     local in_code_block = false
     local code_block_lines = {}
@@ -252,6 +253,10 @@ function M.to_rml(markdown)
 
     -- Close incomplete code block
     if in_code_block and #code_block_lines > 0 then
+        table.insert(warnings, {
+            type = "unclosed_code_block",
+            message = "Code block not closed at end of file"
+        })
         if code_block_lang ~= "" then
             table.insert(rml_parts, '<pre class="code-block ' .. escape_html(code_block_lang) .. '"><code>')
         else
@@ -261,7 +266,7 @@ function M.to_rml(markdown)
         table.insert(rml_parts, "</code></pre>")
     end
 
-    return table.concat(rml_parts, "\n")
+    return table.concat(rml_parts, "\n"), warnings
 end
 
 return M
