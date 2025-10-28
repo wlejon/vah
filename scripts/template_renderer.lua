@@ -131,7 +131,12 @@ render_node = function(node, context)
                 iter_context["@first"] = (i == 1)
                 iter_context["@last"] = (i == #collection)
 
-                table.insert(output, render_nodes(node.body, iter_context))
+                local rendered = render_nodes(node.body, iter_context)
+
+                -- Trim leading newline from each iteration to avoid double newlines
+                rendered = rendered:gsub("^[\r\n]+", "")
+
+                table.insert(output, rendered)
             end
         else
             -- Object iteration
@@ -156,7 +161,12 @@ render_node = function(node, context)
                 iter_context["@first"] = (idx == 1)
                 iter_context["@last"] = (idx == #keys)
 
-                table.insert(output, render_nodes(node.body, iter_context))
+                local rendered = render_nodes(node.body, iter_context)
+
+                -- Trim leading newline from each iteration to avoid double newlines
+                rendered = rendered:gsub("^[\r\n]+", "")
+
+                table.insert(output, rendered)
             end
         end
 

@@ -2,36 +2,36 @@
 -- Model Context Protocol server implementation
 -- Provides tools and resources via JSON-RPC 2.0 over HTTP with SSE
 
+-- Load configuration
+local config = require("mcp_config")
+
 local server = nil
 local sessions = {}
 local next_session_id = 1
 local server_status = "stopped"  -- "stopped", "starting", "running", "stopping"
 
--- Server capabilities
-local capabilities = {
-    tools = {
-        listChanged = true
-    }
-}
+-- Server capabilities (from config)
+local capabilities = config.capabilities
 
--- Server info
-local server_info = {
-    name = "VahMCPServer",
-    version = "1.0.0"
-}
+-- Server info (from config)
+local server_info = config.info
 
--- Supported protocol version
-local PROTOCOL_VERSION = "2024-11-05"
+-- Supported protocol version (from config)
+local PROTOCOL_VERSION = config.server.protocol_version
 
--- MCP endpoint
-local MCP_ENDPOINT = "/mcp"
+-- MCP endpoint (from config)
+local MCP_ENDPOINT = config.server.endpoint
 
--- Server port
-local SERVER_PORT = 8765
-local SERVER_HOST = "127.0.0.1"
+-- Server port (from config)
+local SERVER_PORT = config.server.port
+local SERVER_HOST = config.server.host
 
--- Tool registry
-local tools = {}
+-- Tool definitions (all possible tools)
+-- Maps tool_name -> {name, description, inputSchema, handler}
+local tool_definitions = {}
+
+-- Type registry (loaded on startup)
+local type_registry = nil
 
 function update_ui_state()
     -- Determine status color
@@ -73,15 +73,86 @@ function generate_session_id()
     return id
 end
 
--- Register a tool
+-- Register a tool definition
 function register_tool(name, description, input_schema, handler)
-    tools[name] = {
+    tool_definitions[name] = {
         name = name,
         description = description,
         inputSchema = input_schema,
         handler = handler
     }
     print("Registered MCP tool: " .. name)
+end
+
+-- Get tool definition by name
+function get_tool_definition(name)
+    return tool_definitions[name]
+end
+
+-- Get tools available for a session
+function get_session_tools(session)
+    if not session or not session.available_tools then
+        return {}
+    end
+
+    local tool_list = {}
+    for _, tool_name in ipairs(session.available_tools) do
+        local tool_def = tool_definitions[tool_name]
+        if tool_def then
+            table.insert(tool_list, {
+                name = tool_def.name,
+                description = tool_def.description,
+                inputSchema = tool_def.inputSchema
+            })
+        end
+    end
+
+    return tool_list
+end
+
+-- Update session context and rebuild available tools
+function update_session_context(session, type_name, view, id, params)
+    session.current_context = {
+        type = type_name,
+        view = view,
+        id = id,
+        params = params or {}
+    }
+
+    -- Rebuild available tools list
+    session.available_tools = {}
+
+    -- Add core navigation tools
+    for _, tool_name in ipairs(config.core_tools) do
+        table.insert(session.available_tools, tool_name)
+    end
+
+    -- Add type-specific tools if we have a type
+    if type_name and type_registry then
+        local type_def = type_registry.get(type_name)
+        if type_def and type_def.tools then
+            for _, tool in ipairs(type_def.tools) do
+                table.insert(session.available_tools, tool.name)
+            end
+        end
+    end
+end
+
+-- Add action to session history
+function add_recent_action(session, action_text)
+    if not session.recent_actions then
+        session.recent_actions = {}
+    end
+
+    table.insert(session.recent_actions, {
+        action = action_text,
+        timestamp = os.time()
+    })
+
+    -- Keep only last 10 actions
+    if #session.recent_actions > 10 then
+        table.remove(session.recent_actions, 1)
+    end
 end
 
 -- JSON-RPC error response
@@ -125,20 +196,35 @@ function handle_initialize(message, session_id)
         )
     end
 
-    -- Create session
-    sessions[session_id] = {
+    -- Create session with navigation context
+    local session = {
         client_capabilities = params.capabilities or {},
         client_info = params.clientInfo or {},
         initialized = false,
-        created_at = os.time()
+        created_at = os.time(),
+        current_context = {
+            type = nil,
+            view = nil,
+            id = nil,
+            params = {}
+        },
+        available_tools = {},
+        recent_actions = {}
     }
+
+    -- Initialize with core navigation tools only
+    for _, tool_name in ipairs(config.core_tools) do
+        table.insert(session.available_tools, tool_name)
+    end
+
+    sessions[session_id] = session
 
     -- Build response
     return json_rpc_success(message.id, {
         protocolVersion = PROTOCOL_VERSION,
         capabilities = capabilities,
         serverInfo = server_info,
-        instructions = "MCP server running in Vah. Use tools/list to see available tools."
+        instructions = "MCP server running in Vah. Use navigation tools to explore the system."
     })
 end
 
@@ -151,16 +237,13 @@ function handle_initialized(session)
 end
 
 -- Handle tools/list request
-function handle_tools_list(message)
-    local tool_list = {}
-
-    for name, tool in pairs(tools) do
-        table.insert(tool_list, {
-            name = tool.name,
-            description = tool.description,
-            inputSchema = tool.inputSchema
-        })
+function handle_tools_list(message, session)
+    if not session then
+        -- No session yet, return empty list
+        return json_rpc_success(message.id, {tools = {}})
     end
+
+    local tool_list = get_session_tools(session)
 
     return json_rpc_success(message.id, {
         tools = tool_list
@@ -168,7 +251,7 @@ function handle_tools_list(message)
 end
 
 -- Handle tools/call request
-function handle_tools_call(message)
+function handle_tools_call(message, session)
     local params = message.params or {}
     local tool_name = params.name
     local arguments = params.arguments or {}
@@ -177,13 +260,30 @@ function handle_tools_call(message)
         return json_rpc_error(message.id, -32602, "Missing tool name")
     end
 
-    local tool = tools[tool_name]
+    if not session then
+        return json_rpc_error(message.id, -32600, "No active session")
+    end
+
+    -- Check if tool is available in this session
+    local tool_available = false
+    for _, available_tool in ipairs(session.available_tools) do
+        if available_tool == tool_name then
+            tool_available = true
+            break
+        end
+    end
+
+    if not tool_available then
+        return json_rpc_error(message.id, -32601, "Tool not available in current context: " .. tool_name)
+    end
+
+    local tool = tool_definitions[tool_name]
     if not tool then
         return json_rpc_error(message.id, -32601, "Tool not found: " .. tool_name)
     end
 
-    -- Call tool handler
-    local success, result = pcall(tool.handler, arguments)
+    -- Call tool handler with session context
+    local success, result = pcall(tool.handler, arguments, session)
 
     if not success then
         return json_rpc_error(message.id, -32603, "Tool execution error: " .. tostring(result))
@@ -204,9 +304,9 @@ function handle_request(message, session)
     local method = message.method
 
     if method == "tools/list" then
-        return handle_tools_list(message)
+        return handle_tools_list(message, session)
     elseif method == "tools/call" then
-        return handle_tools_call(message)
+        return handle_tools_call(message, session)
     else
         return json_rpc_error(message.id, -32601, "Method not found: " .. method)
     end
@@ -434,7 +534,7 @@ end
 
 -- Register built-in test tools
 function register_builtin_tools()
-    -- Simple echo tool
+    -- Simple echo tool (for testing)
     register_tool(
         "echo",
         "Echoes back the input message",
@@ -448,12 +548,12 @@ function register_builtin_tools()
             },
             required = {"message"}
         },
-        function(args)
+        function(args, session)
             return "Echo: " .. (args.message or "")
         end
     )
 
-    -- Get time tool
+    -- Get time tool (for testing)
     register_tool(
         "get_time",
         "Returns the current server time",
@@ -461,60 +561,8 @@ function register_builtin_tools()
             type = "object",
             properties = {}
         },
-        function(args)
+        function(args, session)
             return "Current time: " .. os.date("%Y-%m-%d %H:%M:%S")
-        end
-    )
-
-    -- Calculator tool
-    register_tool(
-        "calculate",
-        "Performs basic arithmetic calculations",
-        {
-            type = "object",
-            properties = {
-                operation = {
-                    type = "string",
-                    description = "Operation: add, subtract, multiply, divide",
-                    enum = {"add", "subtract", "multiply", "divide"}
-                },
-                a = {
-                    type = "number",
-                    description = "First operand"
-                },
-                b = {
-                    type = "number",
-                    description = "Second operand"
-                }
-            },
-            required = {"operation", "a", "b"}
-        },
-        function(args)
-            local a = tonumber(args.a)
-            local b = tonumber(args.b)
-            local op = args.operation
-
-            if not a or not b then
-                return "Error: Invalid numbers"
-            end
-
-            local result
-            if op == "add" then
-                result = a + b
-            elseif op == "subtract" then
-                result = a - b
-            elseif op == "multiply" then
-                result = a * b
-            elseif op == "divide" then
-                if b == 0 then
-                    return "Error: Division by zero"
-                end
-                result = a / b
-            else
-                return "Error: Unknown operation"
-            end
-
-            return string.format("%s %s %s = %s", tostring(a), op, tostring(b), tostring(result))
         end
     )
 end
@@ -522,10 +570,20 @@ end
 function startup()
     print("MCP server system starting...")
 
+    -- Load type registry
+    type_registry = require("mcp_type_registry")
+    type_registry.init(config.type_registry)
+    print("Type registry initialized")
+
+    -- Load navigation tools
+    local navigation = require(config.navigation_tools)
+    navigation.register(register_tool, type_registry, update_session_context)
+    print("Navigation tools registered")
+
     -- Register events
     register_events()
 
-    -- Register built-in tools
+    -- Register built-in test tools (temporary, for backward compatibility)
     register_builtin_tools()
 
     print("MCP server system ready (use start command to launch server)")
