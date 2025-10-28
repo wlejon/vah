@@ -97,6 +97,13 @@ render_node = function(node, context)
         end
         return ""
 
+    elseif node.type == parser.NODE_TYPES.UNLESS then
+        local value = resolve_path(node.condition, context)
+        if not is_truthy(value) then
+            return render_nodes(node.body, context)
+        end
+        return ""
+
     elseif node.type == parser.NODE_TYPES.EACH then
         local collection = resolve_path(node.collection, context)
 

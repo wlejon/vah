@@ -68,72 +68,194 @@ we recently created an app called template_tester that let's me look at the mark
 
 please read the docs/mcp* files. 
 
-here's what you've done so far and what's left. 
+i think there's an issue with the mcp row results. here's the list payload i use:
+{"type": "row", "context": {"database": "data/notifications.db", "table": "notifications"}}
 
-PS D:\projects\vah> git status
-On branch main
-Your branch is ahead of 'origin/main' by 1 commit.
-  (use "git push" to publish your local commits)
+we should probably show the primary key or perhaps a few of the first few columns. 
 
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        modified:   CMakeLists.txt
-        modified:   docs/instructions.md
-        modified:   mcp_views/templates/list.md
-        modified:   src/CommandProcessor.cpp
-        modified:   src/CommandProcessor.h
-        modified:   src/Commands.h
-        modified:   src/DocumentManager.cpp
-        modified:   src/DocumentManager.h
-        modified:   src/LuaThread.cpp
-        modified:   src/LuaThread.h
-        modified:   src/ThreadManager.cpp
-        modified:   src/ThreadManager.h
-        modified:   src/main.cpp
+## current log
 
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-        docs/mcp-type-usage.md
-        mcp_views/types/application.lua
-        mcp_views/types/directory.lua
-        mcp_views/types/document.lua
-        mcp_views/types/row.lua
-        mcp_views/types/table.lua
-        src/HttpServerThread.cpp
-        src/HttpServerThread.h
+[2025-10-28 02:23:59.340] [info] Initializing Vah Engine...
+[2025-10-28 02:23:59.557] [info] RmlGL3: 
+[2025-10-28 02:23:59.564] [info] [RmlUi] Loaded font face 'Roboto' [regular] from 'ui/fonts/roboto-static/Roboto-Regular.ttf'.
+[2025-10-28 02:23:59.564] [info] [RmlUi] Loaded font face 'Roboto' [bold] from 'ui/fonts/roboto-static/Roboto-Bold.ttf'.
+[2025-10-28 02:23:59.565] [info] [RmlUi] Loaded font face 'Roboto' [italic] from 'ui/fonts/roboto-static/Roboto-Italic.ttf'.
+[2025-10-28 02:23:59.565] [info] [RmlUi] Loaded font face 'Roboto' [weight=300] from 'ui/fonts/roboto-static/Roboto-Light.ttf'.
+[2025-10-28 02:23:59.565] [info] [RmlUi] Loaded font face 'Roboto' [weight=500] from 'ui/fonts/roboto-static/Roboto-Medium.ttf'.
+[2025-10-28 02:23:59.565] [info] [RmlUi] Loaded font face 'JetBrains Mono' [regular] from 'ui/fonts/jetbrains-mono-static/JetBrainsMono-Regular.ttf'.
+[2025-10-28 02:23:59.565] [info] [RmlUi] Loading Lua plugin using a new Lua state.
+[2025-10-28 02:23:59.566] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [regular] from 'memory'.
+[2025-10-28 02:23:59.566] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [italic] from 'memory'.
+[2025-10-28 02:23:59.571] [info] Registered custom element: canvas
+[2025-10-28 02:23:59.571] [info] Registered custom element: texteditor
+[2025-10-28 02:23:59.571] [info] Registered Lua bindings for ElementTextEditor
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=14 ctrl=true shift=false alt=false -> command='command_copy'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=33 ctrl=true shift=false alt=false -> command='command_paste'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=35 ctrl=true shift=false alt=false -> command='command_cut'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=12 ctrl=true shift=false alt=false -> command='command_select_all'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=37 ctrl=true shift=false alt=false -> command='command_undo'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=36 ctrl=true shift=false alt=false -> command='command_redo'
+[2025-10-28 02:23:59.571] [info] Mapped keybinding: key=30 ctrl=true shift=false alt=false -> command='command_save'
+[2025-10-28 02:23:59.572] [info] NanoVG bindings registered in Lua state
+[2025-10-28 02:23:59.572] [info] RmlUiBridge: Registered emit(), data, and DOM introspection functions in RmlUI lua state
+[2025-10-28 02:23:59.572] [info] EventDispatcher: Registered thread 0
+[2025-10-28 02:23:59.572] [info] ThreadManager: Spawned thread 0 for script 'scripts/main.lua'
+[2025-10-28 02:23:59.572] [info] HTTP server thread started
+[2025-10-28 02:23:59.572] [info] HTTP server thread starting on 127.0.0.1:8765
+[2025-10-28 02:23:59.572] [info] Watching ui/ directory for RML/RCSS changes
+[2025-10-28 02:23:59.572] [info] Vah Engine initialized successfully
+[2025-10-28 02:23:59.573] [info] HTTP server listening on 127.0.0.1:8765
+[2025-10-28 02:23:59.576] [info] Lua thread 0 running
+[2025-10-28 02:23:59.597] [info] [Lua Thread 0] Main Lua thread started
+[2025-10-28 02:23:59.597] [info] Processing SpawnThread command: scripts/notifications.lua (parent: 0)
+[2025-10-28 02:23:59.597] [info] EventDispatcher: Registered thread 1
+[2025-10-28 02:23:59.597] [info] ThreadManager: Spawned thread 1 for script 'scripts/notifications.lua'
+[2025-10-28 02:23:59.597] [info] Processing SpawnThread command: scripts/menu.lua (parent: 0)
+[2025-10-28 02:23:59.598] [info] EventDispatcher: Registered thread 2
+[2025-10-28 02:23:59.598] [info] ThreadManager: Spawned thread 2 for script 'scripts/menu.lua'
+[2025-10-28 02:23:59.598] [info] Processing SpawnThread command: scripts/mcp_server.lua (parent: 0)
+[2025-10-28 02:23:59.598] [info] EventDispatcher: Registered thread 3
+[2025-10-28 02:23:59.598] [info] ThreadManager: Spawned thread 3 for script 'scripts/mcp_server.lua'
+[2025-10-28 02:23:59.598] [info] Processing SpawnThread command: scripts/launcher.lua (parent: 0)
+[2025-10-28 02:23:59.598] [info] EventDispatcher: Registered thread 4
+[2025-10-28 02:23:59.598] [info] ThreadManager: Spawned thread 4 for script 'scripts/launcher.lua'
+[2025-10-28 02:23:59.600] [info] Lua thread 4 running
+[2025-10-28 02:23:59.600] [info] Lua thread 2 running
+[2025-10-28 02:23:59.603] [info] Lua thread 1 running
+[2025-10-28 02:23:59.606] [info] Lua thread 3 running
+[2025-10-28 02:23:59.970] [info] Processing 1 first-time data model registrations
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] MCP server system starting...
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Initializing type registry...
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Types directory: mcp_views/types
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Templates directory: mcp_views/templates
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: application
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: database
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: directory
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: document
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: file
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: row
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3]   Loaded type: table
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Type registry initialized with 7 types
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Type registry initialized
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: list
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: detail
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: summary
+[2025-10-28 02:23:59.970] [info] [Lua Thread 1] Notifications system started
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: search
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'add_notification' registered to thread 1
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: diff
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'notification_success' registered to thread 1
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: status
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'notification_error' registered to thread 1
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Navigation tools registered: list, detail, summary, search, diff, status
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'notification_info' registered to thread 1
+[2025-10-28 02:23:59.970] [info] [Lua Thread 2] Menu system starting...
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Navigation tools registered
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'notification_warning' registered to thread 1
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'mcp_start_server' registered to thread 3
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'open_file_menu' registered to thread 2
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'mcp_stop_server' registered to thread 3
+[2025-10-28 02:23:59.970] [info] EventDispatcher: Global event 'close_all_menus' registered to thread 2
+[2025-10-28 02:23:59.970] [info] [Lua Thread 3] Registered MCP tool: echo
+[2025-10-28 02:23:59.970] [info] Processing LoadUIDocument command: ui/internal/notifications_badge.rml
+[2025-10-28 02:23:59.980] [info] Stored document with ID: notifications_badge
+[2025-10-28 02:23:59.981] [info] Loaded UI document: ui/internal/notifications_badge.rml
+[2025-10-28 02:23:59.981] [info] EventDispatcher: Global event 'mcp_status_update' registered to thread 2
+[2025-10-28 02:23:59.981] [info] [Lua Thread 3] Registered MCP tool: get_time
+[2025-10-28 02:23:59.981] [info] Processing LoadUIDocument command: ui/internal/notifications_panel.rml
+[2025-10-28 02:24:00.027] [info] Stored document with ID: notifications_panel
+[2025-10-28 02:24:00.028] [info] Loaded UI document: ui/internal/notifications_panel.rml
+[2025-10-28 02:24:00.028] [info] Processing LoadUIDocument command: ui/internal/menu.rml
+[2025-10-28 02:24:00.034] [info] Stored document with ID: app_menu
+[2025-10-28 02:24:00.035] [info] Loaded UI document: ui/internal/menu.rml
+[2025-10-28 02:24:00.035] [info] [Lua Thread 3] MCP server system ready (use start command to launch server)
+[2025-10-28 02:24:00.035] [info] [Lua Thread 4] Launcher started (thread_id: 4)
+[2025-10-28 02:24:00.035] [info] EventDispatcher: Global event 'return_to_launcher' registered to thread 4
+[2025-10-28 02:24:00.035] [info] EventDispatcher: Global event 'close_application' registered to thread 4
+[2025-10-28 02:24:00.035] [info] Processing LoadUIDocument command: ui/launcher.rml
+[2025-10-28 02:24:00.047] [info] Stored document with ID: launcher
+[2025-10-28 02:24:00.051] [info] Loaded UI document: ui/launcher.rml
+[2025-10-28 02:24:00.051] [info] [Lua Thread 1] Notifications system ready
+[2025-10-28 02:24:00.051] [info] [Lua Thread 2] Menu system started
+[2025-10-28 02:24:00.051] [info] [Lua Thread 4] Launcher ready
+[2025-10-28 02:24:01.753] [info] [Lua Thread 3] Starting MCP server...
+[2025-10-28 02:24:01.753] [info] [Lua Thread 3] MCP server listening on 127.0.0.1:8765
+[2025-10-28 02:24:01.792] [info] [Lua Thread 1] Added notification: 'MCP Server Started' (type=success, ttl=5.0, timestamp=1761636241, expires=1761636246)
+[2025-10-28 02:24:03.331] [info] [Lua Thread 4] Launching app: MCP Client
+[2025-10-28 02:24:03.332] [info] Hiding document: launcher
+[2025-10-28 02:24:03.332] [info] Processing SpawnThread command: scripts/mcp_client.lua (parent: 4)
+[2025-10-28 02:24:03.332] [info] EventDispatcher: Registered thread 5
+[2025-10-28 02:24:03.332] [info] ThreadManager: Spawned thread 5 for script 'scripts/mcp_client.lua' (parent: 4)
+[2025-10-28 02:24:03.333] [info] Lua thread 5 running
+[2025-10-28 02:24:03.334] [info] Processing 1 first-time data model registrations
+[2025-10-28 02:24:03.334] [info] [Lua Thread 5] MCP Client started
+[2025-10-28 02:24:03.334] [info] Processing LoadUIDocument command: ui/mcp_client.rml
+[2025-10-28 02:24:03.337] [warning] [RmlUi] Could not find variable name 'mcp_client_data.tools_loaded' in data model.
+[2025-10-28 02:24:03.337] [warning] [RmlUi] Error in data expression at 28. Could not find data variable with name 'mcp_client_data.tools_loaded'.
+[2025-10-28 02:24:03.337] [warning] [RmlUi]   "mcp_client_data.tools_loaded > 0"
+[2025-10-28 02:24:03.337] [warning] [RmlUi]                                ^
+[2025-10-28 02:24:03.337] [warning] [RmlUi] Could not add data-if view to element: div.tools-list < div.tools-section < div.container < body
+[2025-10-28 02:24:03.345] [info] Stored document with ID: mcp_client
+[2025-10-28 02:24:03.347] [info] Loaded UI document: ui/mcp_client.rml
+[2025-10-28 02:24:03.347] [info] [Lua Thread 5] MCP Client ready
+[2025-10-28 02:24:03.364] [info] [Lua Thread 4] Thread spawned: 5 for script: scripts/mcp_client.lua
+[2025-10-28 02:24:03.364] [info] [Lua Thread 4] Tracking thread ID: 5
+[2025-10-28 02:24:04.491] [info] HTTP: Received POST /mcp (request_id=1)
+[2025-10-28 02:24:04.492] [info] [Lua Thread 5] Connecting to MCP server...
+[2025-10-28 02:24:04.492] [info] Processing HttpRequest command for thread 3
+[2025-10-28 02:24:04.492] [info] [Lua Thread 5] Sending MCP request: initialize
+[2025-10-28 02:24:04.526] [info] [Lua Thread 3] Received HTTP POST /mcp (request_id=1)
+[2025-10-28 02:24:04.526] [info] Processing HttpResponseCommand for request 1
+[2025-10-28 02:24:04.534] [info] [Lua Thread 5] Received session ID: session-1
+[2025-10-28 02:24:04.534] [info] [Lua Thread 5] Connected to MCP server
+[2025-10-28 02:24:04.534] [info] [Lua Thread 5] Server: VahMCPServer v1.0.0
+[2025-10-28 02:24:04.542] [info] HTTP: Received POST /mcp (request_id=2)
+[2025-10-28 02:24:04.545] [info] Processing HttpRequest command for thread 3
+[2025-10-28 02:24:04.559] [info] [Lua Thread 3] Received HTTP POST /mcp (request_id=2)
+[2025-10-28 02:24:04.559] [info] [Lua Thread 3] Session initialized
+[2025-10-28 02:24:04.559] [info] Processing HttpResponseCommand for request 2
+[2025-10-28 02:24:04.565] [info] [Lua Thread 5] Loading tools from MCP server...
+[2025-10-28 02:24:04.565] [info] [Lua Thread 5] Sending MCP request: tools/list
+[2025-10-28 02:24:04.573] [info] HTTP: Received POST /mcp (request_id=3)
+[2025-10-28 02:24:04.576] [info] Processing HttpRequest command for thread 3
+[2025-10-28 02:24:04.592] [info] [Lua Thread 3] Received HTTP POST /mcp (request_id=3)
+[2025-10-28 02:24:04.592] [info] Processing HttpResponseCommand for request 3
+[2025-10-28 02:24:04.595] [info] [Lua Thread 1] Added notification: 'MCP Connected' (type=success, ttl=5.0, timestamp=1761636244, expires=1761636249)
+[2025-10-28 02:24:04.638] [info] [Lua Thread 5] Loaded 6 tools
+[2025-10-28 02:24:15.678] [info] HTTP: Received POST /mcp (request_id=4)
+[2025-10-28 02:24:15.679] [info] [Lua Thread 5] Calling tool: list
+[2025-10-28 02:24:15.679] [info] Processing HttpRequest command for thread 3
+[2025-10-28 02:24:15.679] [info] [Lua Thread 5] Sending MCP request: tools/call
+[2025-10-28 02:24:15.712] [info] [Lua Thread 3] Received HTTP POST /mcp (request_id=4)
+[2025-10-28 02:24:15.715] [info] Processing HttpResponseCommand for request 4
+[2025-10-28 02:24:15.723] [info] [Lua Thread 5] Tool result: # Rows
 
-  Summary
+Total: **7** items | Page 1 of 1
 
-  We've successfully built a dedicated C++ HTTP server thread that removes all busy-wait loops from Lua! Here's the final architecture:
+## Items
+- **Row 1**
+- **Row 2**
+- **Row 3**
+- **Row 4**
+- **Row 5**
+- **Row 6**
+- **Row 7**
 
-  Flow:
-  1. HTTP request arrives → HttpServerThread (dedicated C++ thread, blocks safely)
-  2. HttpServerThread → sends HttpRequest command → main thread command queue
-  3. Main thread → dispatches "http_request" event → Thread 3 (mcp_server.lua)
-  4. Thread 3 processes → sends HttpResponseCommand → command queue
-  5. Main thread → forwards response → HttpServerThread's response queue
-  6. HttpServerThread → returns HTTP response
-
-  Benefits:
-  - ✅ No Lua busy-wait loops
-  - ✅ Lock-free architecture preserved
-  - ✅ Thread 3's update loop runs normally
-  - ✅ HTTP waiting happens in dedicated thread (proper separation)
-
-  Let me provide the complete updated mcp_server.lua. This will be a comprehensive rewrite, so I'll write the whole file:
-
-  The implementation is complete! I've:
-
-  1. ✅ Created HttpServerThread C++ class
-  2. ✅ Added HTTP commands to Commands.h
-  3. ✅ Added to CMakeLists.txt
-  4. ✅ Integrated with main.cpp
-  5. ⏳ Need to update mcp_server.lua (next)
-  6. ⏳ Need to remove old HTTP bindings
-  7. ⏳ Need to test
-
-  Should I continue with the mcp_server.lua update to complete the refactor? The new version will:
-  - Remove HttpServer.new(), server:route(), server:listen()
-  - Register event handler for "http_request"
-  - Send HttpResponseCommand back via command queue
+---
+*Page 1 of 1, showing 10 per page*
+[2025-10-28 02:25:43.557] [info] Shutting down Vah Engine...
+[2025-10-28 02:25:43.558] [info] HTTP server thread stopped
+[2025-10-28 02:25:43.558] [info] HTTP server thread stopped
+[2025-10-28 02:25:43.558] [info] ThreadManager: Stopping all 6 threads
+[2025-10-28 02:25:43.558] [info] Lua thread 3 finished normally
+[2025-10-28 02:25:43.560] [info] Lua thread 0 finished normally
+[2025-10-28 02:25:43.561] [info] EventDispatcher: Unregistered thread 0
+[2025-10-28 02:25:43.585] [info] Lua thread 4 finished normally
+[2025-10-28 02:25:43.585] [info] Lua thread 2 finished normally
+[2025-10-28 02:25:43.589] [info] Lua thread 5 finished normally
+[2025-10-28 02:25:43.595] [info] Lua thread 1 finished normally
+[2025-10-28 02:25:43.595] [info] EventDispatcher: Unregistered thread 1
+[2025-10-28 02:25:43.596] [info] EventDispatcher: Unregistered thread 2
+[2025-10-28 02:25:43.596] [info] EventDispatcher: Unregistered thread 3
+[2025-10-28 02:25:43.596] [info] EventDispatcher: Unregistered thread 4
+[2025-10-28 02:25:43.597] [info] EventDispatcher: Unregistered thread 5

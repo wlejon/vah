@@ -7,7 +7,7 @@ return {
         host = "127.0.0.1",
         port = 8765,
         endpoint = "/mcp",
-        protocol_version = "2024-11-05"
+        protocol_version = "2025-06-18"
     },
 
     -- Server capabilities

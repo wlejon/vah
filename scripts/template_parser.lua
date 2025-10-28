@@ -10,6 +10,7 @@ M.NODE_TYPES = {
     TEXT = "TEXT",
     VARIABLE = "VARIABLE",
     IF = "IF",
+    UNLESS = "UNLESS",
     EACH = "EACH"
 }
 
@@ -108,6 +109,46 @@ local function parse_if_directive(parser)
     }
 end
 
+-- Parse {{#unless condition}} ... {{/unless}}
+local function parse_unless_directive(parser)
+    -- Already consumed OPEN_BRACE and HASH
+
+    -- Get "unless" keyword
+    local keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
+    if keyword.value ~= "unless" then
+        error("Expected 'unless' keyword but got '" .. keyword.value .. "'")
+    end
+
+    -- Get condition variable path
+    local condition = parse_variable_path(parser)
+
+    -- Expect closing }}
+    expect(parser, lexer.TOKEN_TYPES.CLOSE_BRACE)
+
+    -- Parse body until {{/unless}}
+    local body = parse_nodes(parser, function(p)
+        local token = peek(p)
+        return token.type == lexer.TOKEN_TYPES.OPEN_BRACE and
+               p.pos + 1 <= #p.tokens and
+               p.tokens[p.pos + 1].type == lexer.TOKEN_TYPES.SLASH
+    end)
+
+    -- Expect {{/unless}}
+    expect(parser, lexer.TOKEN_TYPES.OPEN_BRACE)
+    expect(parser, lexer.TOKEN_TYPES.SLASH)
+    local end_keyword = expect(parser, lexer.TOKEN_TYPES.IDENTIFIER)
+    if end_keyword.value ~= "unless" then
+        error("Expected '/unless' but got '/" .. end_keyword.value .. "'")
+    end
+    expect(parser, lexer.TOKEN_TYPES.CLOSE_BRACE)
+
+    return {
+        type = M.NODE_TYPES.UNLESS,
+        condition = condition,
+        body = body
+    }
+end
+
 -- Parse {{#each collection}} ... {{/each}}
 local function parse_each_directive(parser)
     -- Already consumed OPEN_BRACE and HASH
@@ -187,10 +228,12 @@ parse_nodes = function(parser, stop_condition)
 
             if next_token.type == lexer.TOKEN_TYPES.HASH then
                 advance(parser)
-                -- Directive: {{#if}} or {{#each}}
+                -- Directive: {{#if}}, {{#unless}}, or {{#each}}
                 local keyword_token = peek(parser)
                 if keyword_token.value == "if" then
                     table.insert(nodes, parse_if_directive(parser))
+                elseif keyword_token.value == "unless" then
+                    table.insert(nodes, parse_unless_directive(parser))
                 elseif keyword_token.value == "each" then
                     table.insert(nodes, parse_each_directive(parser))
                 else

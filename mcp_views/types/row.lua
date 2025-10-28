@@ -67,8 +67,8 @@ return {
                     -- Generate a display name from first few columns
                     local name_parts = {}
                     for _, col in ipairs(columns) do
-                        if col.name ~= "_row_index" and row[col.name] ~= nil then
-                            local value = tostring(row[col.name])
+                        if col ~= "_row_index" and row[col] ~= nil then
+                            local value = tostring(row[col])
                             -- Truncate long values
                             if #value > 50 then
                                 value = value:sub(1, 47) .. "..."
@@ -132,7 +132,7 @@ return {
 
             -- Get row by primary key or rowid
             local query = "SELECT * FROM " .. table_name .. " WHERE " .. primary_key .. " = ?"
-            local rows, query_err = dbh:query(query, {row_id})
+            local rows, query_err = dbh:query(query, row_id)
 
             if query_err ~= "" then
                 dbh:close()
@@ -288,7 +288,7 @@ return {
             end
             query = query .. " LIMIT 100"  -- Limit search results
 
-            local rows, query_err = dbh:query(query, params)
+            local rows, query_err = dbh:query(query, table.unpack(params))
 
             local matches = {}
             if query_err == "" and rows then
@@ -333,6 +333,8 @@ return {
     -- Future: insert_row, update_row, delete_row
     tools = {},
 
-    -- No custom templates (use generic ones)
-    templates = {}
+    -- Custom templates
+    templates = {
+        list = "mcp_views/templates/row_list.md"
+    }
 }

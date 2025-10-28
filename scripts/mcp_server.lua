@@ -499,6 +499,29 @@ function register_events()
         local response
         if method == "POST" and path == "/mcp" then
             response = handle_mcp_post(body, headers)
+        elseif method == "GET" and path == "/mcp" then
+            -- GET without session: health check or server info
+            -- GET with session: SSE stream (not yet implemented)
+            local session_id = headers["mcp-session-id"]
+            if session_id then
+                -- TODO: Implement SSE stream for server-initiated messages
+                response = {
+                    status = 501,
+                    content_type = "text/plain",
+                    body = "SSE streaming not yet implemented"
+                }
+            else
+                -- Health check response
+                response = {
+                    status = 200,
+                    content_type = "application/json",
+                    body = json.encode({
+                        name = "VahMCPServer",
+                        version = "1.0.0",
+                        status = "running"
+                    })
+                }
+            end
         elseif method == "DELETE" and path == "/mcp" then
             response = handle_mcp_delete(headers)
         else

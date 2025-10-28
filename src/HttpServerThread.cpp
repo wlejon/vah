@@ -100,6 +100,40 @@ void HttpServerThread::SetupRoutes() {
         }
     });
 
+    // GET /mcp - Handle health checks and SSE streams
+    server_->Get("/mcp", [this](const httplib::Request& req, httplib::Response& res) {
+        int request_id = next_request_id_++;
+
+        LOG_INFO("HTTP: Received GET /mcp (request_id={})", request_id);
+
+        // Send command to MCP handler thread
+        Commands::HttpRequest cmd;
+        cmd.request_id = request_id;
+        cmd.method = "GET";
+        cmd.path = "/mcp";
+        cmd.body = req.body;
+        cmd.target_thread_id = mcp_handler_thread_id_;
+
+        // Copy headers
+        for (const auto& [key, value] : req.headers) {
+            cmd.headers[key] = value;
+        }
+
+        command_queue_->enqueue(std::move(cmd));
+
+        // Wait for response
+        HttpResponse http_response = WaitForResponse(request_id);
+
+        // Return HTTP response
+        res.status = http_response.status_code;
+        res.set_content(http_response.body, http_response.content_type);
+
+        // Set custom headers
+        for (const auto& [key, value] : http_response.headers) {
+            res.set_header(key, value);
+        }
+    });
+
     // DELETE /mcp - Handle session termination
     server_->Delete("/mcp", [this](const httplib::Request& req, httplib::Response& res) {
         int request_id = next_request_id_++;

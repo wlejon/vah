@@ -143,7 +143,7 @@ function connect_to_server()
 
     -- Send initialize request
     send_request("initialize", {
-        protocolVersion = "2024-11-05",
+        protocolVersion = "2025-06-18",
         capabilities = {
             roots = {
                 listChanged = true
