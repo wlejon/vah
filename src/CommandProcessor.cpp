@@ -3,6 +3,7 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "EventDispatcher.h"
+#include "HttpServerThread.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
@@ -10,12 +11,14 @@ CommandProcessor::CommandProcessor(
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
     EventDispatcher* event_dispatcher,
+    HttpServerThread* http_server_thread,
     std::function<void()> on_close_application
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
     , event_dispatcher_(event_dispatcher)
+    , http_server_thread_(http_server_thread)
     , on_close_application_(on_close_application)
 {
 }
@@ -154,6 +157,161 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
             LOG_INFO("Processing CloseApplication command");
             if (on_close_application_) {
                 on_close_application_();
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::QueryThreadList>) {
+            LOG_INFO("Processing QueryThreadList command for thread {}", command.requesting_thread_id);
+
+            // Get all thread info
+            auto thread_infos = thread_manager_->GetAllThreadInfo();
+
+            // Convert to PayloadMap with array-like DynamicMap
+            PayloadMap response_data;
+            DynamicRow threads_map;
+
+            // Create array-like structure with numeric string keys
+            for (size_t i = 0; i < thread_infos.size(); ++i) {
+                const auto& info = thread_infos[i];
+                DynamicRow thread_row;
+                thread_row["thread_id"] = static_cast<int64_t>(info.thread_id);
+                thread_row["script_path"] = info.script_path;
+                thread_row["status"] = info.status;
+                thread_row["uptime"] = info.uptime;
+
+                // Use numeric string keys to create array (1-indexed for Lua)
+                threads_map[std::to_string(i + 1)] = std::make_shared<DynamicMap>(DynamicMap{thread_row});
+            }
+
+            response_data["threads"] = std::make_shared<DynamicMap>(DynamicMap{threads_map});
+
+            // Send response back to requesting thread
+            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
+            if (response_queue) {
+                Response response(command.request_id, std::move(response_data), "");
+                response_queue->enqueue(std::move(response));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::QueryThreadInfo>) {
+            LOG_INFO("Processing QueryThreadInfo command for thread {}, querying thread {}",
+                     command.requesting_thread_id, command.thread_id);
+
+            // Get specific thread info
+            auto info = thread_manager_->GetThreadInfo(command.thread_id);
+
+            // Convert to PayloadMap
+            PayloadMap response_data;
+            response_data["thread_id"] = static_cast<int64_t>(info.thread_id);
+            response_data["script_path"] = info.script_path;
+            response_data["status"] = info.status;
+            response_data["uptime"] = info.uptime;
+
+            // Check if thread doesn't exist
+            std::string error = "";
+            if (!thread_manager_->HasThread(command.thread_id)) {
+                error = "Thread not found";
+            }
+
+            // Send response back to requesting thread
+            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
+            if (response_queue) {
+                Response response(command.request_id, std::move(response_data), error);
+                response_queue->enqueue(std::move(response));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::QueryDocumentList>) {
+            LOG_INFO("Processing QueryDocumentList command for thread {}", command.requesting_thread_id);
+
+            // Get all document info
+            auto document_infos = document_manager_->GetAllDocumentInfo();
+
+            // Convert to PayloadMap with array-like DynamicMap
+            PayloadMap response_data;
+            DynamicRow documents_map;
+
+            // Create array-like structure with numeric string keys
+            for (size_t i = 0; i < document_infos.size(); ++i) {
+                const auto& info = document_infos[i];
+                DynamicRow doc_row;
+                doc_row["document_id"] = info.document_id;
+                doc_row["path"] = info.path;
+                doc_row["visible"] = info.visible;
+                doc_row["element_count"] = static_cast<int64_t>(info.element_count);
+                doc_row["width"] = static_cast<int64_t>(info.width);
+                doc_row["height"] = static_cast<int64_t>(info.height);
+
+                // Use numeric string keys to create array (1-indexed for Lua)
+                documents_map[std::to_string(i + 1)] = std::make_shared<DynamicMap>(DynamicMap{doc_row});
+            }
+
+            response_data["documents"] = std::make_shared<DynamicMap>(DynamicMap{documents_map});
+
+            // Send response back to requesting thread
+            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
+            if (response_queue) {
+                Response response(command.request_id, std::move(response_data), "");
+                response_queue->enqueue(std::move(response));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::QueryDocumentInfo>) {
+            LOG_INFO("Processing QueryDocumentInfo command for thread {}, querying document '{}'",
+                     command.requesting_thread_id, command.document_id);
+
+            // Get specific document info
+            auto info = document_manager_->GetDocumentInfo(command.document_id);
+
+            // Convert to PayloadMap
+            PayloadMap response_data;
+            response_data["document_id"] = info.document_id;
+            response_data["path"] = info.path;
+            response_data["visible"] = info.visible;
+            response_data["element_count"] = static_cast<int64_t>(info.element_count);
+            response_data["width"] = static_cast<int64_t>(info.width);
+            response_data["height"] = static_cast<int64_t>(info.height);
+
+            // Check if document doesn't exist
+            std::string error = "";
+            if (info.path.empty()) {
+                error = "Document not found";
+            }
+
+            // Send response back to requesting thread
+            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
+            if (response_queue) {
+                Response response(command.request_id, std::move(response_data), error);
+                response_queue->enqueue(std::move(response));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::HttpRequest>) {
+            LOG_INFO("Processing HttpRequest command for thread {}", command.target_thread_id);
+
+            // Forward the HTTP request to the target Lua thread via event
+            PayloadMap payload;
+            payload["request_id"] = static_cast<int64_t>(command.request_id);
+            payload["method"] = command.method;
+            payload["path"] = command.path;
+            payload["body"] = command.body;
+
+            // Send headers as nested map
+            DynamicRow headers_map;
+            for (const auto& [key, value] : command.headers) {
+                headers_map[key] = value;
+            }
+            payload["headers"] = std::make_shared<DynamicMap>(DynamicMap{headers_map});
+
+            event_dispatcher_->DispatchToThread(command.target_thread_id, "http_request", payload);
+        }
+        else if constexpr (std::is_same_v<T, Commands::HttpResponseCommand>) {
+            LOG_INFO("Processing HttpResponseCommand for request {}", command.request_id);
+
+            if (http_server_thread_) {
+                HttpResponse response;
+                response.request_id = command.request_id;
+                response.status_code = command.status_code;
+                response.content_type = command.content_type;
+                response.body = command.body;
+                response.headers = command.headers;
+
+                http_server_thread_->GetResponseQueue()->enqueue(std::move(response));
             }
         }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)

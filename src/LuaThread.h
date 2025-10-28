@@ -55,6 +55,7 @@ public:
     bool ShouldStop() const { return should_stop_.load(); }
     std::string GetError() const { return error_message_; }
     std::string GetScriptPath() const { return script_path_; }
+    double GetUptime() const;  // Returns uptime in seconds
 
     // Parent/child tracking
     void SetParent(int parent_id, int parent_request_id);
@@ -72,6 +73,9 @@ public:
     // Wait for thread to finish
     void Join();
 
+    // Manually process pending responses (for busy-wait scenarios)
+    void ProcessPendingResponses();
+
 private:
     void ThreadMain();
     void SetupLuaBindings();
@@ -82,6 +86,7 @@ private:
     std::atomic<State> state_;
     std::atomic<bool> should_stop_;
     std::atomic<bool> is_paused_;
+    std::chrono::steady_clock::time_point start_time_;
 
     std::unique_ptr<std::thread> thread_;
     std::unique_ptr<sol::state> lua_;

@@ -350,3 +350,59 @@ moodycamel::ConcurrentQueue<Response>* ThreadManager::GetThreadResponseQueue(int
     }
     return nullptr;
 }
+
+ThreadManager::ThreadInfo ThreadManager::GetThreadInfo(int thread_id) const {
+    LuaThread* thread = GetThread(thread_id);
+
+    ThreadInfo info;
+    info.thread_id = thread_id;
+
+    if (thread == nullptr) {
+        info.script_path = "";
+        info.status = "stopped";
+        info.uptime = 0.0;
+        return info;
+    }
+
+    info.script_path = thread->GetScriptPath();
+    info.uptime = thread->GetUptime();
+
+    // Convert state enum to string
+    switch (thread->GetState()) {
+        case LuaThread::State::Starting:
+            info.status = "starting";
+            break;
+        case LuaThread::State::Running:
+            info.status = "running";
+            break;
+        case LuaThread::State::Paused:
+            info.status = "paused";
+            break;
+        case LuaThread::State::Stopping:
+            info.status = "stopping";
+            break;
+        case LuaThread::State::Stopped:
+            info.status = "stopped";
+            break;
+        case LuaThread::State::Error:
+            info.status = "error";
+            break;
+        default:
+            info.status = "unknown";
+            break;
+    }
+
+    return info;
+}
+
+std::vector<ThreadManager::ThreadInfo> ThreadManager::GetAllThreadInfo() const {
+    std::vector<ThreadInfo> result;
+
+    for (size_t i = 0; i < threads_.size(); ++i) {
+        if (threads_[i] != nullptr) {
+            result.push_back(GetThreadInfo(static_cast<int>(i)));
+        }
+    }
+
+    return result;
+}

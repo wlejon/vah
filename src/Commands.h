@@ -208,6 +208,47 @@ namespace Commands {
 
     struct CloseApplication {
     };
+
+    // Query commands (request/response pattern)
+    struct QueryThreadList {
+        int requesting_thread_id;
+        int request_id;
+    };
+
+    struct QueryThreadInfo {
+        int requesting_thread_id;
+        int request_id;
+        int thread_id;
+    };
+
+    struct QueryDocumentList {
+        int requesting_thread_id;
+        int request_id;
+    };
+
+    struct QueryDocumentInfo {
+        int requesting_thread_id;
+        int request_id;
+        std::string document_id;
+    };
+
+    // HTTP server commands
+    struct HttpRequest {
+        int request_id;
+        int target_thread_id;  // Which thread should handle this
+        std::string method;    // GET, POST, DELETE, etc.
+        std::string path;      // /mcp
+        std::string body;
+        std::unordered_map<std::string, std::string> headers;
+    };
+
+    struct HttpResponseCommand {
+        int request_id;
+        int status_code;
+        std::string content_type;
+        std::string body;
+        std::unordered_map<std::string, std::string> headers;
+    };
 }
 
 // Variant holding all possible command types
@@ -250,7 +291,13 @@ using Command = std::variant<
     Commands::AddNotification,
     Commands::ClearNotifications,
     Commands::DismissNotification,
-    Commands::CloseApplication
+    Commands::CloseApplication,
+    Commands::QueryThreadList,
+    Commands::QueryThreadInfo,
+    Commands::QueryDocumentList,
+    Commands::QueryDocumentInfo,
+    Commands::HttpRequest,
+    Commands::HttpResponseCommand
 >;
 
 // Response sent from main thread to lua thread

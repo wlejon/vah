@@ -62,22 +62,16 @@
 
             <div class="input-group">
                 <div class="label">Tool Arguments (JSON):</div>
-                <textarea id="tool_input_area" class="textarea" cols="60" rows="5" data-attr-value="mcp_client_data.tool_input"></textarea>
+                <texteditor id="tool_input_editor" class="textarea" style="width: 600px; height: 120px;" onmodified="emit('tool_input_modified', {content = event.parameters.content})"/>
             </div>
 
             <div class="input-group">
-                <div class="button" onclick="
-                    local textarea = document:GetElementById('tool_input_area')
-                    if textarea then
-                        local input_value = textarea:GetAttribute('value')
-                        emit('mcp_call_tool', {input_json = input_value})
-                    end
-                ">Call Tool</div>
+                <div class="button" onclick="emit('mcp_call_tool', {})">Call Tool</div>
             </div>
 
             <div class="input-group">
                 <div class="label">Result:</div>
-                <div class="result-box">{{mcp_client_data.result}}</div>
+                <texteditor id="result_editor" class="result-box" style="width: 600px; height: 300px;"/>
             </div>
         </div>
     </div>

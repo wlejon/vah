@@ -53,6 +53,19 @@ public:
     // Check and reset the document changed flag
     bool GetAndClearDocumentChangedFlag();
 
+    // Query document information (for MCP API)
+    struct DocumentInfo {
+        std::string document_id;
+        std::string path;
+        bool visible;
+        int element_count;
+        int width;
+        int height;
+    };
+
+    DocumentInfo GetDocumentInfo(const std::string& document_id) const;
+    std::vector<DocumentInfo> GetAllDocumentInfo() const;
+
 private:
     Rml::Context* context_;
     RmlUiBridge* rmlui_bridge_;

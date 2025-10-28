@@ -46,6 +46,17 @@ public:
     // Get thread's response queue (for sending responses)
     moodycamel::ConcurrentQueue<Response>* GetThreadResponseQueue(int thread_id);
 
+    // Query thread information (for MCP API)
+    struct ThreadInfo {
+        int thread_id;
+        std::string script_path;
+        std::string status;  // "running", "paused", "stopped", "error"
+        double uptime;       // seconds since thread started
+    };
+
+    ThreadInfo GetThreadInfo(int thread_id) const;
+    std::vector<ThreadInfo> GetAllThreadInfo() const;
+
 private:
     LuaThread* GetThread(int thread_id) const;
 

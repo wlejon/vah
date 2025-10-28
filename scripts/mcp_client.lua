@@ -258,6 +258,9 @@ function call_tool(tool_name, arguments)
     client_data.result = "Calling tool..."
     update_client_data()
 
+    -- Update result editor
+    ui.set_texteditor_content("result_editor", "Calling tool...")
+
     send_request("tools/call", {
         name = tool_name,
         arguments = arguments
@@ -267,6 +270,9 @@ function call_tool(tool_name, arguments)
         if err then
             client_data.result = "Error: " .. err
             update_client_data()
+
+            -- Update result editor
+            ui.set_texteditor_content("result_editor", "Error: " .. err)
 
             event.trigger_global("notification_error", {
                 title = "Tool Call Failed",
@@ -287,6 +293,9 @@ function call_tool(tool_name, arguments)
 
         client_data.result = text_content
         update_client_data()
+
+        -- Update result editor
+        ui.set_texteditor_content("result_editor", text_content)
 
         print("Tool result: " .. text_content)
     end)
@@ -342,6 +351,16 @@ function register_events()
         end
     end)
 
+    -- Handle texteditor modifications
+    event.register("tool_input_modified", function(payload)
+        client_data.tool_input = payload.content or "{}"
+        update_client_data()
+    end)
+
+    -- Note: Texteditor keybinding commands (copy, paste, cut, select_all, undo, redo)
+    -- are now handled globally in C++ (RmlUiBridge::ProcessKeyboardEvent)
+    -- No need to register handlers in each Lua script!
+
     -- Call tool
     event.register("mcp_call_tool", function(payload)
         if client_data.selected_tool == "" then
@@ -352,8 +371,8 @@ function register_events()
             return
         end
 
-        -- Get input from payload (sent from RML)
-        local input_json = payload.input_json or "{}"
+        -- Use stored tool_input instead of payload
+        local input_json = client_data.tool_input or "{}"
 
         -- Parse tool input
         local success, arguments = pcall(function()
@@ -370,14 +389,6 @@ function register_events()
 
         call_tool(client_data.selected_tool, arguments)
     end)
-
-    -- Update tool input
-    event.register("mcp_update_tool_input", function(payload)
-        if payload.value then
-            client_data.tool_input = payload.value
-            update_client_data()
-        end
-    end)
 end
 
 function startup()
@@ -391,6 +402,13 @@ function startup()
 
     -- Load UI
     ui.load_document("ui/mcp_client.rml", true, "mcp_client")
+
+    -- Initialize texteditors
+    ui.set_texteditor_content("tool_input_editor", client_data.tool_input)
+    ui.set_texteditor_editable("tool_input_editor", true)
+
+    ui.set_texteditor_content("result_editor", "")
+    ui.set_texteditor_editable("result_editor", false)
 
     print("MCP Client ready")
 end

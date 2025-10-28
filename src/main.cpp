@@ -21,6 +21,7 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "CommandProcessor.h"
+#include "HttpServerThread.h"
 #include "ElementCanvas.h"
 #include "ElementTextEditor.h"
 #include "ElementTextEditorInstancer.h"
@@ -248,7 +249,18 @@ public:
         event_dispatcher_ = std::make_unique<EventDispatcher>();
         data_store_ = std::make_unique<DataStore>();
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), event_dispatcher_.get(), data_store_.get());
+        http_server_thread_ = std::make_unique<HttpServerThread>("127.0.0.1", 8765, command_queue_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(event_dispatcher_.get());
+
+        // Register default keybindings
+        auto& keybindings = rmlui_bridge_->GetKeybindingRegistry();
+        keybindings.MapKeybinding({Rml::Input::KI_C, true, false, false}, "command_copy");
+        keybindings.MapKeybinding({Rml::Input::KI_V, true, false, false}, "command_paste");
+        keybindings.MapKeybinding({Rml::Input::KI_X, true, false, false}, "command_cut");
+        keybindings.MapKeybinding({Rml::Input::KI_A, true, false, false}, "command_select_all");
+        keybindings.MapKeybinding({Rml::Input::KI_Z, true, false, false}, "command_undo");
+        keybindings.MapKeybinding({Rml::Input::KI_Y, true, false, false}, "command_redo");
+        keybindings.MapKeybinding({Rml::Input::KI_S, true, false, false}, "command_save");
 
         // Initialize managers
         document_manager_ = std::make_unique<DocumentManager>(rml_context_, rmlui_bridge_.get(), event_dispatcher_.get());
@@ -260,6 +272,7 @@ public:
             document_manager_.get(),
             data_model_manager_.get(),
             event_dispatcher_.get(),
+            http_server_thread_.get(),
             [this]() { running_ = false; }  // Callback to close application
         );
 
@@ -287,6 +300,10 @@ public:
 
         // Spawn main Lua thread which will load UI
         thread_manager_->SpawnThread("scripts/main.lua");
+
+        // Start HTTP server thread (dedicated thread for HTTP handling)
+        http_server_thread_->Start();
+        LOG_INFO("HTTP server thread started");
 
         // Setup file watcher for RML/RCSS hot reload
         ui_file_watcher_ = std::make_unique<efsw::FileWatcher>();
@@ -336,6 +353,15 @@ public:
 
         // Shutdown managers (in reverse order of initialization)
         command_processor_.reset();
+
+        // Stop HTTP server thread before threads
+        if (http_server_thread_) {
+            http_server_thread_->Stop();
+            http_server_thread_->Join();
+            http_server_thread_.reset();
+            LOG_INFO("HTTP server thread stopped");
+        }
+
         thread_manager_.reset();
         rmlui_bridge_.reset();
 
@@ -712,6 +738,7 @@ private:
     std::unique_ptr<EventDispatcher> event_dispatcher_;
     std::unique_ptr<DataStore> data_store_;
     std::unique_ptr<ThreadManager> thread_manager_;
+    std::unique_ptr<HttpServerThread> http_server_thread_;
     std::unique_ptr<RmlUiBridge> rmlui_bridge_;
 
     // Managers

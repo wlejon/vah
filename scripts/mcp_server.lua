@@ -5,10 +5,9 @@
 -- Load configuration
 local config = require("mcp_config")
 
-local server = nil
 local sessions = {}
 local next_session_id = 1
-local server_status = "stopped"  -- "stopped", "starting", "running", "stopping"
+local server_status = "stopped"  -- "stopped", "running"
 
 -- Server capabilities (from config)
 local capabilities = config.capabilities
@@ -325,24 +324,25 @@ function handle_notification(message, session)
 end
 
 -- Handle MCP POST request
-function handle_mcp_post(req)
+function handle_mcp_post(body, headers)
     -- Parse JSON-RPC message
     local message
     local parse_success, parse_error = pcall(function()
-        message = json.decode(req.body)
+        message = json.decode(body)
     end)
 
     if not parse_success or not message then
         local err_response = json_rpc_error(nil, -32700, "Parse error")
         return {
             status = 400,
-            headers = {["Content-Type"] = "application/json"},
-            body = json.encode(err_response)
+            content_type = "application/json",
+            body = json.encode(err_response),
+            session_id = nil
         }
     end
 
     -- Get or create session
-    local session_id = req.headers["mcp-session-id"] or req.headers["Mcp-Session-Id"]
+    local session_id = headers["mcp-session-id"] or headers["Mcp-Session-Id"]
     local session = nil
     local is_initialize = (message.method == "initialize")
 
@@ -355,8 +355,9 @@ function handle_mcp_post(req)
             local err_response = json_rpc_error(message.id, -32600, "Missing session ID")
             return {
                 status = 400,
-                headers = {["Content-Type"] = "application/json"},
-                body = json.encode(err_response)
+                content_type = "application/json",
+                body = json.encode(err_response),
+                session_id = nil
             }
         end
 
@@ -365,8 +366,9 @@ function handle_mcp_post(req)
             local err_response = json_rpc_error(message.id, -32600, "Invalid session ID")
             return {
                 status = 400,
-                headers = {["Content-Type"] = "application/json"},
-                body = json.encode(err_response)
+                content_type = "application/json",
+                body = json.encode(err_response),
+                session_id = nil
             }
         end
     end
@@ -376,42 +378,41 @@ function handle_mcp_post(req)
 
     if message.method == "initialize" then
         response = handle_initialize(message, session_id)
-        local response_headers = {
-            ["Content-Type"] = "application/json",
-            ["Mcp-Session-Id"] = session_id
-        }
         return {
             status = 200,
-            headers = response_headers,
-            body = json.encode(response)
+            content_type = "application/json",
+            body = json.encode(response),
+            session_id = session_id
         }
     elseif message.id then
         -- Request - needs response
         response = handle_request(message, session)
         return {
             status = 200,
-            headers = {["Content-Type"] = "application/json"},
-            body = json.encode(response)
+            content_type = "application/json",
+            body = json.encode(response),
+            session_id = nil
         }
     else
         -- Notification - no response needed
         handle_notification(message, session)
         return {
             status = 202,
-            headers = {},
-            body = ""
+            content_type = "application/json",
+            body = "",
+            session_id = nil
         }
     end
 end
 
 -- Handle MCP DELETE request (session termination)
-function handle_mcp_delete(req)
-    local session_id = req.headers["mcp-session-id"] or req.headers["Mcp-Session-Id"]
+function handle_mcp_delete(headers)
+    local session_id = headers["mcp-session-id"] or headers["Mcp-Session-Id"]
 
     if not session_id then
         return {
             status = 400,
-            headers = {},
+            content_type = "text/plain",
             body = "Missing session ID"
         }
     end
@@ -420,7 +421,7 @@ function handle_mcp_delete(req)
     if not session then
         return {
             status = 404,
-            headers = {},
+            content_type = "text/plain",
             body = "Session not found"
         }
     end
@@ -431,7 +432,7 @@ function handle_mcp_delete(req)
 
     return {
         status = 204,
-        headers = {},
+        content_type = "text/plain",
         body = ""
     }
 end
@@ -444,17 +445,6 @@ function start_server()
     end
 
     print("Starting MCP server...")
-    server_status = "starting"
-    update_ui_state()
-
-    -- Create server
-    server = HttpServer.new()
-
-    -- Setup MCP endpoint
-    server:route("POST", MCP_ENDPOINT, handle_mcp_post)
-    server:route("DELETE", MCP_ENDPOINT, handle_mcp_delete)
-
-    -- Mark as running before blocking
     server_status = "running"
     update_ui_state()
 
@@ -465,23 +455,6 @@ function start_server()
         title = "MCP Server Started",
         message = "Server listening on " .. SERVER_HOST .. ":" .. SERVER_PORT
     })
-
-    -- Start server (this blocks until server is stopped)
-    local success, err = server:listen(SERVER_HOST, SERVER_PORT)
-
-    -- This is only reached when server stops
-    print("MCP server listen() returned: success=" .. tostring(success))
-
-    if not success and err then
-        print("Server error: " .. err)
-        event.trigger_global("notification_error", {
-            title = "MCP Server Error",
-            message = err
-        })
-    end
-
-    server_status = "stopped"
-    update_ui_state()
 end
 
 -- Stop the MCP server
@@ -492,12 +465,8 @@ function stop_server()
     end
 
     print("Stopping MCP server...")
-    server_status = "stopping"
+    server_status = "stopped"
     update_ui_state()
-
-    if server then
-        server:stop()
-    end
 
     -- Clear sessions
     sessions = {}
@@ -506,13 +475,50 @@ function stop_server()
         title = "MCP Server Stopped",
         message = "Server has been shut down"
     })
-
-    server_status = "stopped"
-    update_ui_state()
 end
 
 -- Register event handlers
 function register_events()
+    -- HTTP request handler (from HttpServerThread via main thread)
+    event.register("http_request", function(payload)
+        local request_id = payload.request_id
+        local method = payload.method
+        local path = payload.path
+        local body = payload.body
+        local headers = payload.headers
+
+        print("Received HTTP " .. method .. " " .. path .. " (request_id=" .. request_id .. ")")
+
+        -- Only process if server is running
+        if server_status ~= "running" then
+            command.http_response(request_id, 503, "application/json",
+                json.encode({error = "MCP server not running"}))
+            return
+        end
+
+        local response
+        if method == "POST" and path == "/mcp" then
+            response = handle_mcp_post(body, headers)
+        elseif method == "DELETE" and path == "/mcp" then
+            response = handle_mcp_delete(headers)
+        else
+            response = {
+                status = 404,
+                content_type = "text/plain",
+                body = "Not Found"
+            }
+        end
+
+        -- Send response back via command queue
+        -- Add Mcp-Session-Id header if present
+        local response_headers = {}
+        if response.session_id then
+            response_headers["Mcp-Session-Id"] = response.session_id
+        end
+
+        command.http_response(request_id, response.status, response.content_type, response.body, response_headers)
+    end)
+
     -- Local events (from UI)
     event.register("mcp_start_server", function(payload)
         start_server()

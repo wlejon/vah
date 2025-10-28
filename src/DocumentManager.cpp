@@ -578,3 +578,50 @@ Rml::Element* DocumentManager::FindElementById(const std::string& element_id) {
     }
     return nullptr;
 }
+
+DocumentManager::DocumentInfo DocumentManager::GetDocumentInfo(const std::string& document_id) const {
+    DocumentInfo info;
+    info.document_id = document_id;
+    info.path = "";
+    info.visible = false;
+    info.element_count = 0;
+    info.width = 0;
+    info.height = 0;
+
+    auto it = loaded_documents_.find(document_id);
+    if (it != loaded_documents_.end() && it->second != nullptr) {
+        auto doc = it->second;
+        info.path = doc->GetSourceURL();
+        info.visible = doc->IsVisible();
+
+        // Count elements (recursively)
+        std::function<int(Rml::Element*)> count_elements = [&](Rml::Element* elem) -> int {
+            if (!elem) return 0;
+            int count = 1;  // Count this element
+            for (int i = 0; i < elem->GetNumChildren(); ++i) {
+                count += count_elements(elem->GetChild(i));
+            }
+            return count;
+        };
+        info.element_count = count_elements(doc);
+
+        // Get dimensions
+        auto box = doc->GetBox();
+        info.width = static_cast<int>(box.GetSize().x);
+        info.height = static_cast<int>(box.GetSize().y);
+    }
+
+    return info;
+}
+
+std::vector<DocumentManager::DocumentInfo> DocumentManager::GetAllDocumentInfo() const {
+    std::vector<DocumentInfo> result;
+
+    for (const auto& [doc_id, doc] : loaded_documents_) {
+        if (doc != nullptr) {
+            result.push_back(GetDocumentInfo(doc_id));
+        }
+    }
+
+    return result;
+}

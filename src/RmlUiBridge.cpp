@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "DataStore.h"
 #include "EventDispatcher.h"
+#include "ElementTextEditor.h"
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Lua/Utilities.h>
 #include <RmlUi/Lua/Interpreter.h>
@@ -344,6 +345,38 @@ bool RmlUiBridge::ProcessKeyboardEvent(Rml::Input::KeyIdentifier key, int modifi
     std::string command = keybinding_registry_.LookupCommand(combo);
     if (command.empty()) {
         return false;  // No command mapped
+    }
+
+    // Check if focused element is a texteditor - handle common commands directly
+    if (focused_element && focused_element->GetTagName() == "texteditor") {
+        ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(focused_element);
+        if (editor) {
+            if (command == "command_copy") {
+                editor->CopyToClipboard();
+                return true;
+            }
+            else if (command == "command_select_all") {
+                editor->SelectAll();
+                return true;
+            }
+            else if (command == "command_cut") {
+                editor->CutToClipboard();
+                return true;
+            }
+            else if (command == "command_paste") {
+                editor->PasteFromClipboard();
+                return true;
+            }
+            else if (command == "command_undo") {
+                editor->Undo();
+                return true;
+            }
+            else if (command == "command_redo") {
+                editor->Redo();
+                return true;
+            }
+            // For other commands, fall through to Lua dispatch
+        }
     }
 
     // Build payload with element context

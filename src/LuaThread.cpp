@@ -175,6 +175,7 @@ LuaThread::~LuaThread() {
 }
 
 void LuaThread::Start() {
+    start_time_ = std::chrono::steady_clock::now();
     thread_ = std::make_unique<std::thread>(&LuaThread::ThreadMain, this);
 }
 
@@ -204,10 +205,20 @@ void LuaThread::SetParent(int parent_id, int parent_request_id) {
     parent_request_id_ = parent_request_id;
 }
 
+double LuaThread::GetUptime() const {
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time_);
+    return duration.count() / 1000.0;  // Convert to seconds
+}
+
 void LuaThread::Join() {
     if (thread_ && thread_->joinable()) {
         thread_->join();
     }
+}
+
+void LuaThread::ProcessPendingResponses() {
+    ProcessResponses();
 }
 
 sol::object LuaThread::CallSaveHook() {
@@ -277,11 +288,11 @@ void LuaThread::ProcessResponses() {
                     for (const auto& [key, value] : response.data) {
                         data_table[key] = DynamicValueToLua(*lua_, value);
                     }
-                    // Success: callback(data, nil)
-                    it->second.callback(data_table, sol::nil);
+                    // Success: callback(nil, data) - Lua convention: (error, result)
+                    it->second.callback(sol::nil, data_table);
                 } else {
-                    // Error: callback(nil, error)
-                    it->second.callback(sol::nil, response.error);
+                    // Error: callback(error, nil) - Lua convention: (error, result)
+                    it->second.callback(response.error, sol::nil);
                 }
             } catch (const sol::error& e) {
                 LOG_ERROR("Lua thread {} error in callback for request {}: {}",
@@ -509,6 +520,25 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    command_table["http_response"] = [this](int request_id, int status_code, const std::string& content_type, const std::string& body, sol::optional<sol::table> headers_table) {
+        Commands::HttpResponseCommand cmd;
+        cmd.request_id = request_id;
+        cmd.status_code = status_code;
+        cmd.content_type = content_type;
+        cmd.body = body;
+
+        // Convert headers table to unordered_map
+        if (headers_table) {
+            for (const auto& [key, value] : headers_table.value()) {
+                if (key.is<std::string>() && value.is<std::string>()) {
+                    cmd.headers[key.as<std::string>()] = value.as<std::string>();
+                }
+            }
+        }
+
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["command"] = command_table;
 
     // Bind UI operations
@@ -644,6 +674,34 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    // Document query operations
+    ui_table["list_documents"] = [this](sol::function callback) {
+        int request_id = next_request_id_++;
+
+        // Store callback for when response arrives
+        pending_requests_[request_id] = {request_id, callback, "ui.list_documents"};
+
+        // Send query command
+        Commands::QueryDocumentList cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = request_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["get_document_info"] = [this](const std::string& document_id, sol::function callback) {
+        int request_id = next_request_id_++;
+
+        // Store callback for when response arrives
+        pending_requests_[request_id] = {request_id, callback, "ui.get_document_info"};
+
+        // Send query command
+        Commands::QueryDocumentInfo cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = request_id;
+        cmd.document_id = document_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
 
     // Bind clipboard operations
@@ -676,13 +734,50 @@ void LuaThread::SetupLuaBindings() {
 
     (*lua_)["data"] = data_table;
 
-    // Bind thread info
+    // Bind thread query operations
+    auto thread_table = lua_->create_table();
+
+    thread_table["list"] = [this](sol::function callback) {
+        int request_id = next_request_id_++;
+
+        // Store callback for when response arrives
+        pending_requests_[request_id] = {request_id, callback, "thread.list"};
+
+        // Send query command
+        Commands::QueryThreadList cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = request_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    thread_table["get_info"] = [this](int thread_id, sol::function callback) {
+        int request_id = next_request_id_++;
+
+        // Store callback for when response arrives
+        pending_requests_[request_id] = {request_id, callback, "thread.get_info"};
+
+        // Send query command
+        Commands::QueryThreadInfo cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = request_id;
+        cmd.thread_id = thread_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    (*lua_)["thread"] = thread_table;
+
+    // Bind thread info (backward compatibility)
     (*lua_)["thread_id"] = id_;
     (*lua_)["thread_name"] = script_path_;
 
     // Bind sleep function
     (*lua_)["sleep"] = [](double seconds) {
         std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
+    };
+
+    // Bind process_responses function (for manual response processing during busy-wait)
+    (*lua_)["process_responses"] = [this]() {
+        ProcessPendingResponses();
     };
 
     // Override print to send to main thread via command queue
