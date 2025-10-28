@@ -3,8 +3,19 @@
     <title>Template Tester</title>
     <link type="text/rcss" href="reset.rcss"/>
     <link type="text/rcss" href="template_tester.rcss"/>
+    <script>
+        -- Setup keybindings when document loads
+        function setup_keybindings()
+            ui.map_keybinding("ctrl+c", "command_copy")
+            ui.map_keybinding("ctrl+v", "command_paste")
+            ui.map_keybinding("ctrl+x", "command_cut")
+            ui.map_keybinding("ctrl+a", "command_select_all")
+            ui.map_keybinding("ctrl+z", "command_undo")
+            ui.map_keybinding("ctrl+shift+z", "command_redo")
+        end
+    </script>
 </head>
-<body>
+<body onload="setup_keybindings()">
     <div class="header">
         <h1>Markdown Template Tester</h1>
     </div>

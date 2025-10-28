@@ -275,6 +275,66 @@ void DocumentManager::SetTextEditorConfig(const std::string& element_id, const s
     LOG_INFO("SetTextEditorConfig: Set '{}' config '{}' for texteditor '{}'", config_key, element_id, element_id);
 }
 
+void DocumentManager::TextEditorCopy(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->CopyToClipboard();
+    }
+}
+
+void DocumentManager::TextEditorPaste(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->PasteFromClipboard();
+    }
+}
+
+void DocumentManager::TextEditorCut(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->CutToClipboard();
+    }
+}
+
+void DocumentManager::TextEditorSelectAll(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->SelectAll();
+    }
+}
+
+void DocumentManager::TextEditorUndo(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->Undo();
+    }
+}
+
+void DocumentManager::TextEditorRedo(const std::string& element_id) {
+    auto element = FindElementById(element_id);
+    if (!element) return;
+
+    ElementTextEditor* editor = dynamic_cast<ElementTextEditor*>(element);
+    if (editor) {
+        editor->Redo();
+    }
+}
+
 std::string DocumentManager::GetTextEditorContent(const std::string& element_id) {
     auto element = FindElementById(element_id);
     if (!element) {

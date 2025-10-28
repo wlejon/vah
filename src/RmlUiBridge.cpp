@@ -184,6 +184,30 @@ namespace {
         return 0;
     }
 
+    // Lua callback for ui.map_keybinding()
+    int lua_map_keybinding(lua_State* L) {
+        if (!g_bridge) {
+            return luaL_error(L, "RmlUiBridge not initialized");
+        }
+
+        // Arguments: combo_string, command_name
+        if (!lua_isstring(L, 1)) {
+            return luaL_error(L, "ui.map_keybinding() arg 1: key combo string required");
+        }
+        if (!lua_isstring(L, 2)) {
+            return luaL_error(L, "ui.map_keybinding() arg 2: command name required");
+        }
+
+        std::string combo_str = lua_tostring(L, 1);
+        std::string command = lua_tostring(L, 2);
+
+        // Parse and register
+        auto combo = KeybindingRegistry::ParseKeyCombo(combo_str);
+        g_bridge->GetKeybindingRegistry().MapKeybinding(combo, command);
+
+        return 0;
+    }
+
     // Lua callback for emit() - clean event emission without context recovery
     int lua_emit(lua_State* L) {
         if (!g_bridge) {
@@ -265,6 +289,16 @@ void RmlUiBridge::SetupLuaBindings(lua_State* L, Rml::Context* context, DataStor
     lua_pushcfunction(L, lua_emit);
     lua_setglobal(L, "emit");
 
+    // Create ui table if it doesn't exist (for keybinding registration)
+    lua_getglobal(L, "ui");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        lua_newtable(L);
+    }
+    lua_pushcfunction(L, lua_map_keybinding);
+    lua_setfield(L, -2, "map_keybinding");
+    lua_setglobal(L, "ui");
+
     // Create data table with get() and update_row() functions
     lua_newtable(L);
     lua_pushcfunction(L, lua_data_get);
@@ -296,4 +330,49 @@ void RmlUiBridge::TriggerEvent(const std::string& event_name, const PayloadMap& 
 
     // Dispatch event through EventDispatcher to the appropriate thread
     event_dispatcher_->DispatchEvent(document_id, event_name, payload);
+}
+
+bool RmlUiBridge::ProcessKeyboardEvent(Rml::Input::KeyIdentifier key, int modifiers, Rml::Element* focused_element) {
+    // Build KeyCombo from modifiers
+    KeybindingRegistry::KeyCombo combo;
+    combo.key = key;
+    combo.ctrl = (modifiers & Rml::Input::KM_CTRL) != 0;
+    combo.shift = (modifiers & Rml::Input::KM_SHIFT) != 0;
+    combo.alt = (modifiers & Rml::Input::KM_ALT) != 0;
+
+    // Look up command
+    std::string command = keybinding_registry_.LookupCommand(combo);
+    if (command.empty()) {
+        return false;  // No command mapped
+    }
+
+    // Build payload with element context
+    PayloadMap payload;
+
+    if (focused_element) {
+        payload["element_id"] = focused_element->GetId().c_str();
+        payload["element_tag"] = focused_element->GetTagName();
+
+        // Get document from focused element
+        Rml::ElementDocument* doc = focused_element->GetOwnerDocument();
+        if (doc) {
+            std::string doc_id = doc->GetId().c_str();
+            if (!doc_id.empty()) {
+                payload["document_id"] = doc_id;
+
+                // Emit command to the owning thread
+                TriggerEvent(command, payload, doc_id);
+                return true;
+            }
+        }
+    }
+
+    // No document context available - emit to current document
+    if (!current_document_id_.empty()) {
+        TriggerEvent(command, payload, current_document_id_);
+        return true;
+    }
+
+    LOG_WARN("RmlUiBridge: Cannot emit command '{}' - no document context", command);
+    return false;
 }

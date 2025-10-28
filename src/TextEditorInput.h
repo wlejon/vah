@@ -30,10 +30,12 @@ public:
     using DirtyCallback = std::function<void()>;
     using ContentChangeCallback = std::function<void()>;
     using SaveCallback = std::function<void()>;
+    using BeforeContentChangeCallback = std::function<void()>;
 
     void SetDirtyCallback(DirtyCallback callback) { dirty_callback_ = callback; }
     void SetContentChangeCallback(ContentChangeCallback callback) { content_change_callback_ = callback; }
     void SetSaveCallback(SaveCallback callback) { save_callback_ = callback; }
+    void SetBeforeContentChangeCallback(BeforeContentChangeCallback callback) { before_content_change_callback_ = callback; }
 
     // Mouse input
     void OnMouseDown(float mouse_x, float mouse_y, const Rml::Vector2f& element_offset);
@@ -73,4 +75,5 @@ private:
     DirtyCallback dirty_callback_;
     ContentChangeCallback content_change_callback_;
     SaveCallback save_callback_;
+    BeforeContentChangeCallback before_content_change_callback_;
 };

@@ -178,14 +178,23 @@ texteditor {
     color: #ce9178;
 }
 
+.rml-rendered pre {
+    display: block;
+    white-space: pre;
+}
+
+.rml-rendered code {
+    font-family: "JetBrains Mono";
+}
+
 .rml-rendered .code-block {
     font-family: "JetBrains Mono";
     background-color: #1e1e1e;
     padding: 10dp;
+    margin-top: 0dp;
     margin-bottom: 10dp;
     border-width: 1dp;
     border-color: #3e3e42;
-    white-space: pre-wrap;
 }
 
 .rml-rendered .md-table {

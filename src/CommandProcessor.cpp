@@ -104,6 +104,24 @@ void CommandProcessor::ProcessCommand(const Command& cmd) {
         else if constexpr (std::is_same_v<T, Commands::SetTextEditorConfig>) {
             document_manager_->SetTextEditorConfig(command.element_id, command.config_key, command.value);
         }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorCopy>) {
+            document_manager_->TextEditorCopy(command.element_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorPaste>) {
+            document_manager_->TextEditorPaste(command.element_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorCut>) {
+            document_manager_->TextEditorCut(command.element_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorSelectAll>) {
+            document_manager_->TextEditorSelectAll(command.element_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorUndo>) {
+            document_manager_->TextEditorUndo(command.element_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::TextEditorRedo>) {
+            document_manager_->TextEditorRedo(command.element_id);
+        }
         else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
             data_model_manager_->UpdateModel(command.model_name, std::move(const_cast<DynamicTable&>(command.data)));
         }

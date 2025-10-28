@@ -5,6 +5,7 @@
 #include <string>
 #include "InputState.h"
 #include "DomIntrospection.h"
+#include "KeybindingRegistry.h"
 
 class DataStore;  // Forward declaration
 class EventDispatcher;  // Forward declaration
@@ -21,9 +22,17 @@ public:
     Rml::Context* GetContext() const { return context_; }
     EventDispatcher* GetEventDispatcher() const { return event_dispatcher_; }
 
+    // Process keyboard event and check for command mappings
+    // Returns true if a command was emitted, false otherwise
+    bool ProcessKeyboardEvent(Rml::Input::KeyIdentifier key, int modifiers, Rml::Element* focused_element);
+
+    // Get keybinding registry for configuration
+    KeybindingRegistry& GetKeybindingRegistry() { return keybinding_registry_; }
+
 private:
     EventDispatcher* event_dispatcher_;
     Rml::Context* context_;
     DataStore* data_store_;
     std::string current_document_id_;
+    KeybindingRegistry keybinding_registry_;
 };

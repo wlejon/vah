@@ -30,6 +30,12 @@ public:
     void SetTextEditorEditable(const std::string& element_id, bool editable);
     void SetTextEditorModified(const std::string& element_id, bool modified);
     void SetTextEditorConfig(const std::string& element_id, const std::string& config_key, const DynamicValue& value);
+    void TextEditorCopy(const std::string& element_id);
+    void TextEditorPaste(const std::string& element_id);
+    void TextEditorCut(const std::string& element_id);
+    void TextEditorSelectAll(const std::string& element_id);
+    void TextEditorUndo(const std::string& element_id);
+    void TextEditorRedo(const std::string& element_id);
     std::string GetTextEditorContent(const std::string& element_id);
     bool GetTextEditorModified(const std::string& element_id);
 

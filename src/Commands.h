@@ -112,6 +112,30 @@ namespace Commands {
         DynamicValue value;
     };
 
+    struct TextEditorCopy {
+        std::string element_id;
+    };
+
+    struct TextEditorPaste {
+        std::string element_id;
+    };
+
+    struct TextEditorCut {
+        std::string element_id;
+    };
+
+    struct TextEditorSelectAll {
+        std::string element_id;
+    };
+
+    struct TextEditorUndo {
+        std::string element_id;
+    };
+
+    struct TextEditorRedo {
+        std::string element_id;
+    };
+
     struct UpdateDataModel {
         std::string model_name;
         DynamicTable data;
@@ -208,6 +232,12 @@ using Command = std::variant<
     Commands::SetTextEditorEditable,
     Commands::SetTextEditorModified,
     Commands::SetTextEditorConfig,
+    Commands::TextEditorCopy,
+    Commands::TextEditorPaste,
+    Commands::TextEditorCut,
+    Commands::TextEditorSelectAll,
+    Commands::TextEditorUndo,
+    Commands::TextEditorRedo,
     Commands::UpdateDataModel,
     Commands::UpdateDataObject,
     Commands::TriggerTextEditorModified,

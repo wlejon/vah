@@ -50,6 +50,9 @@ add_executable(vah
     src/JsonBindings.cpp
     src/SqliteBindings.cpp
     src/HttpBindings.cpp
+    src/ClipboardBindings.cpp
+    src/KeybindingRegistry.cpp
+    src/UndoStack.cpp
     src/DataBindings.cpp
     src/DataStore.cpp
     src/FileWatcherBindings.cpp

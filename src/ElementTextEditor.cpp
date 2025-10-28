@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <SDL2/SDL.h>
 #include <chrono>
 
 ElementTextEditor::ElementTextEditor(const Rml::String& tag)
@@ -10,9 +11,11 @@ ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     , layout_(std::make_unique<TextLayout>())
     , selection_(std::make_unique<SelectionManager>())
     , config_(std::make_unique<TextEditorConfig>())
+    , undo_stack_(std::make_unique<UndoStack>())
     , editable_(false)
     , modified_(false)
     , cursor_blink_time_(0.0)
+    , applying_undo_redo_(false)
 {
     // Create renderer and input handlers
     renderer_ = std::make_unique<TextEditorRenderer>(*buffer_, *layout_, *selection_, *config_);
@@ -22,6 +25,7 @@ ElementTextEditor::ElementTextEditor(const Rml::String& tag)
     input_->SetDirtyCallback([this]() { OnDirty(); });
     input_->SetContentChangeCallback([this]() { OnContentChange(); });
     input_->SetSaveCallback([this]() { OnSave(); });
+    input_->SetBeforeContentChangeCallback([this]() { PushUndoSnapshot(); });
 }
 
 ElementTextEditor::~ElementTextEditor() {
@@ -145,6 +149,171 @@ std::string ElementTextEditor::GetSelectedText() const {
     return selection_->ExtractText(*buffer_);
 }
 
+void ElementTextEditor::CopyToClipboard() {
+    if (!selection_) return;
+
+    std::string selected = selection_->ExtractText(*buffer_);
+    if (!selected.empty()) {
+        SDL_SetClipboardText(selected.c_str());
+    }
+}
+
+void ElementTextEditor::PasteFromClipboard() {
+    if (!editable_ || !buffer_ || !selection_ || !input_) return;
+
+    if (SDL_HasClipboardText()) {
+        char* clipboard_text = SDL_GetClipboardText();
+        if (clipboard_text) {
+            // Push state to undo stack BEFORE making changes
+            PushUndoSnapshot();
+
+            // Delete selection if any and clear it
+            TextBuffer::Position cursor;
+            if (selection_->HasSelection()) {
+                TextBuffer::Position start, end;
+                selection_->GetSelectionRange(start, end);
+                buffer_->DeleteRange(start, end);
+                selection_->ClearSelection();
+                cursor = start;
+            } else {
+                cursor = input_->GetCursorPosition();
+            }
+
+            // Insert clipboard text at cursor
+            buffer_->InsertText(cursor, clipboard_text);
+
+            // Move cursor to end of inserted text
+            for (const char* p = clipboard_text; *p; ++p) {
+                if (*p == '\n') {
+                    cursor.line++;
+                    cursor.column = 0;
+                } else {
+                    cursor.column++;
+                }
+            }
+
+            SDL_free(clipboard_text);
+
+            // Set cursor to end of pasted text and update
+            input_->SetCursorPosition(cursor);
+
+            // Mark as modified and trigger events
+            SetModified(true);
+            OnDirty();
+            OnContentChange();
+        }
+    }
+}
+
+void ElementTextEditor::CutToClipboard() {
+    if (!editable_ || !selection_ || !buffer_ || !input_) return;
+
+    if (selection_->HasSelection()) {
+        // Push state to undo stack BEFORE making changes
+        PushUndoSnapshot();
+
+        // Copy to clipboard first
+        std::string selected = selection_->ExtractText(*buffer_);
+        if (!selected.empty()) {
+            SDL_SetClipboardText(selected.c_str());
+        }
+
+        // Delete the selection and clear it
+        TextBuffer::Position start, end;
+        selection_->GetSelectionRange(start, end);
+        buffer_->DeleteRange(start, end);
+        selection_->ClearSelection();
+
+        // Set cursor to where the selection started (the void/gap)
+        input_->SetCursorPosition(start);
+
+        // Mark as modified and trigger events
+        SetModified(true);
+        OnDirty();
+        OnContentChange();
+    }
+}
+
+void ElementTextEditor::SelectAll() {
+    if (!buffer_ || !selection_ || !input_) return;
+
+    // Select from start to end of document
+    TextBuffer::Position start(0, 0);
+    int last_line = buffer_->GetLineCount() - 1;
+    int last_column = static_cast<int>(buffer_->GetLine(last_line).length());
+    TextBuffer::Position end(last_line, last_column);
+
+    selection_->SetAnchor(start);
+    selection_->SetCursor(end);
+    input_->SetCursorPosition(end);
+
+    OnDirty();
+}
+
+void ElementTextEditor::Undo() {
+    if (!undo_stack_ || !buffer_ || !input_) return;
+
+    std::string text;
+    TextBuffer::Position cursor_pos;
+
+    if (undo_stack_->Undo(text, cursor_pos)) {
+        // Set flag to prevent pushing to undo stack
+        applying_undo_redo_ = true;
+
+        // Restore state
+        buffer_->SetText(text);
+        input_->SetCursorPosition(cursor_pos);
+        selection_->ClearSelection();
+
+        // Update display
+        SetModified(true);
+        OnDirty();
+
+        // Dispatch content change event (won't push to undo due to flag)
+        renderer_->SetTokens(DynamicTable{});
+        DispatchContentChangeEvent();
+
+        // Clear flag
+        applying_undo_redo_ = false;
+    }
+}
+
+void ElementTextEditor::Redo() {
+    if (!undo_stack_ || !buffer_ || !input_) return;
+
+    std::string text;
+    TextBuffer::Position cursor_pos;
+
+    if (undo_stack_->Redo(text, cursor_pos)) {
+        // Set flag to prevent pushing to undo stack
+        applying_undo_redo_ = true;
+
+        // Restore state
+        buffer_->SetText(text);
+        input_->SetCursorPosition(cursor_pos);
+        selection_->ClearSelection();
+
+        // Update display
+        SetModified(true);
+        OnDirty();
+
+        // Dispatch content change event (won't push to undo due to flag)
+        renderer_->SetTokens(DynamicTable{});
+        DispatchContentChangeEvent();
+
+        // Clear flag
+        applying_undo_redo_ = false;
+    }
+}
+
+bool ElementTextEditor::CanUndo() const {
+    return undo_stack_ && undo_stack_->CanUndo();
+}
+
+bool ElementTextEditor::CanRedo() const {
+    return undo_stack_ && undo_stack_->CanRedo();
+}
+
 void ElementTextEditor::SetTokens(const DynamicTable& tokens) {
     renderer_->SetTokens(tokens);
 }
@@ -261,6 +430,16 @@ void ElementTextEditor::OnContentChange() {
     renderer_->SetTokens(DynamicTable{});  // Clear tokens when text changes
     DispatchContentChangeEvent();
     modified_ = true;
+
+    // NOTE: Undo stack is pushed BEFORE changes in PushUndoSnapshot()
+    // We don't push here because this is called AFTER the change
+}
+
+void ElementTextEditor::PushUndoSnapshot() {
+    // Push current state to undo stack BEFORE making changes
+    if (!applying_undo_redo_ && undo_stack_ && buffer_ && input_) {
+        undo_stack_->PushUndo(buffer_->GetText(), input_->GetCursorPosition());
+    }
 }
 
 void ElementTextEditor::OnSave() {

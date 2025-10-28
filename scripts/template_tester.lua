@@ -138,6 +138,43 @@ function startup()
         ui.set_texteditor_editable("template_editor", true)
     end)
 
+    -- Register command handlers for keybindings
+    event.register("command_copy", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_copy(payload.element_id)
+        end
+    end)
+
+    event.register("command_paste", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_paste(payload.element_id)
+        end
+    end)
+
+    event.register("command_cut", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_cut(payload.element_id)
+        end
+    end)
+
+    event.register("command_select_all", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_select_all(payload.element_id)
+        end
+    end)
+
+    event.register("command_undo", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_undo(payload.element_id)
+        end
+    end)
+
+    event.register("command_redo", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_redo(payload.element_id)
+        end
+    end)
+
     -- Initialize output with initial render
     render_template()
 

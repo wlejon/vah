@@ -73,70 +73,32 @@ void TextEditorInput::OnMouseUp() {
 }
 
 void TextEditorInput::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers, bool editable) {
-    // Handle Ctrl+C for copy (works in both editable and read-only mode)
-    if (key == Rml::Input::KI_C && (modifiers & Rml::Input::KM_CTRL)) {
-        std::string selected = selection_.ExtractText(buffer_);
-        if (!selected.empty()) {
-            SDL_SetClipboardText(selected.c_str());
-        }
-        return;
-    }
+    // Note: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+S now handled by keybinding system
+    // Commands are emitted to Lua for application-specific handling
 
     // Only handle editing keys if editable
     if (!editable) {
         return;
     }
 
-    // Handle Ctrl+S for save
-    if (key == Rml::Input::KI_S && (modifiers & Rml::Input::KM_CTRL)) {
-        if (save_callback_) {
-            save_callback_();
-        }
-        return;
-    }
-
-    // Handle Ctrl+V for paste
-    if (key == Rml::Input::KI_V && (modifiers & Rml::Input::KM_CTRL)) {
-        if (SDL_HasClipboardText()) {
-            char* clipboard_text = SDL_GetClipboardText();
-            if (clipboard_text) {
-                // Delete selection if any
-                if (selection_.HasSelection()) {
-                    TextBuffer::Position start, end;
-                    selection_.GetSelectionRange(start, end);
-                    buffer_.DeleteRange(start, end);
-                    cursor_pos_ = start;
-                    selection_.ClearSelection();
-                }
-
-                // Insert clipboard text
-                buffer_.InsertText(cursor_pos_, clipboard_text);
-
-                // Move cursor to end of inserted text
-                for (const char* p = clipboard_text; *p; ++p) {
-                    if (*p == '\n') {
-                        cursor_pos_.line++;
-                        cursor_pos_.column = 0;
-                    } else {
-                        cursor_pos_.column++;
-                    }
-                }
-
-                SDL_free(clipboard_text);
-
-                if (content_change_callback_) {
-                    content_change_callback_();
-                }
-                if (dirty_callback_) {
-                    dirty_callback_();
-                }
-            }
-        }
-        return;
-    }
-
     // Handle backspace
     if (key == Rml::Input::KI_BACK) {
+        bool will_make_change = false;
+
+        // Check if we will make a change
+        if (selection_.HasSelection()) {
+            will_make_change = true;
+        } else if (cursor_pos_.column > 0) {
+            will_make_change = true;
+        } else if (cursor_pos_.line > 0) {
+            will_make_change = true;
+        }
+
+        // Push undo snapshot BEFORE making changes
+        if (will_make_change && before_content_change_callback_) {
+            before_content_change_callback_();
+        }
+
         bool made_change = false;
         if (selection_.HasSelection()) {
             // Delete selection
@@ -172,6 +134,11 @@ void TextEditorInput::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers, bo
 
     // Handle delete
     if (key == Rml::Input::KI_DELETE) {
+        // Push undo snapshot BEFORE making changes
+        if (before_content_change_callback_) {
+            before_content_change_callback_();
+        }
+
         if (selection_.HasSelection()) {
             // Delete selection
             TextBuffer::Position start, end;
@@ -194,6 +161,11 @@ void TextEditorInput::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers, bo
 
     // Handle enter/return
     if (key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER) {
+        // Push undo snapshot BEFORE making changes
+        if (before_content_change_callback_) {
+            before_content_change_callback_();
+        }
+
         // Delete selection if any
         if (selection_.HasSelection()) {
             TextBuffer::Position start, end;
@@ -295,6 +267,11 @@ void TextEditorInput::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers, bo
 
     // Handle Tab
     if (key == Rml::Input::KI_TAB) {
+        // Push undo snapshot BEFORE making changes
+        if (before_content_change_callback_) {
+            before_content_change_callback_();
+        }
+
         // Delete selection if any
         if (selection_.HasSelection()) {
             TextBuffer::Position start, end;
@@ -330,6 +307,11 @@ void TextEditorInput::OnKeyDown(Rml::Input::KeyIdentifier key, int modifiers, bo
 void TextEditorInput::OnTextInput(const std::string& text, bool editable) {
     if (!editable || text.empty()) {
         return;
+    }
+
+    // Push undo snapshot BEFORE making changes
+    if (before_content_change_callback_) {
+        before_content_change_callback_();
     }
 
     // Delete selection if any

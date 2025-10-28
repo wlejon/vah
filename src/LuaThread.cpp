@@ -6,6 +6,7 @@
 #include "HttpBindings.h"
 #include "FileWatcherBindings.h"
 #include "FileIngestionBindings.h"
+#include "ClipboardBindings.h"
 #include "DataStore.h"
 #include <httplib.h>
 #include <chrono>
@@ -607,7 +608,46 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
+    ui_table["texteditor_copy"] = [this](const std::string& element_id) {
+        Commands::TextEditorCopy cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["texteditor_paste"] = [this](const std::string& element_id) {
+        Commands::TextEditorPaste cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["texteditor_cut"] = [this](const std::string& element_id) {
+        Commands::TextEditorCut cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["texteditor_select_all"] = [this](const std::string& element_id) {
+        Commands::TextEditorSelectAll cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["texteditor_undo"] = [this](const std::string& element_id) {
+        Commands::TextEditorUndo cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    ui_table["texteditor_redo"] = [this](const std::string& element_id) {
+        Commands::TextEditorRedo cmd;
+        cmd.element_id = element_id;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
     (*lua_)["ui"] = ui_table;
+
+    // Bind clipboard operations
+    ClipboardBindings::SetupBindings(*lua_);
 
     // Bind data model operations
     auto data_table = lua_->create_table();

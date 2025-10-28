@@ -9,6 +9,7 @@
 #include "TextEditorConfig.h"
 #include "TextEditorRenderer.h"
 #include "TextEditorInput.h"
+#include "UndoStack.h"
 #include "DataStore.h"  // For DynamicTable type
 #include <memory>
 
@@ -53,6 +54,18 @@ public:
     bool IsModified() const;
     void SetModified(bool modified);
 
+    // Clipboard operations
+    void CopyToClipboard();
+    void PasteFromClipboard();
+    void CutToClipboard();
+    void SelectAll();
+
+    // Undo/Redo operations
+    void Undo();
+    void Redo();
+    bool CanUndo() const;
+    bool CanRedo() const;
+
     // Access to config for Lua binding
     TextEditorConfig& GetConfig() { return *config_; }
 
@@ -71,6 +84,7 @@ private:
     void OnDirty();
     void OnContentChange();
     void OnSave();
+    void PushUndoSnapshot();  // Push current state to undo stack before making changes
 
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
@@ -78,9 +92,11 @@ private:
     std::unique_ptr<TextEditorConfig> config_;
     std::unique_ptr<TextEditorRenderer> renderer_;
     std::unique_ptr<TextEditorInput> input_;
+    std::unique_ptr<UndoStack> undo_stack_;
 
     // Editor state
     bool editable_;
     bool modified_;
     double cursor_blink_time_;
+    bool applying_undo_redo_;  // Flag to prevent undo stack push during undo/redo
 };

@@ -535,7 +535,14 @@ private:
 
                     if (key_id != Rml::Input::KI_UNKNOWN) {
                         if (event.type == SDL_KEYDOWN) {
-                            rml_context_->ProcessKeyDown(key_id, key_modifier);
+                            // Check if this key combo is mapped to a command
+                            Rml::Element* focused = rml_context_->GetFocusElement();
+                            bool command_handled = rmlui_bridge_->ProcessKeyboardEvent(key_id, key_modifier, focused);
+
+                            // Only pass to RmlUI if no command was emitted
+                            if (!command_handled) {
+                                rml_context_->ProcessKeyDown(key_id, key_modifier);
+                            }
                         } else {
                             rml_context_->ProcessKeyUp(key_id, key_modifier);
                         }
