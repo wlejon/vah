@@ -21,8 +21,8 @@ local function build_nodes_from_server()
         return
     end
 
-    -- Don't refresh if we're currently dragging
-    if editor.dragging_node then
+    -- Don't refresh if we're currently dragging (or about to drag)
+    if editor.dragging_node or editor.potential_drag_node then
         return
     end
 
@@ -67,8 +67,8 @@ local function get_connections_from_server()
         return {}
     end
 
-    -- Don't refresh if we're currently dragging
-    if editor.dragging_node then
+    -- Don't refresh if we're currently dragging (or about to drag)
+    if editor.dragging_node or editor.potential_drag_node then
         return editor.connections or {}
     end
 

@@ -53,6 +53,9 @@ private:
     // - Cleared automatically on destruction (no manual clearing needed)
     std::vector<std::unique_ptr<DataPath>> path_arena_;
 
+    // Cache for simple row paths (to avoid duplicate allocations)
+    std::unordered_map<int, DataPath*> row_path_cache_;
+
     // Helper: Get the value at a specific path
     const DynamicValue* GetValueAtPath(const DataPath* path);
 

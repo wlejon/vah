@@ -152,34 +152,6 @@ Rml::DataVariable DynamicTableDef::Child(void* ptr, const Rml::DataAddressEntry&
     // Lua arrays use 1-based indexing, but RmlUi uses 0-based indexing
     // Convert to string key matching Lua's 1-based index
     else if (address.index >= 0) {
-        // Validate array index before creating path
-        // Get the parent value to check if it's an array and validate bounds
-        const DynamicValue* parent_value = nullptr;
-        if (parent_path->path.empty()) {
-            // Accessing a field directly on the row
-            auto field_it = row.find(parent_path->path.empty() ? "" : parent_path->path.back());
-            if (!parent_path->path.empty() && field_it != row.end()) {
-                parent_value = &field_it->second;
-            }
-        } else {
-            parent_value = GetValueAtPath(parent_path);
-        }
-
-        // Check if parent is a nested object (array-like structure)
-        if (parent_value) {
-            if (auto nested = std::get_if<std::shared_ptr<DynamicMap>>(parent_value)) {
-                if (*nested) {
-                    // Check if the 1-based index exists in the nested map
-                    std::string index_key = std::to_string(address.index + 1);
-                    if ((*nested)->fields.find(index_key) == (*nested)->fields.end()) {
-                        LOG_DEBUG("DataBindings: Array index {} out of bounds in model '{}'",
-                                  address.index, model_name_);
-                        return Rml::DataVariable();
-                    }
-                }
-            }
-        }
-
         child_path.path.push_back(std::to_string(address.index + 1));
     }
 
@@ -323,11 +295,18 @@ void DynamicTableDef::RefreshCache()
 const DataPath* DynamicTableDef::GetPath(void* ptr)
 {
     if (ptr == nullptr) {
-        // Allocate root path in arena to avoid static storage
+        // Check cache first
+        auto it = row_path_cache_.find(-1);
+        if (it != row_path_cache_.end()) {
+            return it->second;
+        }
+
+        // Allocate root path in arena
         auto root_path = std::make_unique<DataPath>();
         root_path->row_index = -1;
-        const DataPath* result = root_path.get();
+        DataPath* result = root_path.get();
         path_arena_.push_back(std::move(root_path));
+        row_path_cache_[-1] = result;
         return result;
     }
 
@@ -336,11 +315,20 @@ const DataPath* DynamicTableDef::GetPath(void* ptr)
     // Check if it's a simple row index (small positive integer)
     // We encoded row indices as row_index + 1, so valid range is 1 to MAX_SIMPLE_ROW_INDEX
     if (ptr_value > 0 && ptr_value < MAX_SIMPLE_ROW_INDEX) {
-        // Allocate simple path in arena to avoid thread_local static storage
+        int row_index = static_cast<int>(ptr_value - 1);
+
+        // Check cache first
+        auto it = row_path_cache_.find(row_index);
+        if (it != row_path_cache_.end()) {
+            return it->second;
+        }
+
+        // Allocate simple path in arena
         auto simple_path = std::make_unique<DataPath>();
-        simple_path->row_index = static_cast<int>(ptr_value - 1);
-        const DataPath* result = simple_path.get();
+        simple_path->row_index = row_index;
+        DataPath* result = simple_path.get();
         path_arena_.push_back(std::move(simple_path));
+        row_path_cache_[row_index] = result;
         return result;
     }
 
@@ -354,8 +342,9 @@ void DynamicTableDef::InvalidateCache()
     // Next access will call RefreshCache() to get latest data from DataStore
     cached_data_.reset();
 
-    // Clear the path arena as well since paths reference old data
+    // Clear the path arena and cache since paths reference old data
     path_arena_.clear();
+    row_path_cache_.clear();
 }
 
 // ============================================================================

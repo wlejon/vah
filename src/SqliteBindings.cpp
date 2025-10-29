@@ -95,20 +95,90 @@ public:
         }
     }
 
-    std::tuple<bool, std::string> Execute(const std::string& sql) {
+    std::tuple<bool, std::string> Execute(const std::string& sql, sol::variadic_args va) {
         if (!db_) {
             return {false, "Database not open"};
         }
 
-        char* error_msg = nullptr;
-        int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error_msg);
+        // If no parameters provided, use simple exec for backward compatibility
+        if (va.size() == 0) {
+            char* error_msg = nullptr;
+            int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error_msg);
+
+            if (rc != SQLITE_OK) {
+                std::string error = error_msg ? error_msg : "Unknown error";
+                sqlite3_free(error_msg);
+                return {false, "SQL execution error: " + error};
+            }
+
+            return {true, ""};
+        }
+
+        // Prepare statement for parameterized query
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
 
         if (rc != SQLITE_OK) {
-            std::string error = error_msg ? error_msg : "Unknown error";
-            sqlite3_free(error_msg);
+            std::string error = sqlite3_errmsg(db_);
+            return {false, "SQL prepare error: " + error};
+        }
+
+        // Bind parameters
+        int param_index = 1;
+        for (const auto& arg : va) {
+            sol::type arg_type = arg.get_type();
+
+            switch (arg_type) {
+                case sol::type::number: {
+                    // Try integer first, fall back to double
+                    if (arg.is<int64_t>()) {
+                        sqlite3_bind_int64(stmt, param_index, arg.as<int64_t>());
+                    } else {
+                        sqlite3_bind_double(stmt, param_index, arg.as<double>());
+                    }
+                    break;
+                }
+                case sol::type::string: {
+                    std::string str = arg.as<std::string>();
+                    sqlite3_bind_text(stmt, param_index, str.c_str(), -1, SQLITE_TRANSIENT);
+                    break;
+                }
+                case sol::type::boolean: {
+                    sqlite3_bind_int(stmt, param_index, arg.as<bool>() ? 1 : 0);
+                    break;
+                }
+                case sol::type::nil: {
+                    sqlite3_bind_null(stmt, param_index);
+                    break;
+                }
+                default: {
+                    sqlite3_finalize(stmt);
+                    std::string type_name;
+                    switch (arg_type) {
+                        case sol::type::function: type_name = "function"; break;
+                        case sol::type::userdata: type_name = "userdata"; break;
+                        case sol::type::lightuserdata: type_name = "lightuserdata"; break;
+                        case sol::type::thread: type_name = "thread"; break;
+                        case sol::type::table: type_name = "table"; break;
+                        default: type_name = "unknown"; break;
+                    }
+                    return {false, "Unsupported parameter type '" + type_name + "' at index " + std::to_string(param_index)};
+                }
+            }
+
+            param_index++;
+        }
+
+        // Execute the statement
+        rc = sqlite3_step(stmt);
+
+        if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+            std::string error = sqlite3_errmsg(db_);
+            sqlite3_finalize(stmt);
             return {false, "SQL execution error: " + error};
         }
 
+        sqlite3_finalize(stmt);
         return {true, ""};
     }
 
