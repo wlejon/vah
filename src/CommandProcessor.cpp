@@ -187,11 +187,9 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
 
             response_data["threads"] = std::make_shared<DynamicMap>(DynamicMap{threads_map});
 
-            // Send response back to requesting thread
-            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-            if (response_queue) {
-                Response response(command.request_id, std::move(response_data), "");
-                response_queue->enqueue(std::move(response));
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value(std::move(response_data));
             }
         }
         else if constexpr (std::is_same_v<T, Commands::QueryThreadInfo>) {
@@ -208,17 +206,15 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
             response_data["status"] = info.status;
             response_data["uptime"] = info.uptime;
 
-            // Check if thread doesn't exist
-            std::string error = "";
-            if (!thread_manager_->HasThread(command.thread_id)) {
-                error = "Thread not found";
-            }
-
-            // Send response back to requesting thread
-            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-            if (response_queue) {
-                Response response(command.request_id, std::move(response_data), error);
-                response_queue->enqueue(std::move(response));
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                if (!thread_manager_->HasThread(command.thread_id)) {
+                    command.promise->set_exception(
+                        std::make_exception_ptr(std::runtime_error("Thread not found"))
+                    );
+                } else {
+                    command.promise->set_value(std::move(response_data));
+                }
             }
         }
         else if constexpr (std::is_same_v<T, Commands::QueryDocumentList>) {
@@ -248,11 +244,9 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
 
             response_data["documents"] = std::make_shared<DynamicMap>(DynamicMap{documents_map});
 
-            // Send response back to requesting thread
-            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-            if (response_queue) {
-                Response response(command.request_id, std::move(response_data), "");
-                response_queue->enqueue(std::move(response));
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value(std::move(response_data));
             }
         }
         else if constexpr (std::is_same_v<T, Commands::QueryDocumentInfo>) {
@@ -271,17 +265,15 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
             response_data["width"] = static_cast<int64_t>(info.width);
             response_data["height"] = static_cast<int64_t>(info.height);
 
-            // Check if document doesn't exist
-            std::string error = "";
-            if (info.path.empty()) {
-                error = "Document not found";
-            }
-
-            // Send response back to requesting thread
-            auto* response_queue = thread_manager_->GetThreadResponseQueue(command.requesting_thread_id);
-            if (response_queue) {
-                Response response(command.request_id, std::move(response_data), error);
-                response_queue->enqueue(std::move(response));
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                if (info.path.empty()) {
+                    command.promise->set_exception(
+                        std::make_exception_ptr(std::runtime_error("Document not found"))
+                    );
+                } else {
+                    command.promise->set_value(std::move(response_data));
+                }
             }
         }
         else if constexpr (std::is_same_v<T, Commands::HttpRequest>) {

@@ -73,6 +73,11 @@ public:
     // Wait for thread to finish
     void Join();
 
+    // Query support (called by LuaQueries)
+    sol::state& GetLuaState() { return *lua_; }
+    uint64_t AllocateRequestId() { return next_request_id_++; }
+    void EnqueueCommand(Command&& cmd) { command_queue_->enqueue(std::move(cmd)); }
+
 private:
     void ThreadMain();
     void SetupLuaBindings();
@@ -93,12 +98,6 @@ private:
     DataStore* data_store_;
     std::unique_ptr<moodycamel::ConcurrentQueue<Response>> response_queue_;
 
-    struct PendingRequest {
-        uint64_t request_id;
-        sol::function callback;
-        std::string operation;
-    };
-    std::unordered_map<uint64_t, PendingRequest> pending_requests_;
     uint64_t next_request_id_;
 
     int parent_thread_id_;

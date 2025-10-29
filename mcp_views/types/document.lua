@@ -1,33 +1,15 @@
 -- Document Type Definition
 -- Provides views for loaded RML documents
 
--- Helper to make blocking call from async API
+-- Helper to get document list (now synchronous - blocks until ready)
 local function ui_list_documents_sync()
     if not ui or not ui.list_documents then
         return {}  -- API not available
     end
 
-    local result = nil
-
-    ui.list_documents(function(err, response)
-        if err then
-            result = {error = err, documents = {}}
-        else
-            result = response
-        end
-    end)
-
-    -- Busy-wait for response (manually process responses during wait)
-    local timeout = 100  -- iterations
-    local count = 0
-    while result == nil and count < timeout do
-        process_responses()  -- Process any pending responses
-        sleep(0.001)  -- 1ms
-        count = count + 1
-    end
-
-    if result == nil then
-        return {}  -- Timeout
+    local result = ui.list_documents()  -- Blocks until response arrives
+    if not result then
+        return {}
     end
 
     -- Convert numeric-keyed table to array
@@ -45,32 +27,13 @@ local function ui_list_documents_sync()
     return documents_array
 end
 
--- Helper to get info for specific document
+-- Helper to get info for specific document (now synchronous - blocks until ready)
 local function ui_get_document_info_sync(document_id)
     if not ui or not ui.get_document_info then
         return nil
     end
 
-    local result = nil
-
-    ui.get_document_info(document_id, function(err, response)
-        if err then
-            result = {error = err}
-        else
-            result = response
-        end
-    end)
-
-    -- Busy-wait for response
-    local timeout = 100
-    local count = 0
-    while result == nil and count < timeout do
-        process_responses()  -- Process any pending responses
-        sleep(0.001)
-        count = count + 1
-    end
-
-    return result
+    return ui.get_document_info(document_id)  -- Blocks until response arrives
 end
 
 return {

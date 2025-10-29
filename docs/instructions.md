@@ -41,7 +41,9 @@ Our loaded font does not have support for icons. stick to ascii in our loaded Ro
 
 ## application design considerations
 
-this application foundation does has some unusual design choices that you need to work within. it uses a lock-free implementation and does not use mutexes. it is multi-threaded through command queues. 
+this application foundation does have some unusual design choices that you need to work within. it uses a lock-free implementation and does not use mutexes. it is multi-threaded through command queues.
+
+**IMPORTANT:** Before suggesting mutexes/locks/semaphores, read [lock-free-philosophy.md](architecture/lock-free-philosophy.md). This is not about performance - it's about debuggability. Multithreaded code with locks becomes exponentially harder to reason about as complexity grows, leading to deadlocks that are nearly impossible to debug. We use lock-free queues and promise-in-command patterns instead. 
 
 ### main thread
 
@@ -61,10 +63,37 @@ the databinding for rmlui is expanded in our system. we use a emit() function ca
 
 you should review the data binding c++ implementation if you need to write rml using data. this ensures that you are operating with the latest api as it's not completely solidified yet.
 
+## lua binding architecture
+
+**IMPORTANT:** All Lua bindings that query cross-thread state (UI documents, thread info) are now **synchronous and blocking**.
+
+The system uses **promise-in-command** pattern:
+- Lua thread creates `std::promise` and `std::future`
+- Promise travels with the command through lock-free queue
+- Main thread sets the promise value directly
+- Lua thread wakes immediately with result
+
+**No busy-waits, no callbacks, no semaphores, no mutexes.** When Lua code calls:
+- `ui.list_documents()` - blocks on future until main thread sets promise
+- `ui.get_document_info(id)` - blocks on future until main thread sets promise
+- `thread.list()` - blocks on future until main thread sets promise
+- `thread.get_info(id)` - blocks on future until main thread sets promise
+- we will add more blocking functions in the future and it's important to understand that lua threads may stop processing while they wait. 
+
+**Architecture:**
+```
+Lua thread:  create promise → put in command → enqueue → future.get() blocks
+Main thread: dequeue command → process → command.promise->set_value() → wakes Lua
+```
+
+**Files involved:**
+- `Commands.h` - Query commands carry their promise
+- `LuaQueries.cpp/h` - Synchronous query implementations (just future.get())
+- `LuaConversions.cpp/h` - Type conversion utilities
+- `CommandProcessor.cpp` - Sets promise directly to wake blocked thread
+
 ## current task
 
 this task will fit in your context, there is no need to use subagents.
 
-let's update the workflow app to use the new menu system.
-
-move the buttons (and their actions) on the workflow page for nav to the menu.
+there are while(true) loops in the lua threads we need to design a way to eliminate.

@@ -1,34 +1,15 @@
 -- Application Type Definition
 -- Provides views for running applications and threads
 
--- Helper to make blocking call from async API
--- This works because the thread's update() loop continues running at 30hz
+-- Helper to get thread list (now synchronous - blocks until ready)
 local function thread_list_sync()
     if not thread or not thread.list then
         return {}  -- API not available
     end
 
-    local result = nil
-
-    thread.list(function(err, response)
-        if err then
-            result = {error = err, threads = {}}
-        else
-            result = response
-        end
-    end)
-
-    -- Busy-wait for response (manually process responses during wait)
-    local timeout = 100  -- iterations
-    local count = 0
-    while result == nil and count < timeout do
-        process_responses()  -- Process any pending responses
-        sleep(0.001)  -- 1ms
-        count = count + 1
-    end
-
-    if result == nil then
-        return {}  -- Timeout
+    local result = thread.list()  -- Blocks until response arrives
+    if not result then
+        return {}
     end
 
     -- Convert numeric-keyed table to array
@@ -46,32 +27,13 @@ local function thread_list_sync()
     return threads_array
 end
 
--- Helper to get info for specific thread
+-- Helper to get info for specific thread (now synchronous - blocks until ready)
 local function thread_get_info_sync(thread_id)
     if not thread or not thread.get_info then
         return nil
     end
 
-    local result = nil
-
-    thread.get_info(tonumber(thread_id), function(err, response)
-        if err then
-            result = {error = err}
-        else
-            result = response
-        end
-    end)
-
-    -- Busy-wait for response
-    local timeout = 100
-    local count = 0
-    while result == nil and count < timeout do
-        process_responses()  -- Process any pending responses
-        sleep(0.001)
-        count = count + 1
-    end
-
-    return result
+    return thread.get_info(tonumber(thread_id))  -- Blocks until response arrives
 end
 
 return {

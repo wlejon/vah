@@ -59,8 +59,10 @@ public:
     ThreadInfo GetThreadInfo(int thread_id) const;
     std::vector<ThreadInfo> GetAllThreadInfo() const;
 
-private:
+    // Get thread pointer (needed for CommandProcessor to signal semaphore)
     LuaThread* GetThread(int thread_id) const;
+
+private:
 
     moodycamel::ConcurrentQueue<Command>* command_queue_;
     EventDispatcher* event_dispatcher_;

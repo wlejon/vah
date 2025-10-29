@@ -3,6 +3,8 @@
 #include <variant>
 #include <string>
 #include <functional>
+#include <future>
+#include <memory>
 #include <sol/sol.hpp>
 #include "InputState.h"
 #include "DataStore.h"
@@ -214,26 +216,31 @@ namespace Commands {
     };
 
     // Query commands (request/response pattern)
+    // Promise is set by main thread to wake blocked Lua thread
     struct QueryThreadList {
         int requesting_thread_id;
         uint64_t request_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
     struct QueryThreadInfo {
         int requesting_thread_id;
         uint64_t request_id;
         int thread_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
     struct QueryDocumentList {
         int requesting_thread_id;
         uint64_t request_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
     struct QueryDocumentInfo {
         int requesting_thread_id;
         uint64_t request_id;
         std::string document_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
     // HTTP server commands

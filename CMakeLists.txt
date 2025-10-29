@@ -44,6 +44,8 @@ add_executable(vah
     src/Logger.cpp
     src/RmlUi_Renderer_GL3.cpp
     src/LuaThread.cpp
+    src/LuaConversions.cpp
+    src/LuaQueries.cpp
     src/ThreadManager.cpp
     src/RmlUiBridge.cpp
     src/FileSystem.cpp
