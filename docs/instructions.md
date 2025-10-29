@@ -96,4 +96,6 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-there are while(true) loops in the lua threads we need to design a way to eliminate.
+we're looking to expand the workflow app to include execution. 
+
+each node will execute. we'll trace the path as it goes. we need to design this system in a way that works well in our architecture. the architecture should support this use case exceptionally well. please review what we have and after you have earned your understanding, please create some 
