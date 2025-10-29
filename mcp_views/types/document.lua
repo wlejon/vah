@@ -200,6 +200,7 @@ return {
                         document_id = document_id,
                         name = document_id,
                         path = path,
+                        size = 0,  -- Documents don't have file size
                         visible = doc.visible or false,
                         element_count = tonumber(doc.element_count) or 0
                     })
@@ -208,7 +209,7 @@ return {
 
             return {
                 items = results,
-                total = #results,
+                total_matches = #results,
                 query = query
             }
         end,

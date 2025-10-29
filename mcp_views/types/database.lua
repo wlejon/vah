@@ -96,7 +96,7 @@ return {
             end
 
             -- Open database and get table list
-            local db, open_err = db.open(db_path)
+            local dbh, open_err = db.open(db_path)
             if open_err ~= "" or not dbh then
                 error("Failed to open database: " .. open_err)
             end
@@ -156,7 +156,7 @@ return {
 
                     -- Count tables
                     local dbh, open_err = db.open(path)
-                    if open_err == "" and db then
+                    if open_err == "" and dbh then
                         local rows, query_err = dbh:query("SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'")
                         if query_err == "" and rows and rows[1] then
                             total_tables = total_tables + (rows[1].count or 0)

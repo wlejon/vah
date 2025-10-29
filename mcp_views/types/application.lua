@@ -133,22 +133,38 @@ return {
 
         -- View application/thread details
         detail = function(context)
-            local thread_id = context.id
+            local id = context.id
 
-            if not thread_id then
-                error("Missing thread ID")
+            if not id then
+                error("Missing thread ID or name")
             end
 
-            -- Get thread info
-            local info = thread_get_info_sync(thread_id)
+            -- Try to parse as numeric thread ID first
+            local numeric_id = tonumber(id)
+            local info = nil
+
+            if numeric_id then
+                -- Direct thread ID lookup
+                info = thread_get_info_sync(numeric_id)
+            else
+                -- Search by name (script filename)
+                local thread_list = thread_list_sync()
+                for _, t in ipairs(thread_list) do
+                    local name = t.script_path and t.script_path:match("([^/\\]+)$") or ""
+                    if name == id then
+                        info = thread_get_info_sync(t.thread_id)
+                        break
+                    end
+                end
+            end
 
             if not info or info.error then
-                error("Thread not found: " .. thread_id)
+                error("Thread not found: " .. id)
             end
 
             return {
-                id = tostring(info.thread_id or thread_id),
-                thread_id = tostring(info.thread_id or thread_id),
+                id = tostring(info.thread_id or id),
+                thread_id = tostring(info.thread_id or id),
                 name = info.script_path and info.script_path:match("([^/\\]+)$") or "Unknown",
                 script_path = info.script_path or "",
                 status = info.status or "unknown",
@@ -205,6 +221,7 @@ return {
                         thread_id = tostring(t.thread_id or ""),
                         name = name,
                         script_path = script_path,
+                        size = 0,  -- Applications don't have file size
                         status = t.status or "unknown",
                         uptime = math.floor(t.uptime or 0)
                     })
@@ -213,7 +230,7 @@ return {
 
             return {
                 items = results,
-                total = #results,
+                total_matches = #results,
                 query = query
             }
         end,
