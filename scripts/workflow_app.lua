@@ -25,6 +25,10 @@ local workflows_list = {}
 -- Current view state
 local active_view = "workflow"
 
+-- Execution state
+local active_execution_id = nil
+local time_since_poll = 0
+
 -- ============================================
 -- View Switching Functions
 -- ============================================
@@ -216,6 +220,154 @@ local function delete_workflow(payload)
     end
 end
 
+-- ============================================
+-- Execution Helper Functions
+-- ============================================
+
+-- Simple hash function for requires list
+local function compute_requires_hash(requires)
+    if not requires or #requires == 0 then
+        return "empty"
+    end
+
+    -- Sort and concatenate library IDs
+    local sorted = {}
+    for _, lib in ipairs(requires) do
+        table.insert(sorted, lib)
+    end
+    table.sort(sorted)
+
+    return table.concat(sorted, ",")
+end
+
+-- Load library information for approval dialog
+local function load_library_info(library_ids)
+    if not library_ids or #library_ids == 0 then
+        return {}
+    end
+
+    local all_libs = workflow_db.get_library_definitions()
+    local selected_libs = {}
+
+    for _, lib_id in ipairs(library_ids) do
+        for _, lib_def in ipairs(all_libs) do
+            if lib_def.id == lib_id then
+                table.insert(selected_libs, {
+                    id = lib_def.id,
+                    name = lib_def.name,
+                    description = lib_def.description,
+                    access_description = lib_def.access_description
+                })
+                break
+            end
+        end
+    end
+
+    return selected_libs
+end
+
+-- Poll execution state and bind to UI
+local function poll_execution_state()
+    if not active_execution_id then
+        return
+    end
+
+    -- Query execution status
+    local execution = workflow_db.get_execution(active_execution_id)
+    if not execution then
+        print("ERROR: Execution " .. active_execution_id .. " not found")
+        active_execution_id = nil
+        return
+    end
+
+    -- Query node states
+    local node_states_sql = [[
+        SELECT node_id, status, inputs, outputs, error_message
+        FROM execution_nodes
+        WHERE execution_id = ?
+    ]]
+    local node_results, node_error = workflow_db.db_handle:query(node_states_sql, active_execution_id)
+
+    if node_error ~= "" then
+        print("ERROR: Failed to query node states: " .. node_error)
+        return
+    end
+
+    -- Build node states map
+    local nodes_map = {}
+    local completed_count = 0
+    local total_count = 0
+
+    if node_results then
+        for _, node_state in ipairs(node_results) do
+            nodes_map[node_state.node_id] = {
+                status = node_state.status,
+                inputs = node_state.inputs,
+                outputs = node_state.outputs,
+                error_message = node_state.error_message
+            }
+
+            total_count = total_count + 1
+            if node_state.status == "completed" or node_state.status == "error" or node_state.status == "skipped" then
+                completed_count = completed_count + 1
+            end
+        end
+    end
+
+    -- Calculate elapsed time
+    local elapsed = 0
+    if execution.started_at then
+        local current_time = os.time()
+        -- Parse timestamp (simplified - assumes ISO format)
+        -- This is a rough approximation; proper timestamp parsing would be better
+        elapsed = 0  -- Would need proper time parsing
+    end
+
+    -- Bind execution state to UI
+    data.bind("execution_state", {{
+        execution_id = active_execution_id,
+        status = execution.status,
+        workflow_id = execution.workflow_id,
+        thread_id = execution.thread_id,
+        total_nodes = total_count,
+        completed_nodes = completed_count,
+        elapsed_time = elapsed,
+        error_message = execution.error_message,
+        nodes = nodes_map
+    }})
+
+    -- Check if execution is complete
+    if execution.status == "completed" or execution.status == "error" or execution.status == "stopped" then
+        -- Clear active execution
+        active_execution_id = nil
+
+        -- Show notification
+        if execution.status == "completed" then
+            event.trigger_global("notification_success", {
+                title = "Workflow Completed",
+                message = "Workflow execution completed successfully"
+            })
+        elseif execution.status == "error" then
+            event.trigger_global("notification_error", {
+                title = "Workflow Failed",
+                message = execution.error_message or "Workflow execution failed"
+            })
+        else
+            event.trigger_global("notification_info", {
+                title = "Workflow Stopped",
+                message = "Workflow execution was stopped"
+            })
+        end
+
+        -- Clear execution state binding
+        data.bind("execution_state", {})
+    end
+end
+
+-- ============================================
+-- Workflow Change Event Handlers
+-- ============================================
+
 -- Workflow change event handlers - update database and push to client
 local function on_workflow_node_created(payload)
     if not database_initialized or not active_workflow.id then
@@ -320,6 +472,347 @@ local function on_workflow_connection_added(payload)
         data.bind("workflow_nodes", nodes)
         data.bind("workflow_connections", connections)
     end
+end
+
+-- ============================================
+-- Execution Control Event Handlers
+-- ============================================
+
+-- Execute workflow
+local function handle_execute_workflow(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        event.trigger_global("notification_error", {
+            title = "Execution Failed",
+            message = "No active workflow to execute"
+        })
+        return
+    end
+
+    -- Load workflow config to get requires list
+    local config_json = workflow_db.load_workflow_config(active_workflow.id)
+    local config = {}
+    local requires = {}
+
+    if config_json then
+        -- Parse JSON (assuming json library available or simple format)
+        -- For now, we'll assume a simple format or use a simple parser
+        -- In production, you'd use a proper JSON library
+        config = {requires = {}}  -- Simplified
+        requires = config.requires or {}
+    end
+
+    -- Compute hash of requires list
+    local requires_hash = compute_requires_hash(requires)
+
+    -- Check approval
+    local is_approved = workflow_db.check_workflow_approval(active_workflow.id, requires_hash)
+
+    if not is_approved then
+        -- Load library info for approval dialog
+        local libraries = load_library_info(requires)
+
+        -- Trigger approval needed event
+        event.trigger_global("workflow_approval_needed", {
+            workflow_id = active_workflow.id,
+            workflow_name = active_workflow.name,
+            requires = libraries,
+            requires_hash = requires_hash
+        })
+
+        print("Workflow approval required")
+        return
+    end
+
+    -- Create execution record
+    local execution_id = workflow_db.create_execution_record(active_workflow.id, nil)
+    if not execution_id then
+        print("ERROR: Failed to create execution record")
+        event.trigger_global("notification_error", {
+            title = "Execution Failed",
+            message = "Failed to create execution record"
+        })
+        return
+    end
+
+    -- Create execution tables
+    workflow_db.create_execution_tables(execution_id)
+
+    -- Initialize execution control
+    workflow_db.set_execution_control(execution_id, "run")
+
+    print("Starting workflow execution: " .. execution_id)
+
+    -- Call thread.create_workflow_thread() to start execution
+    -- NOTE: This is a C++ function that needs to be implemented
+    -- It should create a new thread and load the workflow executor script
+    -- For now, this will fail gracefully if the function doesn't exist
+    local has_thread_func = thread and thread.create_workflow_thread
+    if not has_thread_func then
+        print("WARNING: thread.create_workflow_thread() not implemented yet")
+        workflow_db.update_execution_status(execution_id, "error", "Thread creation not implemented")
+        event.trigger_global("notification_error", {
+            title = "Execution Failed",
+            message = "Workflow thread creation not yet implemented in C++"
+        })
+        active_execution_id = nil
+        return
+    end
+
+    local thread_id = thread.create_workflow_thread(active_workflow.id, execution_id)
+
+    if not thread_id then
+        print("ERROR: Failed to create workflow thread")
+        workflow_db.update_execution_status(execution_id, "error", "Failed to create workflow thread")
+        event.trigger_global("notification_error", {
+            title = "Execution Failed",
+            message = "Failed to create workflow thread"
+        })
+        active_execution_id = nil
+        return
+    end
+
+    -- Update execution record with thread ID
+    local update_sql = "UPDATE workflow_executions SET thread_id = ? WHERE id = ?"
+    workflow_db.db_handle:execute(update_sql, thread_id, execution_id)
+
+    -- Store active execution ID
+    active_execution_id = execution_id
+
+    -- Show notification
+    event.trigger_global("notification_info", {
+        title = "Workflow Executing",
+        message = "Started execution of workflow: " .. active_workflow.name
+    })
+
+    -- Start polling immediately
+    time_since_poll = 0.1
+    poll_execution_state()
+end
+
+-- Pause execution
+local function handle_pause_execution(payload)
+    if not payload.execution_id then
+        print("ERROR: No execution_id in pause_execution payload")
+        return
+    end
+
+    workflow_db.set_execution_control(payload.execution_id, "pause")
+    print("Pause command sent to execution: " .. payload.execution_id)
+end
+
+-- Stop execution
+local function handle_stop_execution(payload)
+    if not payload.execution_id then
+        print("ERROR: No execution_id in stop_execution payload")
+        return
+    end
+
+    workflow_db.set_execution_control(payload.execution_id, "stop")
+    print("Stop command sent to execution: " .. payload.execution_id)
+end
+
+-- Step execution (future feature)
+local function handle_step_execution(payload)
+    if not payload.execution_id then
+        print("ERROR: No execution_id in step_execution payload")
+        return
+    end
+
+    workflow_db.set_execution_control(payload.execution_id, "step")
+    print("Step command sent to execution: " .. payload.execution_id)
+end
+
+-- ============================================
+-- Approval System Event Handlers
+-- ============================================
+
+-- Handle user's approval decision
+local function handle_workflow_approval_response(payload)
+    if not payload.workflow_id then
+        print("ERROR: No workflow_id in approval response payload")
+        return
+    end
+
+    local workflow_id = payload.workflow_id
+    local approved = payload.approved or false
+    local remember = payload.remember or false
+    local requires_hash = payload.requires_hash or "empty"
+
+    if not approved then
+        -- User denied approval
+        event.trigger_global("notification_error", {
+            title = "Execution Denied",
+            message = "Workflow execution was denied"
+        })
+        return
+    end
+
+    -- Save approval if "remember" is true
+    if remember then
+        workflow_db.save_workflow_approval(workflow_id, requires_hash, true)
+        print("Workflow approval saved for workflow " .. workflow_id)
+    end
+
+    -- Proceed with execution
+    handle_execute_workflow({workflow_id = workflow_id})
+end
+
+-- ============================================
+-- Configuration Event Handlers
+-- ============================================
+
+-- Save workflow configuration
+local function handle_save_workflow_config(payload)
+    if not payload.workflow_id then
+        print("ERROR: No workflow_id in save_workflow_config payload")
+        return
+    end
+
+    if not payload.config then
+        print("ERROR: No config in save_workflow_config payload")
+        return
+    end
+
+    -- Convert config table to JSON string
+    -- For now, we'll use a simple serialization
+    -- In production, you'd use a proper JSON library
+    local config_json = payload.config  -- Assuming already JSON string
+
+    local success = workflow_db.save_workflow_config(payload.workflow_id, config_json)
+    if success then
+        print("Workflow configuration saved")
+        event.trigger_global("notification_success", {
+            title = "Configuration Saved",
+            message = "Workflow configuration has been saved"
+        })
+
+        -- Update workflows list to reflect any changes
+        load_workflows()
+    else
+        print("ERROR: Failed to save workflow configuration")
+        event.trigger_global("notification_error", {
+            title = "Save Failed",
+            message = "Failed to save workflow configuration"
+        })
+    end
+end
+
+-- Save node configuration
+local function handle_save_node_config(payload)
+    if not payload.workflow_id or not payload.node_id then
+        print("ERROR: Missing workflow_id or node_id in save_node_config payload")
+        return
+    end
+
+    if not payload.config then
+        print("ERROR: No config in save_node_config payload")
+        return
+    end
+
+    -- Convert config table to JSON string
+    local config_json = payload.config  -- Assuming already JSON string
+
+    local success = workflow_db.save_node_config(payload.workflow_id, payload.node_id, config_json)
+    if success then
+        print("Node configuration saved")
+        event.trigger_global("notification_success", {
+            title = "Configuration Saved",
+            message = "Node configuration has been saved"
+        })
+
+        -- Reload workflow from database and bind
+        local nodes, connections = workflow_db.load_workflow(payload.workflow_id)
+        if nodes then
+            data.bind("workflow_nodes", nodes)
+            data.bind("workflow_connections", connections)
+        end
+    else
+        print("ERROR: Failed to save node configuration")
+        event.trigger_global("notification_error", {
+            title = "Save Failed",
+            message = "Failed to save node configuration"
+        })
+    end
+end
+
+-- ============================================
+-- History Event Handlers
+-- ============================================
+
+-- Show execution history
+local function handle_show_execution_history(payload)
+    if not active_workflow.id then
+        print("ERROR: No active workflow")
+        event.trigger_global("notification_error", {
+            title = "History Error",
+            message = "No active workflow to show history for"
+        })
+        return
+    end
+
+    -- Load execution history
+    local executions = workflow_db.get_workflow_executions(active_workflow.id, 50)
+
+    -- Calculate duration for each execution
+    for _, exec in ipairs(executions) do
+        if exec.started_at and exec.ended_at then
+            -- Simple duration calculation (would need proper timestamp parsing)
+            exec.duration = 0  -- Placeholder
+        end
+    end
+
+    -- Bind to UI
+    data.bind("execution_history", executions)
+
+    print("Loaded " .. #executions .. " execution records")
+end
+
+-- View execution details
+local function handle_view_execution(payload)
+    if not payload.execution_id then
+        print("ERROR: No execution_id in view_execution payload")
+        return
+    end
+
+    local execution_id = payload.execution_id
+
+    -- Load execution details
+    local execution = workflow_db.get_execution(execution_id)
+    if not execution then
+        print("ERROR: Execution " .. execution_id .. " not found")
+        event.trigger_global("notification_error", {
+            title = "View Failed",
+            message = "Execution not found"
+        })
+        return
+    end
+
+    -- Query execution nodes
+    local nodes_sql = [[
+        SELECT node_id, status, inputs, outputs, error_message, started_at, completed_at
+        FROM execution_nodes
+        WHERE execution_id = ?
+        ORDER BY execution_order
+    ]]
+    local node_results, node_error = workflow_db.db_handle:query(nodes_sql, execution_id)
+
+    if node_error ~= "" then
+        print("ERROR: Failed to query execution nodes: " .. node_error)
+        return
+    end
+
+    -- Query execution logs
+    local logs = workflow_db.get_execution_logs(execution_id)
+
+    -- Bind detailed data to UI
+    data.bind("execution_details", {{
+        execution = execution,
+        nodes = node_results or {},
+        logs = logs
+    }})
+
+    print("Loaded execution details for execution " .. execution_id)
 end
 
 -- ============================================
@@ -550,6 +1043,16 @@ local function register_workflow_menu()
                 item_id = "node_types",
                 label = "Configure Node Types",
                 action = "workflow_switch_to_node_editor"
+            },
+            {
+                item_id = "execute_workflow_menu",
+                label = "Execute Workflow",
+                action = "execute_workflow"
+            },
+            {
+                item_id = "execution_history_menu",
+                label = "Execution History",
+                action = "show_execution_history"
             }
         }
     })
@@ -660,6 +1163,25 @@ Version: 1.0.0</pre>
     event.register("save_node_type", save_node_type)
     event.register("delete_node_type", delete_node_type)
 
+    -- Register execution control event handlers
+    event.register("execute_workflow", handle_execute_workflow)
+    event.register_global("execute_workflow", handle_execute_workflow)  -- Also register as global for menu
+    event.register("pause_execution", handle_pause_execution)
+    event.register("stop_execution", handle_stop_execution)
+    event.register("step_execution", handle_step_execution)
+
+    -- Register approval system event handlers
+    event.register("workflow_approval_response", handle_workflow_approval_response)
+
+    -- Register configuration event handlers
+    event.register("save_workflow_config", handle_save_workflow_config)
+    event.register("save_node_config", handle_save_node_config)
+
+    -- Register history event handlers
+    event.register("show_execution_history", handle_show_execution_history)
+    event.register_global("show_execution_history", handle_show_execution_history)  -- Also register as global for menu
+    event.register("view_execution", handle_view_execution)
+
     -- Initialize data bindings
     data.bind("selected_node", {})
     data.bind("workflows", {})
@@ -667,6 +1189,15 @@ Version: 1.0.0</pre>
     data.bind("workflow_nodes", {})
     data.bind("workflow_connections", {})
     data.bind("active_view", {{view = "workflow"}})
+
+    -- Initialize execution-related data models (prevents warnings)
+    data.bind("execution_state", {})
+    data.bind("workflow_config", {})
+    data.bind("library_list", {})
+    data.bind("node_config", {})
+    data.bind("approval_request", {})
+    data.bind("execution_history", {})
+    data.bind("execution_details", {})
 
     -- Load node types from database
     load_node_types()
@@ -713,6 +1244,15 @@ function update(dt)
             })
         end
         user_response = nil  -- Clear response
+    end
+
+    -- Poll execution state if there's an active execution
+    if active_execution_id then
+        time_since_poll = time_since_poll + dt
+        if time_since_poll >= 0.1 then  -- Poll every 100ms
+            poll_execution_state()
+            time_since_poll = 0
+        end
     end
 end
 

@@ -122,6 +122,15 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
     build_nodes_from_server()
     editor.connections = get_connections_from_server()
 
+    -- Get execution state from data model
+    local execution_state = nil
+    if data and data.get then
+        local exec_state_array = data.get("execution_state")
+        if exec_state_array and #exec_state_array > 0 then
+            execution_state = exec_state_array[1]
+        end
+    end
+
     -- Store canvas position for mouse coordinate conversion
     editor.canvas_x = canvas_x
     editor.canvas_y = canvas_y
@@ -146,13 +155,16 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
     -- Draw connections behind nodes
     render.draw_connections(nvg_ctx, editor, colors)
 
-    -- Draw nodes
-    render.draw_nodes(nvg_ctx, editor, colors)
+    -- Draw nodes with execution state
+    render.draw_nodes(nvg_ctx, editor, colors, execution_state)
 
     nvg.restore(nvg_ctx)
 
     -- Draw node creation menu (in screen space, but relative to canvas)
     render.draw_node_menu(nvg_ctx, editor, colors, node_types, x, y, w, h)
+
+    -- Draw execution progress overlay (in screen space)
+    render.draw_execution_overlay(nvg_ctx, editor, colors, execution_state, x, y, w, h)
 
     -- Draw UI overlay (in screen space)
     nvg.fontSize(nvg_ctx, 12.0)

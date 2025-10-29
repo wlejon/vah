@@ -106,6 +106,10 @@ function M.init()
         return false
     end
 
+    -- Add new columns to workflows table
+    M.db_handle:execute("ALTER TABLE workflows ADD COLUMN script TEXT")
+    M.db_handle:execute("ALTER TABLE workflows ADD COLUMN config TEXT")
+
     -- Create workflow_nodes table
     success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS workflow_nodes (
@@ -125,6 +129,9 @@ function M.init()
         return false
     end
 
+    -- Add config column to workflow_nodes table
+    M.db_handle:execute("ALTER TABLE workflow_nodes ADD COLUMN config TEXT")
+
     -- Create workflow_connections table
     success, exec_error = M.db_handle:execute([[
         CREATE TABLE IF NOT EXISTS workflow_connections (
@@ -141,6 +148,136 @@ function M.init()
     if not success then
         print("Error creating workflow_connections table: " .. exec_error)
         return false
+    end
+
+    -- Create library_registry table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS library_registry (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            access_description TEXT NOT NULL,
+            is_builtin BOOLEAN DEFAULT 0,
+            enabled BOOLEAN DEFAULT 1,
+            lua_module_path TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ]])
+
+    if not success then
+        print("Error creating library_registry table: " .. exec_error)
+        return false
+    end
+
+    -- Create workflow_approvals table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS workflow_approvals (
+            workflow_id INTEGER PRIMARY KEY,
+            approved BOOLEAN DEFAULT 0,
+            requires_hash TEXT,
+            approved_at TIMESTAMP,
+            FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating workflow_approvals table: " .. exec_error)
+        return false
+    end
+
+    -- Create workflow_executions table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS workflow_executions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workflow_id INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            thread_id INTEGER,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            error_message TEXT,
+            FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating workflow_executions table: " .. exec_error)
+        return false
+    end
+
+    -- Create execution_nodes table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS execution_nodes (
+            execution_id INTEGER NOT NULL,
+            node_id INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            inputs TEXT,
+            outputs TEXT,
+            error_message TEXT,
+            execution_order INTEGER,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            PRIMARY KEY (execution_id, node_id),
+            FOREIGN KEY (execution_id) REFERENCES workflow_executions(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating execution_nodes table: " .. exec_error)
+        return false
+    end
+
+    -- Create execution_trace table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS execution_trace (
+            execution_id INTEGER NOT NULL,
+            sequence INTEGER NOT NULL,
+            node_id INTEGER NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (execution_id, sequence),
+            FOREIGN KEY (execution_id) REFERENCES workflow_executions(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating execution_trace table: " .. exec_error)
+        return false
+    end
+
+    -- Create execution_control table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS execution_control (
+            execution_id INTEGER PRIMARY KEY,
+            command TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (execution_id) REFERENCES workflow_executions(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating execution_control table: " .. exec_error)
+        return false
+    end
+
+    -- Create execution_cleanup table
+    success, exec_error = M.db_handle:execute([[
+        CREATE TABLE IF NOT EXISTS execution_cleanup (
+            execution_id INTEGER PRIMARY KEY,
+            cleanup_after TIMESTAMP,
+            keep_indefinitely BOOLEAN DEFAULT 0,
+            FOREIGN KEY (execution_id) REFERENCES workflow_executions(id) ON DELETE CASCADE
+        )
+    ]])
+
+    if not success then
+        print("Error creating execution_cleanup table: " .. exec_error)
+        return false
+    end
+
+    -- Check if we need to populate library_registry
+    local lib_count_result, lib_count_error = M.db_handle:query("SELECT COUNT(*) as count FROM library_registry")
+    if lib_count_error == "" and lib_count_result and #lib_count_result > 0 and lib_count_result[1].count == 0 then
+        print("Populating library registry with default C++ libraries...")
+        M.populate_library_registry()
     end
 
     -- Check if we need to add sample data
@@ -184,6 +321,32 @@ function M.init()
     M.db_handle:execute([[
         CREATE INDEX IF NOT EXISTS idx_workflow_connections_to_node
         ON workflow_connections(to_node)
+    ]])
+
+    -- Execution-related indexes
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_executions_workflow
+        ON workflow_executions(workflow_id)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_executions_status
+        ON workflow_executions(status)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_executions_status_date
+        ON workflow_executions(status, started_at DESC)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_execution_nodes_execution
+        ON execution_nodes(execution_id)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_execution_nodes_status
+        ON execution_nodes(execution_id, status)
+    ]])
+    M.db_handle:execute([[
+        CREATE INDEX IF NOT EXISTS idx_trace_sequence
+        ON execution_trace(execution_id, sequence)
     ]])
 
     print("Database indexes created")
@@ -247,6 +410,59 @@ function M.add_default_node_types()
     end
 
     print("Added default node types")
+end
+
+-- Populate library registry with default C++ libraries
+function M.populate_library_registry()
+    if not M.db_handle then
+        print("M.populate_library_registry: Database not initialized")
+        return false
+    end
+
+    local libraries = {
+        {id = "math", name = "Math Operations",
+         description = "Standard mathematical functions and constants",
+         access_description = "No data access - pure computation"},
+        {id = "string", name = "String Operations",
+         description = "String manipulation and pattern matching",
+         access_description = "No data access - pure computation"},
+        {id = "table", name = "Table Operations",
+         description = "Table manipulation utilities",
+         access_description = "No data access - pure computation"},
+        {id = "db", name = "Database Access",
+         description = "Query and modify SQLite databases",
+         access_description = "Read/write access to execution-specific tables"},
+        {id = "fs", name = "File System Access",
+         description = "Read and write files on disk",
+         access_description = "Full file system access (current user permissions)"},
+        {id = "http", name = "Network Access",
+         description = "Make HTTP/HTTPS requests",
+         access_description = "Can send data to external services"},
+        {id = "ui", name = "User Interface",
+         description = "Create UI windows using RmlUI",
+         access_description = "Can display content and capture user input"},
+        {id = "thread", name = "Threading Utilities",
+         description = "Thread management and querying",
+         access_description = "Limited to thread queries and sleep"},
+        {id = "event", name = "Event System",
+         description = "Trigger and listen for events",
+         access_description = "Can communicate with other application components"}
+    }
+
+    local sql = [[
+        INSERT INTO library_registry (id, name, description, access_description, is_builtin)
+        VALUES (?, ?, ?, ?, 1)
+    ]]
+
+    for _, lib in ipairs(libraries) do
+        local success, error = M.db_handle:execute(sql, lib.id, lib.name, lib.description, lib.access_description)
+        if not success then
+            print("M.populate_library_registry: Error adding library '" .. lib.id .. "': " .. error)
+        end
+    end
+
+    print("Library registry populated with default libraries")
+    return true
 end
 
 -- Create a new node type
@@ -887,6 +1103,659 @@ function M.load_workflow(workflow_id)
     end
 
     return nodes, connections
+end
+
+-- ============================================
+-- Workflow Configuration Functions
+-- ============================================
+
+-- Save workflow configuration
+function M.save_workflow_config(workflow_id, config)
+    if not M.db_handle then
+        print("M.save_workflow_config: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        UPDATE workflows
+        SET config = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ]]
+
+    local success, error = M.db_handle:execute(sql, config, workflow_id)
+    if not success then
+        print("M.save_workflow_config: Error saving workflow config: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Load workflow configuration
+function M.load_workflow_config(workflow_id)
+    if not M.db_handle then
+        print("M.load_workflow_config: Database not initialized")
+        return nil
+    end
+
+    local results, error = M.db_handle:query([[
+        SELECT config FROM workflows WHERE id = ?
+    ]], workflow_id)
+
+    if error ~= "" then
+        print("M.load_workflow_config: Error loading workflow config: " .. error)
+        return nil
+    end
+
+    if results and #results > 0 then
+        return results[1].config
+    end
+
+    return nil
+end
+
+-- Save node configuration
+function M.save_node_config(workflow_id, node_id, config)
+    if not M.db_handle then
+        print("M.save_node_config: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        UPDATE workflow_nodes
+        SET config = ?
+        WHERE workflow_id = ? AND node_id = ?
+    ]]
+
+    local success, error = M.db_handle:execute(sql, config, workflow_id, node_id)
+    if not success then
+        print("M.save_node_config: Error saving node config: " .. error)
+        return false
+    end
+
+    -- Update workflow timestamp
+    M.db_handle:execute("UPDATE workflows SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", workflow_id)
+
+    return true
+end
+
+-- Load node configuration
+function M.load_node_config(workflow_id, node_id)
+    if not M.db_handle then
+        print("M.load_node_config: Database not initialized")
+        return nil
+    end
+
+    local results, error = M.db_handle:query([[
+        SELECT config FROM workflow_nodes WHERE workflow_id = ? AND node_id = ?
+    ]], workflow_id, node_id)
+
+    if error ~= "" then
+        print("M.load_node_config: Error loading node config: " .. error)
+        return nil
+    end
+
+    if results and #results > 0 then
+        return results[1].config
+    end
+
+    return nil
+end
+
+-- ============================================
+-- Execution Management Functions
+-- ============================================
+
+-- Create a new execution record
+function M.create_execution_record(workflow_id, thread_id)
+    if not M.db_handle then
+        print("M.create_execution_record: Database not initialized")
+        return nil
+    end
+
+    local sql = [[
+        INSERT INTO workflow_executions (workflow_id, status, thread_id)
+        VALUES (?, 'running', ?)
+    ]]
+
+    local success, error = M.db_handle:execute(sql, workflow_id, thread_id)
+    if not success then
+        print("M.create_execution_record: Error creating execution record: " .. error)
+        return nil
+    end
+
+    return M.db_handle:last_insert_rowid()
+end
+
+-- Update execution status
+function M.update_execution_status(execution_id, status, error_message)
+    if not M.db_handle then
+        print("M.update_execution_status: Database not initialized")
+        return false
+    end
+
+    local sql
+    if error_message then
+        sql = [[
+            UPDATE workflow_executions
+            SET status = ?, error_message = ?, ended_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ]]
+    else
+        sql = [[
+            UPDATE workflow_executions
+            SET status = ?, ended_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ]]
+    end
+
+    local success, exec_error
+    if error_message then
+        success, exec_error = M.db_handle:execute(sql, status, error_message, execution_id)
+    else
+        success, exec_error = M.db_handle:execute(sql, status, execution_id)
+    end
+
+    if not success then
+        print("M.update_execution_status: Error updating execution status: " .. exec_error)
+        return false
+    end
+
+    return true
+end
+
+-- Update or insert node execution status
+function M.update_node_execution(execution_id, node_id, status, inputs, outputs, error_message)
+    if not M.db_handle then
+        print("M.update_node_execution: Database not initialized")
+        return false
+    end
+
+    -- Check if node execution already exists
+    local check_sql = [[
+        SELECT execution_order FROM execution_nodes
+        WHERE execution_id = ? AND node_id = ?
+    ]]
+
+    local results, query_error = M.db_handle:query(check_sql, execution_id, node_id)
+    if query_error ~= "" then
+        print("M.update_node_execution: Error checking node execution: " .. query_error)
+        return false
+    end
+
+    local sql
+    local success, exec_error
+
+    if results and #results > 0 then
+        -- Update existing record
+        sql = [[
+            UPDATE execution_nodes
+            SET status = ?, inputs = ?, outputs = ?, error_message = ?,
+                completed_at = CASE WHEN ? IN ('completed', 'error', 'skipped') THEN CURRENT_TIMESTAMP ELSE completed_at END
+            WHERE execution_id = ? AND node_id = ?
+        ]]
+        success, exec_error = M.db_handle:execute(sql, status, inputs, outputs, error_message, status, execution_id, node_id)
+    else
+        -- Insert new record
+        -- Get next execution order
+        local order_sql = [[
+            SELECT COALESCE(MAX(execution_order), 0) + 1 as next_order
+            FROM execution_nodes WHERE execution_id = ?
+        ]]
+        local order_results, order_error = M.db_handle:query(order_sql, execution_id)
+        if order_error ~= "" then
+            print("M.update_node_execution: Error getting execution order: " .. order_error)
+            return false
+        end
+
+        local execution_order = 1
+        if order_results and #order_results > 0 then
+            execution_order = order_results[1].next_order
+        end
+
+        sql = [[
+            INSERT INTO execution_nodes (execution_id, node_id, status, inputs, outputs, error_message, execution_order, started_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ]]
+        success, exec_error = M.db_handle:execute(sql, execution_id, node_id, status, inputs, outputs, error_message, execution_order)
+    end
+
+    if not success then
+        print("M.update_node_execution: Error updating node execution: " .. exec_error)
+        return false
+    end
+
+    return true
+end
+
+-- Add entry to execution trace
+function M.add_execution_trace(execution_id, node_id)
+    if not M.db_handle then
+        print("M.add_execution_trace: Database not initialized")
+        return false
+    end
+
+    -- Get next sequence number
+    local seq_sql = [[
+        SELECT COALESCE(MAX(sequence), 0) + 1 as next_seq
+        FROM execution_trace WHERE execution_id = ?
+    ]]
+    local results, error = M.db_handle:query(seq_sql, execution_id)
+    if error ~= "" then
+        print("M.add_execution_trace: Error getting sequence: " .. error)
+        return false
+    end
+
+    local sequence = 1
+    if results and #results > 0 then
+        sequence = results[1].next_seq
+    end
+
+    local sql = [[
+        INSERT INTO execution_trace (execution_id, sequence, node_id)
+        VALUES (?, ?, ?)
+    ]]
+
+    local success, exec_error = M.db_handle:execute(sql, execution_id, sequence, node_id)
+    if not success then
+        print("M.add_execution_trace: Error adding trace entry: " .. exec_error)
+        return false
+    end
+
+    return true
+end
+
+-- Create per-execution state and log tables
+function M.create_execution_tables(execution_id)
+    if not M.db_handle then
+        print("M.create_execution_tables: Database not initialized")
+        return false
+    end
+
+    -- Create state table
+    local state_sql = string.format([[
+        CREATE TABLE IF NOT EXISTS exec_%d_state (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ]], execution_id)
+
+    local success, error = M.db_handle:execute(state_sql)
+    if not success then
+        print("M.create_execution_tables: Error creating state table: " .. error)
+        return false
+    end
+
+    -- Create log table
+    local log_sql = string.format([[
+        CREATE TABLE IF NOT EXISTS exec_%d_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            level TEXT,
+            node_id INTEGER,
+            message TEXT
+        )
+    ]], execution_id)
+
+    success, error = M.db_handle:execute(log_sql)
+    if not success then
+        print("M.create_execution_tables: Error creating log table: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Delete per-execution tables (for cleanup)
+function M.delete_execution_tables(execution_id)
+    if not M.db_handle then
+        print("M.delete_execution_tables: Database not initialized")
+        return false
+    end
+
+    local state_sql = string.format("DROP TABLE IF EXISTS exec_%d_state", execution_id)
+    local log_sql = string.format("DROP TABLE IF EXISTS exec_%d_log", execution_id)
+
+    M.db_handle:execute(state_sql)
+    M.db_handle:execute(log_sql)
+
+    return true
+end
+
+-- Set execution state value
+function M.set_execution_state(execution_id, key, value)
+    if not M.db_handle then
+        print("M.set_execution_state: Database not initialized")
+        return false
+    end
+
+    local sql = string.format([[
+        INSERT OR REPLACE INTO exec_%d_state (key, value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+    ]], execution_id)
+
+    local success, error = M.db_handle:execute(sql, key, value)
+    if not success then
+        print("M.set_execution_state: Error setting state: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Get execution state value
+function M.get_execution_state(execution_id, key)
+    if not M.db_handle then
+        print("M.get_execution_state: Database not initialized")
+        return nil
+    end
+
+    local sql = string.format([[
+        SELECT value FROM exec_%d_state WHERE key = ?
+    ]], execution_id)
+
+    local results, error = M.db_handle:query(sql, key)
+    if error ~= "" then
+        print("M.get_execution_state: Error getting state: " .. error)
+        return nil
+    end
+
+    if results and #results > 0 then
+        return results[1].value
+    end
+
+    return nil
+end
+
+-- Add execution log entry
+function M.add_execution_log(execution_id, level, message, node_id)
+    if not M.db_handle then
+        print("M.add_execution_log: Database not initialized")
+        return false
+    end
+
+    local sql = string.format([[
+        INSERT INTO exec_%d_log (level, message, node_id)
+        VALUES (?, ?, ?)
+    ]], execution_id)
+
+    local success, error = M.db_handle:execute(sql, level, message, node_id)
+    if not success then
+        print("M.add_execution_log: Error adding log entry: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Get execution logs
+function M.get_execution_logs(execution_id, level_filter)
+    if not M.db_handle then
+        print("M.get_execution_logs: Database not initialized")
+        return {}
+    end
+
+    local sql
+    if level_filter then
+        sql = string.format([[
+            SELECT timestamp, level, node_id, message
+            FROM exec_%d_log
+            WHERE level = ?
+            ORDER BY id
+        ]], execution_id)
+    else
+        sql = string.format([[
+            SELECT timestamp, level, node_id, message
+            FROM exec_%d_log
+            ORDER BY id
+        ]], execution_id)
+    end
+
+    local results, error
+    if level_filter then
+        results, error = M.db_handle:query(sql, level_filter)
+    else
+        results, error = M.db_handle:query(sql)
+    end
+
+    if error ~= "" then
+        print("M.get_execution_logs: Error getting logs: " .. error)
+        return {}
+    end
+
+    return results or {}
+end
+
+-- ============================================
+-- Workflow Approval Functions
+-- ============================================
+
+-- Check if workflow has valid approval
+function M.check_workflow_approval(workflow_id, requires_hash)
+    if not M.db_handle then
+        print("M.check_workflow_approval: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        SELECT approved, requires_hash
+        FROM workflow_approvals
+        WHERE workflow_id = ?
+    ]]
+
+    local results, error = M.db_handle:query(sql, workflow_id)
+    if error ~= "" then
+        print("M.check_workflow_approval: Error checking approval: " .. error)
+        return false
+    end
+
+    if not results or #results == 0 then
+        return false  -- No approval record
+    end
+
+    local approval = results[1]
+    if approval.approved == 0 then
+        return false  -- Not approved
+    end
+
+    if approval.requires_hash ~= requires_hash then
+        return false  -- Hash mismatch, requires re-approval
+    end
+
+    return true
+end
+
+-- Save workflow approval
+function M.save_workflow_approval(workflow_id, requires_hash, approved)
+    if not M.db_handle then
+        print("M.save_workflow_approval: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        INSERT OR REPLACE INTO workflow_approvals (workflow_id, approved, requires_hash, approved_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ]]
+
+    local success, error = M.db_handle:execute(sql, workflow_id, approved and 1 or 0, requires_hash)
+    if not success then
+        print("M.save_workflow_approval: Error saving approval: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- ============================================
+-- Library Registry Functions
+-- ============================================
+
+-- Get all library definitions
+function M.get_library_definitions()
+    if not M.db_handle then
+        print("M.get_library_definitions: Database not initialized")
+        return {}
+    end
+
+    local results, error = M.db_handle:query([[
+        SELECT id, name, description, access_description, is_builtin, enabled, lua_module_path
+        FROM library_registry
+        ORDER BY is_builtin DESC, name
+    ]])
+
+    if error ~= "" then
+        print("M.get_library_definitions: Error loading libraries: " .. error)
+        return {}
+    end
+
+    return results or {}
+end
+
+-- Get enabled libraries
+function M.get_enabled_libraries()
+    if not M.db_handle then
+        print("M.get_enabled_libraries: Database not initialized")
+        return {}
+    end
+
+    local results, error = M.db_handle:query([[
+        SELECT id, name, description, access_description, is_builtin, lua_module_path
+        FROM library_registry
+        WHERE enabled = 1
+        ORDER BY is_builtin DESC, name
+    ]])
+
+    if error ~= "" then
+        print("M.get_enabled_libraries: Error loading enabled libraries: " .. error)
+        return {}
+    end
+
+    return results or {}
+end
+
+-- Enable/disable a library
+function M.set_library_enabled(library_id, enabled)
+    if not M.db_handle then
+        print("M.set_library_enabled: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        UPDATE library_registry
+        SET enabled = ?
+        WHERE id = ?
+    ]]
+
+    local success, error = M.db_handle:execute(sql, enabled and 1 or 0, library_id)
+    if not success then
+        print("M.set_library_enabled: Error updating library: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- ============================================
+-- Execution Control Functions
+-- ============================================
+
+-- Set execution control command
+function M.set_execution_control(execution_id, command)
+    if not M.db_handle then
+        print("M.set_execution_control: Database not initialized")
+        return false
+    end
+
+    local sql = [[
+        INSERT OR REPLACE INTO execution_control (execution_id, command, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+    ]]
+
+    local success, error = M.db_handle:execute(sql, execution_id, command)
+    if not success then
+        print("M.set_execution_control: Error setting control command: " .. error)
+        return false
+    end
+
+    return true
+end
+
+-- Get execution control command
+function M.get_execution_control(execution_id)
+    if not M.db_handle then
+        print("M.get_execution_control: Database not initialized")
+        return nil
+    end
+
+    local sql = [[
+        SELECT command FROM execution_control WHERE execution_id = ?
+    ]]
+
+    local results, error = M.db_handle:query(sql, execution_id)
+    if error ~= "" then
+        print("M.get_execution_control: Error getting control command: " .. error)
+        return nil
+    end
+
+    if results and #results > 0 then
+        return results[1].command
+    end
+
+    return nil
+end
+
+-- Get execution by ID
+function M.get_execution(execution_id)
+    if not M.db_handle then
+        print("M.get_execution: Database not initialized")
+        return nil
+    end
+
+    local sql = [[
+        SELECT id, workflow_id, status, thread_id, started_at, ended_at, error_message
+        FROM workflow_executions
+        WHERE id = ?
+    ]]
+
+    local results, error = M.db_handle:query(sql, execution_id)
+    if error ~= "" then
+        print("M.get_execution: Error getting execution: " .. error)
+        return nil
+    end
+
+    if results and #results > 0 then
+        return results[1]
+    end
+
+    return nil
+end
+
+-- Get executions for a workflow
+function M.get_workflow_executions(workflow_id, limit)
+    if not M.db_handle then
+        print("M.get_workflow_executions: Database not initialized")
+        return {}
+    end
+
+    local sql = [[
+        SELECT id, workflow_id, status, thread_id, started_at, ended_at, error_message
+        FROM workflow_executions
+        WHERE workflow_id = ?
+        ORDER BY started_at DESC
+    ]]
+
+    if limit then
+        sql = sql .. " LIMIT " .. tonumber(limit)
+    end
+
+    local results, error = M.db_handle:query(sql, workflow_id)
+    if error ~= "" then
+        print("M.get_workflow_executions: Error getting executions: " .. error)
+        return {}
+    end
+
+    return results or {}
 end
 
 return M

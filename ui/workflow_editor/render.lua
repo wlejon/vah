@@ -168,10 +168,48 @@ local function draw_port(nvg_ctx, editor, colors, x, y, is_output, is_hovered)
 end
 
 -- Draw a single node
-local function draw_single_node(nvg_ctx, editor, colors, node)
+local function draw_single_node(nvg_ctx, editor, colors, node, execution_state)
     local height = node_module.get_height(editor, node)
     local is_selected = editor.selected_node == node.id
     local is_hovered = editor.hovered_node == node.id
+
+    -- Check execution state for this node
+    local node_exec_state = nil
+    local border_color = node.color
+    local border_width = 2.0
+    local status_indicator_color = nil
+
+    if execution_state and execution_state.nodes then
+        node_exec_state = execution_state.nodes[node.id]
+        if node_exec_state then
+            -- Set border color and width based on execution status
+            if node_exec_state.status == "running" then
+                border_color = nvg.rgba(244, 167, 66, 255) -- yellow #f4a742
+                border_width = 4.0
+                status_indicator_color = nvg.rgba(244, 167, 66, 255)
+            elseif node_exec_state.status == "completed" then
+                border_color = nvg.rgba(74, 196, 74, 255) -- green #4ac44a
+                border_width = 3.0
+                status_indicator_color = nvg.rgba(74, 196, 74, 255)
+            elseif node_exec_state.status == "error" then
+                border_color = nvg.rgba(196, 74, 74, 255) -- red #c44a4a
+                border_width = 4.0
+                status_indicator_color = nvg.rgba(196, 74, 74, 255)
+            elseif node_exec_state.status == "pending" then
+                border_color = nvg.rgba(136, 136, 136, 255) -- gray #888888
+                border_width = 2.0
+                status_indicator_color = nvg.rgba(136, 136, 136, 255)
+            end
+        end
+    end
+
+    -- Override border for selection/hover states
+    if is_selected then
+        border_color = colors.node_selected
+        border_width = 3.0
+    elseif is_hovered and not node_exec_state then
+        border_color = nvg.rgba(100, 100, 120, 255)
+    end
 
     -- Shadow
     nvg.beginPath(nvg_ctx)
@@ -203,17 +241,39 @@ local function draw_single_node(nvg_ctx, editor, colors, node)
     nvg.fill(nvg_ctx)
 
     -- Border
-    local border_color = is_selected and colors.node_selected or node.color
-    if is_hovered and not is_selected then
-        border_color = nvg.rgba(100, 100, 120, 255)
-    end
-
     nvg.beginPath(nvg_ctx)
     nvg.roundedRect(nvg_ctx, node.x, node.y,
                     editor.node_width, height, editor.node_rounding)
-    nvg.strokeWidth(nvg_ctx, is_selected and 3.0 or 2.0)
+    nvg.strokeWidth(nvg_ctx, border_width)
     nvg.strokeColor(nvg_ctx, border_color)
     nvg.stroke(nvg_ctx)
+
+    -- Draw status indicator dot in top-right corner if execution is active
+    if status_indicator_color then
+        local dot_x = node.x + editor.node_width - 12
+        local dot_y = node.y + 12
+        local dot_radius = 6
+
+        -- Outer glow for running status
+        if node_exec_state.status == "running" then
+            nvg.beginPath(nvg_ctx)
+            nvg.circle(nvg_ctx, dot_x, dot_y, dot_radius + 3)
+            nvg.fillColor(nvg_ctx, nvg.rgba(244, 167, 66, 100))
+            nvg.fill(nvg_ctx)
+        end
+
+        -- Status dot
+        nvg.beginPath(nvg_ctx)
+        nvg.circle(nvg_ctx, dot_x, dot_y, dot_radius)
+        nvg.fillColor(nvg_ctx, status_indicator_color)
+        nvg.fill(nvg_ctx)
+
+        -- Inner shine
+        nvg.beginPath(nvg_ctx)
+        nvg.circle(nvg_ctx, dot_x - 2, dot_y - 2, dot_radius / 2)
+        nvg.fillColor(nvg_ctx, nvg.rgba(255, 255, 255, 150))
+        nvg.fill(nvg_ctx)
+    end
 
     -- Node name in header
     nvg.fontSize(nvg_ctx, 14.0)
@@ -272,11 +332,11 @@ local function draw_single_node(nvg_ctx, editor, colors, node)
 end
 
 -- Draw all nodes
-function M.draw_nodes(nvg_ctx, editor, colors)
+function M.draw_nodes(nvg_ctx, editor, colors, execution_state)
     -- Draw non-selected nodes first
     for _, node in ipairs(editor.nodes) do
         if editor.selected_node ~= node.id then
-            draw_single_node(nvg_ctx, editor, colors, node)
+            draw_single_node(nvg_ctx, editor, colors, node, execution_state)
         end
     end
 
@@ -284,9 +344,62 @@ function M.draw_nodes(nvg_ctx, editor, colors)
     if editor.selected_node then
         local selected = node_module.find_by_id(editor, editor.selected_node)
         if selected then
-            draw_single_node(nvg_ctx, editor, colors, selected)
+            draw_single_node(nvg_ctx, editor, colors, selected, execution_state)
         end
     end
+end
+
+-- Draw execution progress overlay
+function M.draw_execution_overlay(nvg_ctx, editor, colors, execution_state, canvas_x, canvas_y, canvas_w, canvas_h)
+    if not execution_state or execution_state.status ~= "running" then
+        return
+    end
+
+    -- Draw semi-transparent overlay at bottom of canvas
+    local overlay_height = 40
+    local overlay_y = canvas_y + canvas_h - overlay_height
+
+    nvg.beginPath(nvg_ctx)
+    nvg.rect(nvg_ctx, canvas_x, overlay_y, canvas_w, overlay_height)
+    nvg.fillColor(nvg_ctx, nvg.rgba(37, 39, 41, 230))
+    nvg.fill(nvg_ctx)
+
+    -- Progress bar
+    local progress = 0
+    if execution_state.total_nodes > 0 then
+        progress = execution_state.completed_nodes / execution_state.total_nodes
+    end
+
+    local bar_width = canvas_w - 40
+    local bar_x = canvas_x + 20
+    local bar_y = overlay_y + 12
+    local bar_height = 16
+
+    -- Background bar
+    nvg.beginPath(nvg_ctx)
+    nvg.roundedRect(nvg_ctx, bar_x, bar_y, bar_width, bar_height, 8)
+    nvg.fillColor(nvg_ctx, nvg.rgba(45, 47, 51, 255))
+    nvg.fill(nvg_ctx)
+
+    -- Progress fill
+    if progress > 0 then
+        nvg.beginPath(nvg_ctx)
+        nvg.roundedRect(nvg_ctx, bar_x, bar_y, bar_width * progress, bar_height, 8)
+        nvg.fillColor(nvg_ctx, nvg.rgba(74, 125, 196, 255))
+        nvg.fill(nvg_ctx)
+    end
+
+    -- Progress text
+    nvg.fontSize(nvg_ctx, 11.0)
+    nvg.fontFace(nvg_ctx, "roboto")
+    nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_MIDDLE)
+    nvg.fillColor(nvg_ctx, nvg.rgba(220, 220, 220, 255))
+
+    local progress_text = string.format("%d%% - Processing node %d of %d",
+                                       math.floor(progress * 100),
+                                       execution_state.completed_nodes + 1,
+                                       execution_state.total_nodes)
+    nvg.text(nvg_ctx, canvas_x + canvas_w / 2, bar_y + bar_height / 2, progress_text)
 end
 
 -- Draw node creation menu

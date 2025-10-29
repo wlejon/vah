@@ -27,6 +27,7 @@
 #include "ElementTextEditorInstancer.h"
 #include "NanoVGBindings.h"
 #include "EventDispatcher.h"
+#include "WorkflowLibrary.h"
 #include <efsw/efsw.hpp>
 
 // File watcher listener for RML/RCSS hot reload
@@ -253,6 +254,9 @@ public:
         thread_manager_ = std::make_unique<ThreadManager>(command_queue_.get(), event_dispatcher_.get(), data_store_.get());
         http_server_thread_ = std::make_unique<HttpServerThread>("127.0.0.1", 8765, command_queue_.get());
         rmlui_bridge_ = std::make_unique<RmlUiBridge>(event_dispatcher_.get());
+
+        // Initialize workflow library registry for execution system
+        WorkflowLibrary::WorkflowLibraryRegistry::RegisterBuiltinLibraries();
 
         // Register default keybindings
         auto& keybindings = rmlui_bridge_->GetKeybindingRegistry();

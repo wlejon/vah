@@ -11,18 +11,79 @@
         doc:GetElementById('workflow-view'):SetClass('active', true)
         doc:GetElementById('node-editor-view'):SetClass('active', false)
         doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
     end
 
     function switch_to_workflow_list_view(doc)
         doc:GetElementById('workflow-view'):SetClass('active', false)
         doc:GetElementById('node-editor-view'):SetClass('active', false)
         doc:GetElementById('workflow-list-view'):SetClass('active', true)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
     end
 
     function switch_to_node_editor_view(doc)
         doc:GetElementById('workflow-view'):SetClass('active', false)
         doc:GetElementById('workflow-list-view'):SetClass('active', false)
         doc:GetElementById('node-editor-view'):SetClass('active', true)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
+    end
+
+    function switch_to_workflow_config_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-config-view'):SetClass('active', true)
+        doc:GetElementById('node-config-view'):SetClass('active', false)
+        doc:GetElementById('approval-dialog-view'):SetClass('active', false)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
+    end
+
+    function switch_to_node_config_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-config-view'):SetClass('active', false)
+        doc:GetElementById('node-config-view'):SetClass('active', true)
+        doc:GetElementById('approval-dialog-view'):SetClass('active', false)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
+    end
+
+    function show_approval_dialog(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-config-view'):SetClass('active', false)
+        doc:GetElementById('node-config-view'):SetClass('active', false)
+        doc:GetElementById('approval-dialog-view'):SetClass('active', true)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
+    end
+
+    function switch_to_execution_history_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-config-view'):SetClass('active', false)
+        doc:GetElementById('node-config-view'):SetClass('active', false)
+        doc:GetElementById('approval-dialog-view'):SetClass('active', false)
+        doc:GetElementById('execution-history-view'):SetClass('active', true)
+        doc:GetElementById('execution-details-view'):SetClass('active', false)
+    end
+
+    function switch_to_execution_details_view(doc)
+        doc:GetElementById('workflow-view'):SetClass('active', false)
+        doc:GetElementById('workflow-list-view'):SetClass('active', false)
+        doc:GetElementById('node-editor-view'):SetClass('active', false)
+        doc:GetElementById('workflow-config-view'):SetClass('active', false)
+        doc:GetElementById('node-config-view'):SetClass('active', false)
+        doc:GetElementById('approval-dialog-view'):SetClass('active', false)
+        doc:GetElementById('execution-history-view'):SetClass('active', false)
+        doc:GetElementById('execution-details-view'):SetClass('active', true)
     end
 
     </script>
@@ -37,6 +98,32 @@
                     <h1>{{ wf.name }}</h1>
                 </div>
             </div>
+
+            <!-- Execution Controls Panel - shown when execution is active -->
+            <div class="execution-controls" data-model="execution_state" data-if="execution_state.size > 0" data-for="exec,i : execution_state">
+                <div class="execution-info">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" data-attr-style-width="(exec.completed_nodes / exec.total_nodes * 100) + '%'"></div>
+                        </div>
+                        <div class="progress-text">{{ exec.completed_nodes }}/{{ exec.total_nodes }} nodes ({{ math.floor(exec.completed_nodes / exec.total_nodes * 100) }}%)</div>
+                    </div>
+                    <div class="execution-status">
+                        <span class="status-label">Status:</span>
+                        <span class="status-value" data-attr-data-status="exec.status">{{ exec.status }}</span>
+                    </div>
+                    <div class="execution-time">
+                        <span class="time-label">Time:</span>
+                        <span class="time-value">{{ string.format('%.1f', exec.elapsed_time or 0) }}s</span>
+                    </div>
+                </div>
+                <div class="execution-buttons">
+                    <button class="pause-btn" data-attr-data-execution-id="exec.execution_id" onclick="emit('pause_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))})">Pause</button>
+                    <button class="step-btn" data-attr-data-execution-id="exec.execution_id" onclick="emit('step_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))})">Step</button>
+                    <button class="stop-btn" data-attr-data-execution-id="exec.execution_id" onclick="emit('stop_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))})">Stop</button>
+                </div>
+            </div>
+
             <div class="container">
                 <canvas id="workflow-canvas"
                         renderfunction="render_workflow"
@@ -159,6 +246,243 @@
                 <!-- Empty state when no node type is selected -->
                 <div class="editor-panel empty-state" data-model="selected_node" data-if="selected_node.size == 0">
                     <p>Select a node type to edit, or create a new one</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow Configuration View -->
+        <div id="workflow-config-view" class="view" data-class-active="v.view == 'workflow_config'">
+            <div class="header">
+                <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
+                <h1>Workflow Configuration</h1>
+                <div></div>
+            </div>
+
+            <div class="main-container">
+                <div class="config-form" data-model="workflow_config" data-if="workflow_config.size > 0" data-for="config,i : workflow_config">
+                    <div class="form-section">
+                        <label>Workflow Name:</label>
+                        <input type="text" name="workflow_name" data-attr-value="config.name" />
+                    </div>
+
+                    <div class="form-section">
+                        <label>Description:</label>
+                        <textarea name="workflow_description" rows="4" data-attr-value="config.description"></textarea>
+                    </div>
+
+                    <div class="form-section">
+                        <label>Required Libraries:</label>
+                        <div class="libraries-list" data-model="library_list" data-for="library,j : library_list">
+                            <div class="library-item">
+                                <input type="checkbox" data-attr-name="'library_' + j" data-attr-checked="library.enabled" />
+                                <div class="library-info">
+                                    <div class="library-name">{{ library.name }}</div>
+                                    <div class="library-description">{{ library.description }}</div>
+                                    <div class="library-access">{{ library.access_description }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="save-btn" onclick="emit('save_workflow_config', {workflow_id = config.workflow_id, name = document:GetElementById('workflow-config-view'):GetElementsByTagName('input')[0].value, description = document:GetElementById('workflow-config-view'):GetElementsByTagName('textarea')[0].value})">Save</button>
+                        <button onclick="switch_to_workflow_view(document)">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node Configuration Dialog -->
+        <div id="node-config-view" class="view" data-class-active="v.view == 'node_config'">
+            <div class="dialog-overlay">
+                <div class="dialog-box" data-model="node_config" data-if="node_config.size > 0" data-for="node,i : node_config">
+                    <h2>Configure Node</h2>
+
+                    <div class="form-section">
+                        <label>Node Label:</label>
+                        <input type="text" name="node_label" data-attr-value="node.label" />
+                    </div>
+
+                    <div class="form-section">
+                        <label>Inputs (comma-separated):</label>
+                        <input type="text" name="node_inputs" data-attr-value="node.inputs" />
+                    </div>
+
+                    <div class="form-section">
+                        <label>Outputs (comma-separated):</label>
+                        <input type="text" name="node_outputs" data-attr-value="node.outputs" />
+                    </div>
+
+                    <div class="form-section">
+                        <label>Script:</label>
+                        <textarea name="node_script" rows="15" data-attr-value="node.script"></textarea>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="save-btn" onclick="emit('save_node_config', {node_id = node.node_id, label = document:GetElementById('node-config-view'):GetElementsByTagName('input')[0].value, inputs = document:GetElementById('node-config-view'):GetElementsByTagName('input')[1].value, outputs = document:GetElementById('node-config-view'):GetElementsByTagName('input')[2].value, script = document:GetElementById('node-config-view'):GetElementsByTagName('textarea')[0].value}); switch_to_workflow_view(document)">Save</button>
+                        <button onclick="switch_to_workflow_view(document)">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Dialog View -->
+        <div id="approval-dialog-view" class="view" data-class-active="v.view == 'approval_dialog'">
+            <div class="dialog-overlay">
+                <div class="dialog-box approval-dialog" data-model="approval_request" data-if="approval_request.size > 0" data-for="request,i : approval_request">
+                    <h2>Workflow Approval Required</h2>
+
+                    <div class="approval-content">
+                        <p>Workflow <strong>{{ request.workflow_name }}</strong> wants to run with:</p>
+
+                        <div class="approval-libraries">
+                            <div class="approval-library-list" data-for="library,j : request.libraries">
+                                <div class="approval-library-item">
+                                    <div class="warning-indicator">[!]</div>
+                                    <div class="approval-library-info">
+                                        <div class="approval-library-name">{{ library.name }}</div>
+                                        <div class="approval-library-access">{{ library.access_description }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="approval-question">Do you want to allow this workflow to run?</p>
+                    </div>
+
+                    <div class="button-group approval-buttons">
+                        <button class="delete-btn" onclick="emit('workflow_approval_response', {workflow_id = request.workflow_id, approved = false, remember = false}); switch_to_workflow_view(document)">Deny</button>
+                        <button onclick="emit('workflow_approval_response', {workflow_id = request.workflow_id, approved = true, remember = false}); switch_to_workflow_view(document)">Allow Once</button>
+                        <button class="save-btn" onclick="emit('workflow_approval_response', {workflow_id = request.workflow_id, approved = true, remember = true}); switch_to_workflow_view(document)">Always Allow</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution History View -->
+        <div id="execution-history-view" class="view" data-class-active="v.view == 'execution_history'">
+            <div class="header">
+                <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
+                <h1>Execution History</h1>
+                <button class="delete-btn" onclick="emit('clear_execution_history', {})">Clear History</button>
+            </div>
+
+            <div class="main-container">
+                <div class="history-content">
+                    <!-- Execution History Table -->
+                    <div class="history-table" data-model="execution_history" data-if="execution_history.size > 0">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th>Nodes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody data-for="exec,i : execution_history">
+                                <tr>
+                                    <td>{{ exec.started_at }}</td>
+                                    <td>
+                                        <span class="status-badge" data-attr-data-status="exec.status">{{ exec.status }}</span>
+                                    </td>
+                                    <td>{{ string.format('%.1f', exec.duration) }}s</td>
+                                    <td>{{ exec.completed_nodes }}/{{ exec.total_nodes }}</td>
+                                    <td>
+                                        <button class="view-btn" data-attr-data-execution-id="exec.execution_id" onclick="emit('view_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))}); switch_to_execution_details_view(document)">View Details</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty state when no executions exist -->
+                    <div class="empty-state" data-model="execution_history" data-if="execution_history.size == 0">
+                        <p>No execution history available</p>
+                        <p class="empty-hint">Execute a workflow to see its history here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution Details View -->
+        <div id="execution-details-view" class="view" data-class-active="v.view == 'execution_details'">
+            <div class="header">
+                <button class="back-btn" onclick="switch_to_execution_history_view(document)">← Back to History</button>
+                <h1>Execution Details</h1>
+                <div></div>
+            </div>
+
+            <div class="main-container">
+                <div class="details-content" data-model="execution_details" data-if="execution_details.size > 0" data-for="details,i : execution_details">
+                    <!-- Execution Summary -->
+                    <div class="execution-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">Workflow:</span>
+                            <span class="summary-value">{{ details.workflow_name }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Started:</span>
+                            <span class="summary-value">{{ details.started_at }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Status:</span>
+                            <span class="status-badge" data-attr-data-status="details.status">{{ details.status }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Duration:</span>
+                            <span class="summary-value">{{ string.format('%.1f', details.duration) }}s</span>
+                        </div>
+                    </div>
+
+                    <!-- Node Results Section -->
+                    <div class="details-section">
+                        <h2>Node Results</h2>
+                        <div class="node-results-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Node Name/ID</th>
+                                        <th>Status</th>
+                                        <th>Inputs</th>
+                                        <th>Outputs</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-for="node,j : details.nodes">
+                                    <tr>
+                                        <td>{{ node.node_name }} (#{{ node.node_id }})</td>
+                                        <td>
+                                            <span class="status-badge" data-attr-data-status="node.status">{{ node.status }}</span>
+                                        </td>
+                                        <td><pre class="json-content">{{ node.inputs }}</pre></td>
+                                        <td><pre class="json-content">{{ node.outputs }}</pre></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Execution Log Section -->
+                    <div class="details-section">
+                        <h2>Execution Log</h2>
+                        <div class="execution-log">
+                            <div class="log-entries" data-for="log,k : details.logs">
+                                <div class="log-entry" data-attr-data-level="log.level">
+                                    <span class="log-timestamp">{{ log.timestamp }}</span>
+                                    <span class="log-level">{{ log.level }}</span>
+                                    <span class="log-message">{{ log.message }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="button-group">
+                        <button onclick="switch_to_execution_history_view(document)">Back to History</button>
+                        <button data-attr-data-execution-id="details.execution_id" onclick="emit('export_execution_log', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))})">Export Log</button>
+                        <button class="delete-btn" data-attr-data-execution-id="details.execution_id" onclick="emit('delete_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))}); switch_to_execution_history_view(document)">Delete Execution</button>
+                    </div>
                 </div>
             </div>
         </div>

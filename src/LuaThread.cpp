@@ -10,6 +10,7 @@
 #include "FileIngestionBindings.h"
 #include "ClipboardBindings.h"
 #include "DataStore.h"
+#include "WorkflowThread.h"
 #include <httplib.h>
 #include <chrono>
 
@@ -632,6 +633,24 @@ void LuaThread::SetupLuaBindings() {
 
     thread_table["get_info"] = [this](int thread_id) {
         return LuaQueries::QueryThreadInfo(this, thread_id);
+    };
+
+    thread_table["create_workflow_thread"] = [](int workflow_id, int execution_id, sol::optional<sol::table> libraries) {
+        WorkflowThreadConfig config;
+        config.workflow_id = workflow_id;
+        config.execution_id = execution_id;
+
+        // Parse required libraries from table
+        if (libraries) {
+            for (const auto& [key, value] : libraries.value()) {
+                if (value.is<std::string>()) {
+                    config.required_libraries.push_back(value.as<std::string>());
+                }
+            }
+        }
+
+        int thread_id = CreateWorkflowThread(config);
+        return thread_id;
     };
 
     (*lua_)["thread"] = thread_table;
