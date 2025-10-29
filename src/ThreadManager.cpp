@@ -180,6 +180,16 @@ int ThreadManager::SpawnThread(const std::string& script_path) {
 
     threads_.push_back(std::move(thread));
 
+    // Send already-ready system notifications to this new thread
+    if (event_dispatcher_) {
+        const auto& ready_systems = event_dispatcher_->GetReadySystems();
+        for (const std::string& system_name : ready_systems) {
+            PayloadMap payload;
+            payload["system"] = system_name;
+            event_dispatcher_->DispatchToThread(thread_id, "system_ready", payload);
+        }
+    }
+
     LOG_INFO("ThreadManager: Spawned thread {} for script '{}'", thread_id, script_path);
     return thread_id;
 }
@@ -199,6 +209,16 @@ int ThreadManager::SpawnThread(const std::string& script_path, int parent_thread
     thread->Start();
 
     threads_.push_back(std::move(thread));
+
+    // Send already-ready system notifications to this new thread
+    if (event_dispatcher_) {
+        const auto& ready_systems = event_dispatcher_->GetReadySystems();
+        for (const std::string& system_name : ready_systems) {
+            PayloadMap payload;
+            payload["system"] = system_name;
+            event_dispatcher_->DispatchToThread(thread_id, "system_ready", payload);
+        }
+    }
 
     LOG_INFO("ThreadManager: Spawned thread {} for script '{}' (parent: {})", thread_id, script_path, parent_thread_id);
     return thread_id;

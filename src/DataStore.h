@@ -23,6 +23,7 @@ using DynamicValue = std::variant<
 // Define the nested map structure
 struct DynamicMap {
     std::unordered_map<std::string, DynamicValue> fields;
+    bool is_array = false;  // True if this should be converted to Lua array
 };
 
 // A row is a map of column names to values

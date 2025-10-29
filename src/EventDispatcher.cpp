@@ -129,3 +129,30 @@ void EventDispatcher::DispatchGlobalEvent(const std::string& event_name, const P
     event.payload = payload;
     queue_it->second->enqueue(std::move(event));
 }
+
+void EventDispatcher::BroadcastEvent(const std::string& event_name, const PayloadMap& payload) {
+    // Send event to all registered threads
+    for (const auto& [thread_id, queue] : thread_queues_) {
+        UIEvent event;
+        event.name = event_name;
+        event.payload = payload;
+        queue->enqueue(event);
+    }
+
+    LOG_INFO("EventDispatcher: Broadcast event '{}' to {} thread(s)", event_name, thread_queues_.size());
+}
+
+void EventDispatcher::MarkSystemReady(const std::string& system_name) {
+    ready_systems_.insert(system_name);
+
+    // Broadcast to all threads that this system is ready
+    PayloadMap payload;
+    payload["system"] = system_name;
+    BroadcastEvent("system_ready", payload);
+
+    LOG_INFO("EventDispatcher: System '{}' marked ready", system_name);
+}
+
+bool EventDispatcher::IsSystemReady(const std::string& system_name) const {
+    return ready_systems_.find(system_name) != ready_systems_.end();
+}

@@ -3,6 +3,7 @@
 #include "Commands.h"
 #include <moodycamel/concurrentqueue.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 
 // EventDispatcher manages event routing between threads
@@ -37,6 +38,14 @@ public:
     // Dispatch a global event (main thread only, goes to registered global handler)
     void DispatchGlobalEvent(const std::string& event_name, const PayloadMap& payload);
 
+    // Broadcast an event to all threads (main thread only)
+    void BroadcastEvent(const std::string& event_name, const PayloadMap& payload);
+
+    // System readiness tracking (main thread only)
+    void MarkSystemReady(const std::string& system_name);
+    bool IsSystemReady(const std::string& system_name) const;
+    const std::unordered_set<std::string>& GetReadySystems() const { return ready_systems_; }
+
 private:
     // Per-thread event queues (lock-free queues, modified only on main thread)
     std::unordered_map<int, std::unique_ptr<moodycamel::ConcurrentQueue<UIEvent>>> thread_queues_;
@@ -46,4 +55,7 @@ private:
 
     // Global event name -> Thread ID mapping (modified only on main thread)
     std::unordered_map<std::string, int> global_events_;
+
+    // System readiness tracking (modified only on main thread)
+    std::unordered_set<std::string> ready_systems_;
 };

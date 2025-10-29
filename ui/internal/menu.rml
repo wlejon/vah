@@ -5,48 +5,53 @@
     <link type="text/rcss" href="menu.rcss"/>
 </head>
 <body>
-    <div class="menu-container" data-model="menu_data">
+    <div class="menu-container" data-model="menus">
         <div class="menu-bar">
-            <!-- File Menu -->
-            <div class="menu-item">
-                <div class="menu-label" onclick="emit('toggle_file_menu')">
-                    File
-                </div>
-                <!-- Dropdown (shown when file_menu_open is true) -->
-                <div data-if="menu_data.file_menu_open == 1" class="menu-dropdown">
-                    <div class="menu-dropdown-item" onclick="emit('menu_file_home')">
-                        Home
+            <!-- Dynamically generated menus -->
+            <div data-for="menu, i : menus">
+                <div class="menu-item">
+                    <div class="menu-label"
+                         data-attr-data-menu-id="menu.menu_id"
+                         onclick="emit('toggle_menu', {menu_id = event.current_element:GetAttribute('data-menu-id')})">
+                        <!-- Status indicator for menus like MCP -->
+                        <span data-if="menu.status_indicator == 1 && menu.status == 'stopped'"
+                              class="mcp-status-dot status-stopped"></span>
+                        <span data-if="menu.status_indicator == 1 && menu.status == 'starting'"
+                              class="mcp-status-dot status-starting"></span>
+                        <span data-if="menu.status_indicator == 1 && menu.status == 'running'"
+                              class="mcp-status-dot status-running"></span>
+                        <span data-if="menu.status_indicator == 1 && menu.status == 'stopping'"
+                              class="mcp-status-dot status-stopping"></span>
+                        {{menu.label}}
                     </div>
-                    <div class="menu-dropdown-item" onclick="emit('menu_file_close')">
-                        Close
-                    </div>
-                </div>
-            </div>
 
-            <!-- MCP Status Menu -->
-            <div class="menu-item mcp-status-item">
-                <div class="menu-label" onclick="emit('toggle_mcp_menu')">
-                    <span data-if="menu_data.mcp_status == 'stopped'" class="mcp-status-dot status-stopped"></span>
-                    <span data-if="menu_data.mcp_status == 'starting'" class="mcp-status-dot status-starting"></span>
-                    <span data-if="menu_data.mcp_status == 'running'" class="mcp-status-dot status-running"></span>
-                    <span data-if="menu_data.mcp_status == 'stopping'" class="mcp-status-dot status-stopping"></span>
-                    MCP
+                    <!-- Dropdown (shown when menu is open) -->
+                    <div data-if="menu.open == 1" class="menu-dropdown">
+                        <!-- Status text for status indicator menus -->
+                        <div data-if="menu.status_text != ''" class="mcp-status-info">
+                            {{menu.status_text}}
+                        </div>
+
+                        <!-- Menu items (data-for directly on the item div) -->
+                        <div data-for="item, j : menu.items"
+                             data-if="item.visible == 1"
+                             class="menu-dropdown-item"
+                             data-attr-data-menu-id="menu.menu_id"
+                             data-attr-data-item-id="item.item_id"
+                             onclick="emit('menu_item_click', {menu_id = event.current_element:GetAttribute('data-menu-id'), item_id = event.current_element:GetAttribute('data-item-id')})">
+                            {{item.label}}
+                        </div>
+                    </div>
                 </div>
-                <!-- Dropdown (shown when mcp_menu_open is true) -->
-                <div data-if="menu_data.mcp_menu_open == 1" class="menu-dropdown">
-                    <div class="mcp-status-info">{{menu_data.mcp_status_text}}</div>
-                    <div data-if="menu_data.mcp_is_stopped == 1" class="menu-dropdown-item" onclick="emit('menu_mcp_start')">
-                        Start Server
-                    </div>
-                    <div data-if="menu_data.mcp_is_running == 1" class="menu-dropdown-item" onclick="emit('menu_mcp_stop')">
-                        Stop Server
-                    </div>
+
+                <!-- Overlay to close this menu when clicking outside -->
+                <div data-if="menu.open == 1"
+                     class="menu-overlay"
+                     data-attr-data-menu-id="menu.menu_id"
+                     onclick="emit('close_menu', {menu_id = event.current_element:GetAttribute('data-menu-id')})">
                 </div>
             </div>
         </div>
-        <!-- Invisible overlay to close menu when clicking outside -->
-        <div data-if="menu_data.file_menu_open == 1" class="menu-overlay" onclick="emit('close_file_menu')"></div>
-        <div data-if="menu_data.mcp_menu_open == 1" class="menu-overlay" onclick="emit('close_mcp_menu')"></div>
     </div>
 </body>
 </rml>

@@ -65,4 +65,12 @@ you should review the data binding c++ implementation if you need to write rml u
 
 this task will fit in your context, there is no need to use subagents.
 
-we've created mcp functionality. please review it and explain it to me.
+currently the menu app (scripts/menu.lua) has hard coded menus (file, mcp). what i wanted when i asked for this system was something that other apps could register their menus with and it would render them in the appropriate place in the menu. 
+
+please update the menu system such that the api is for giving it data about the hierarchy and actions of a given menu instead of hard coded menu entries.
+
+the launcher app, for example, should add the "home" button (through the menu api) when another app is opened and the "home" button should close the current app and reopen the launcher. 
+
+the mcp app should add the mcp menu through the menu api.
+
+we need to redesign the menu system for this purpose. please review what we have and how it's used. how the app works. determine an approach we can take, including foundational shifts to support this idea. this is a critical application component that needs to be well designed. 

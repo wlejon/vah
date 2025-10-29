@@ -16,6 +16,8 @@ public:
     ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
                   EventDispatcher* event_dispatcher,
                   DataStore* data_store);
+
+    void SetEventDispatcher(EventDispatcher* event_dispatcher) { event_dispatcher_ = event_dispatcher; }
     ~ThreadManager();
 
     // Thread lifecycle

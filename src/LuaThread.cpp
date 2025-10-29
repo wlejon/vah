@@ -41,8 +41,18 @@ namespace {
                     return sol::make_object(lua, sol::nil);
                 }
                 auto nested_table = lua.create_table();
-                for (const auto& [key, nested_value] : val->fields) {
-                    nested_table[key] = DynamicValueToLua(lua, nested_value);
+
+                if (val->is_array) {
+                    // Restore as Lua array with integer keys
+                    for (const auto& [key_str, nested_value] : val->fields) {
+                        int index = std::stoi(key_str);
+                        nested_table[index] = DynamicValueToLua(lua, nested_value);
+                    }
+                } else {
+                    // Regular object with string keys
+                    for (const auto& [key, nested_value] : val->fields) {
+                        nested_table[key] = DynamicValueToLua(lua, nested_value);
+                    }
                 }
                 return nested_table;
             }
@@ -66,15 +76,32 @@ namespace {
             return obj.as<std::string>();
         } else if (obj.is<sol::table>()) {
             // Nested table - convert to DynamicMap
-            // Support both string keys and numeric array indices (converted to strings)
             auto nested_map = std::make_shared<DynamicMap>();
             sol::table nested_table = obj.as<sol::table>();
+
+            // Detect if this is an array (consecutive integer keys starting from 1)
+            bool is_array = true;
+            size_t expected_index = 1;
+            size_t count = 0;
+
+            for (const auto& [key, value] : nested_table) {
+                count++;
+                if (!key.is<int>() || key.as<int>() != static_cast<int>(expected_index)) {
+                    is_array = false;
+                }
+                expected_index++;
+            }
+
+            // Mark as array if detected
+            nested_map->is_array = (count > 0 && is_array);
+
+            // Convert all keys to strings for storage
             for (const auto& [key, value] : nested_table) {
                 std::string key_str;
                 if (key.is<std::string>()) {
                     key_str = key.as<std::string>();
                 } else if (key.is<int>()) {
-                    // Convert numeric index to string for arrays
+                    // Convert numeric index to string
                     key_str = std::to_string(key.as<int>());
                 } else {
                     // Skip other key types
@@ -388,6 +415,36 @@ void LuaThread::ThreadMain() {
                 }
 
                 for (const auto& ui_event : ui_events) {
+                    // Special handling for system_ready events
+                    // Try to call optional {system}_ready() callback
+                    if (ui_event.name == "system_ready") {
+                        auto system_it = ui_event.payload.find("system");
+                        if (system_it != ui_event.payload.end()) {
+                            std::string system_name;
+                            if (std::holds_alternative<std::string>(system_it->second)) {
+                                system_name = std::get<std::string>(system_it->second);
+                            }
+
+                            if (!system_name.empty()) {
+                                // Look for optional {system}_ready callback
+                                std::string callback_name = system_name + "_ready";
+                                sol::optional<sol::function> callback_fn = (*lua_)[callback_name];
+                                if (callback_fn) {
+                                    try {
+                                        callback_fn.value()();
+                                        LOG_INFO("Lua thread {} called {}()", id_, callback_name);
+                                    } catch (const sol::error& e) {
+                                        LOG_ERROR("Lua thread {} error in {}: {}", id_, callback_name, e.what());
+                                    } catch (const std::exception& e) {
+                                        LOG_ERROR("Lua thread {} C++ exception in {}: {}", id_, callback_name, e.what());
+                                    } catch (...) {
+                                        LOG_ERROR("Lua thread {} unknown exception in {}", id_, callback_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     auto it = event_handlers_.find(ui_event.name);
                     if (it != event_handlers_.end()) {
                         // Convert payload to lua table (handles nested objects)
@@ -562,6 +619,17 @@ void LuaThread::SetupLuaBindings() {
     };
 
     (*lua_)["command"] = command_table;
+
+    // Bind system operations
+    auto system_table = lua_->create_table();
+
+    system_table["mark_ready"] = [this](const std::string& system_name) {
+        Commands::MarkSystemReady cmd;
+        cmd.system_name = system_name;
+        command_queue_->enqueue(std::move(cmd));
+    };
+
+    (*lua_)["system"] = system_table;
 
     // Bind UI operations
     auto ui_table = lua_->create_table();

@@ -39,16 +39,6 @@ local tool_definitions = {}
 local type_registry = nil
 
 function update_ui_state()
-    -- Determine status color
-    local color_map = {
-        stopped = "red",
-        starting = "yellow",
-        running = "green",
-        stopping = "yellow"
-    }
-
-    local status_color = color_map[server_status] or "red"
-
     -- Status text for display
     local status_text
     if server_status == "running" then
@@ -61,13 +51,11 @@ function update_ui_state()
         status_text = "Stopped"
     end
 
-    -- Send status update to menu (which owns the mcp_status data model)
-    event.trigger_global("mcp_status_update", {
+    -- Send status update to menu
+    event.trigger_global("menu_update_status", {
+        menu_id = "mcp",
         status = server_status,
-        status_text = status_text,
-        status_color = status_color,
-        is_stopped = (server_status == "stopped") and 1 or 0,
-        is_running = (server_status == "running") and 1 or 0
+        status_text = status_text
     })
 end
 
@@ -751,6 +739,24 @@ function shutdown()
     end
 
     print("MCP server system shut down")
+end
+
+-- Called when menu system is ready
+function menu_ready()
+    -- Register MCP menu with status indicator
+    event.trigger_global("menu_register", {
+        menu_id = "mcp",
+        label = "MCP",
+        position = 2,
+        status_indicator = true,
+        items = {
+            {item_id = "start", label = "Start Server", action = "mcp_start_server", show_when_status = "stopped"},
+            {item_id = "stop", label = "Stop Server", action = "mcp_stop_server", show_when_status = "running"}
+        }
+    })
+
+    -- Send initial status
+    update_ui_state()
 end
 
 -- Export API for programmatic access

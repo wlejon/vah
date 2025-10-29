@@ -73,6 +73,31 @@ local apps = {
     }
 }
 
+-- Update File menu when app is launched (add Home option)
+local function update_file_menu_for_app()
+    event.trigger_global("menu_register", {
+        menu_id = "file",
+        label = "File",
+        position = 1,
+        items = {
+            {item_id = "home", label = "Home", action = "return_to_launcher"},
+            {item_id = "close", label = "Close", action = "close_application"}
+        }
+    })
+end
+
+-- Update File menu when returning to launcher (remove Home option)
+local function update_file_menu_for_launcher()
+    event.trigger_global("menu_register", {
+        menu_id = "file",
+        label = "File",
+        position = 1,
+        items = {
+            {item_id = "close", label = "Close", action = "close_application"}
+        }
+    })
+end
+
 -- Launch an app
 local function launch_app(payload)
     local app_id = payload.app_id
@@ -91,6 +116,9 @@ local function launch_app(payload)
 
     -- Hide launcher
     ui.hide_document("launcher")
+
+    -- Update File menu to include Home option
+    update_file_menu_for_app()
 
     -- Launch the app
     if app.script then
@@ -111,6 +139,9 @@ end
 -- Close the current app and return to launcher
 local function close_current_app(payload)
     print("Closing current app")
+
+    -- Update File menu to remove Home option
+    update_file_menu_for_launcher()
 
     -- Hide the app's document if it exists
     if active_app.document_id then
@@ -174,4 +205,17 @@ end
 
 function shutdown()
     print("Launcher shutting down")
+end
+
+-- Called when menu system is ready
+function menu_ready()
+    -- Register File menu at startup (always visible)
+    event.trigger_global("menu_register", {
+        menu_id = "file",
+        label = "File",
+        position = 1,
+        items = {
+            {item_id = "close", label = "Close", action = "close_application"}
+        }
+    })
 end

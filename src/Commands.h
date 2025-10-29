@@ -209,6 +209,10 @@ namespace Commands {
     struct CloseApplication {
     };
 
+    struct MarkSystemReady {
+        std::string system_name;
+    };
+
     // Query commands (request/response pattern)
     struct QueryThreadList {
         int requesting_thread_id;
@@ -292,6 +296,7 @@ using Command = std::variant<
     Commands::ClearNotifications,
     Commands::DismissNotification,
     Commands::CloseApplication,
+    Commands::MarkSystemReady,
     Commands::QueryThreadList,
     Commands::QueryThreadInfo,
     Commands::QueryDocumentList,

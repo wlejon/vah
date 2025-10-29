@@ -159,6 +159,9 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
                 on_close_application_();
             }
         }
+        else if constexpr (std::is_same_v<T, Commands::MarkSystemReady>) {
+            event_dispatcher_->MarkSystemReady(command.system_name);
+        }
         else if constexpr (std::is_same_v<T, Commands::QueryThreadList>) {
             LOG_INFO("Processing QueryThreadList command for thread {}", command.requesting_thread_id);
 
