@@ -83,7 +83,7 @@
                 <div class="node-types-list">
                     <h2>Node Types</h2>
                     <div class="node-types-container" data-model="node_types" data-for="node_type,i : node_types">
-                        <div class="node-type-item" onclick="emit('select_node_type', {id = node_type.id})">
+                        <div class="node-type-item" data-attr-data-node-type-id="node_type.id" onclick="emit('select_node_type', {id = tonumber(event.current_element:GetAttribute('data-node-type-id'))})">
                             <div class="color-preview" data-attr-style-background-color="'rgba(' + node_type.color_r + ',' + node_type.color_g + ',' + node_type.color_b + ',' + node_type.color_a + ')'"></div>
                             <span class="node-type-name">{{ node_type.name }}</span>
                         </div>
