@@ -22,6 +22,33 @@ local active_workflow = {
 
 local workflows_list = {}
 
+-- Current view state
+local active_view = "workflow"
+
+-- ============================================
+-- View Switching Functions
+-- ============================================
+
+local function switch_to_view(view_name)
+    active_view = view_name
+    -- Bind as an array with a single element
+    data.bind("active_view", {{view = view_name}})
+end
+
+local function handle_switch_to_list_view(payload)
+    switch_to_view("list")
+    -- Reload workflows when switching to list view
+    load_workflows()
+end
+
+local function handle_switch_to_node_editor(payload)
+    switch_to_view("node_editor")
+end
+
+local function handle_switch_to_workflow_view(payload)
+    switch_to_view("workflow")
+end
+
 -- ============================================
 -- Shared Functions
 -- ============================================
@@ -134,6 +161,9 @@ function select_workflow(payload)
     data.bind("workflow_connections", connections)
     data.bind("active_workflow", {active_workflow})
     data.bind("workflow_reload_trigger", {timestamp = os.time()})
+
+    -- Switch back to workflow view
+    switch_to_view("workflow")
 end
 
 
@@ -497,6 +527,35 @@ local function delete_node_type(payload)
 end
 
 -- ============================================
+-- Menu Registration
+-- ============================================
+
+local function register_workflow_menu()
+    event.trigger_global("menu_register", {
+        menu_id = "workflow",
+        label = "Workflow",
+        position = 100,
+        items = {
+            {
+                item_id = "workflow_list",
+                label = "Workflows",
+                action = "workflow_switch_to_list_view"
+            },
+            {
+                item_id = "new_workflow_menu",
+                label = "New Workflow",
+                action = "new_workflow"
+            },
+            {
+                item_id = "node_types",
+                label = "Configure Node Types",
+                action = "workflow_switch_to_node_editor"
+            }
+        }
+    })
+end
+
+-- ============================================
 -- Main Thread Functions
 -- ============================================
 
@@ -570,11 +629,17 @@ Version: 1.0.0</pre>
         ]]
     })
 
+    -- Register global event handlers for view switching (from menu)
+    event.register_global("workflow_switch_to_list_view", handle_switch_to_list_view)
+    event.register_global("workflow_switch_to_node_editor", handle_switch_to_node_editor)
+    event.register_global("workflow_switch_to_main_view", handle_switch_to_workflow_view)
+
     -- Register reload handler for workflow list view
     event.register("reload_workflows", reload_workflows_handler)
 
     -- Register event handlers for workflow management
     event.register("new_workflow", create_new_workflow)
+    event.register_global("new_workflow", create_new_workflow)  -- Also register as global for menu
     event.register("select_workflow", select_workflow)
     event.register("rename_workflow", rename_workflow)
     event.register("delete_workflow", delete_workflow)
@@ -601,6 +666,7 @@ Version: 1.0.0</pre>
     data.bind("active_workflow", {})
     data.bind("workflow_nodes", {})
     data.bind("workflow_connections", {})
+    data.bind("active_view", {{view = "workflow"}})
 
     -- Load node types from database
     load_node_types()
@@ -622,6 +688,9 @@ Version: 1.0.0</pre>
 
     -- Load the unified UI
     ui.load_document("ui/workflow_app.rml", true, "workflow_app")
+
+    -- Register workflow menu
+    register_workflow_menu()
 end
 
 function update(dt)
@@ -648,6 +717,9 @@ function update(dt)
 end
 
 function shutdown()
+    -- Unregister workflow menu
+    event.trigger_global("menu_unregister", {menu_id = "workflow"})
+
     if database_initialized then
         workflow_db.close()
     end

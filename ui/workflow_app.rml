@@ -24,21 +24,17 @@
         doc:GetElementById('workflow-list-view'):SetClass('active', false)
         doc:GetElementById('node-editor-view'):SetClass('active', true)
     end
+
     </script>
 </head>
 <body>
     <!-- Main application container -->
-    <div id="app-container">
+    <div id="app-container" data-model="active_view" data-for="v,i : active_view">
         <!-- Workflow Editor View -->
-        <div id="workflow-view" class="view active">
+        <div id="workflow-view" class="view" data-class-active="v.view == 'workflow'">
             <div class="header">
                 <div class="workflow-info" data-model="active_workflow" data-if="active_workflow.size > 0" data-for="wf,i : active_workflow">
                     <h1>{{ wf.name }}</h1>
-                </div>
-                <div class="button-group-header">
-                    <button onclick="switch_to_workflow_list_view(document); emit('reload_workflows')">Workflows</button>
-                    <button onclick="emit('new_workflow')">New Workflow</button>
-                    <button class="config-btn" onclick="switch_to_node_editor_view(document)">Configure Node Types</button>
                 </div>
             </div>
             <div class="container">
@@ -52,7 +48,7 @@
         </div>
 
         <!-- Workflow List View -->
-        <div id="workflow-list-view" class="view">
+        <div id="workflow-list-view" class="view" data-class-active="v.view == 'list'">
             <div class="header">
                 <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>My Workflows</h1>
@@ -63,11 +59,11 @@
                 <div class="workflows-list">
                     <div class="workflows-container" data-model="workflows" data-for="workflow,i : workflows">
                         <div class="workflow-item">
-                            <div class="workflow-item-content" onclick="emit('select_workflow', {id = workflow.id}); switch_to_workflow_view(document)">
+                            <div class="workflow-item-content" data-attr-data-workflow-id="workflow.id" onclick="emit('select_workflow', {id = tonumber(event.current_element:GetAttribute('data-workflow-id'))})">
                                 <h3>{{ workflow.name }}</h3>
                                 <p class="workflow-meta">Updated: {{ workflow.updated_at }}</p>
                             </div>
-                            <button class="delete-btn" onclick="emit('delete_workflow', {id = workflow.id})">×</button>
+                            <button class="delete-btn" data-attr-data-workflow-id="workflow.id" onclick="emit('delete_workflow', {id = tonumber(event.current_element:GetAttribute('data-workflow-id'))})">×</button>
                         </div>
                     </div>
                 </div>
@@ -75,7 +71,7 @@
         </div>
 
         <!-- Node Type Editor View -->
-        <div id="node-editor-view" class="view">
+        <div id="node-editor-view" class="view" data-class-active="v.view == 'node_editor'">
             <div class="header">
                 <button class="back-btn" onclick="switch_to_workflow_view(document)">← Back to Workflow</button>
                 <h1>Node Type Editor</h1>
@@ -161,7 +157,7 @@
                 </div>
 
                 <!-- Empty state when no node type is selected -->
-                <div class="editor-panel empty-state" data-if="!selected_node">
+                <div class="editor-panel empty-state" data-model="selected_node" data-if="selected_node.size == 0">
                     <p>Select a node type to edit, or create a new one</p>
                 </div>
             </div>
