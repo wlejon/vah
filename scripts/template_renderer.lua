@@ -60,7 +60,9 @@ local function is_truthy(value)
 end
 
 -- Convert value to string
-local function to_string(value)
+local function to_string(value, depth)
+    depth = depth or 0
+
     if value == nil then
         return ""
     end
@@ -74,7 +76,63 @@ local function to_string(value)
         return value
     end
     if type(value) == "table" then
-        return "[table]"
+        -- Prevent infinite recursion
+        if depth > 2 then
+            return "[nested table]"
+        end
+
+        -- Check if it's an array
+        local is_array = #value > 0
+
+        if is_array then
+            -- For arrays, check what type of elements they contain
+            local first_elem = value[1]
+
+            if type(first_elem) == "table" then
+                -- Array of objects - show count and first few items
+                local count = #value
+                if count <= 3 then
+                    -- Show all items
+                    local items = {}
+                    for _, item in ipairs(value) do
+                        if type(item) == "table" then
+                            -- Show first property of each object
+                            local first_key, first_val = next(item)
+                            if first_key and first_val then
+                                table.insert(items, to_string(first_val, depth + 1))
+                            end
+                        else
+                            table.insert(items, to_string(item, depth + 1))
+                        end
+                    end
+                    return table.concat(items, ", ")
+                else
+                    return count .. " items"
+                end
+            else
+                -- Array of primitives - show as comma-separated
+                local items = {}
+                local max_items = 10
+                for i, item in ipairs(value) do
+                    if i > max_items then
+                        table.insert(items, "...")
+                        break
+                    end
+                    table.insert(items, to_string(item, depth + 1))
+                end
+                return table.concat(items, ", ")
+            end
+        else
+            -- Object/dictionary - show count of keys
+            local count = 0
+            for _ in pairs(value) do
+                count = count + 1
+            end
+            if count == 0 then
+                return "{}"
+            end
+            return count .. " fields"
+        end
     end
     return tostring(value)
 end
