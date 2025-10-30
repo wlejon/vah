@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <filesystem>
+#include <utf8cpp/utf8.h>
 
 #include "Logger.h"
 #include "RmlUi_Renderer_GL3.h"
@@ -422,52 +423,20 @@ private:
                     break;
                 case SDL_TEXTINPUT: {
                     // SDL_TEXTINPUT provides UTF-8 encoded text
-                    // We need to decode UTF-8 to Unicode code points for RmlUI
+                    // Use utf8cpp library to safely decode to Unicode code points for RmlUI
                     const char* text = event.text.text;
-                    while (*text) {
-                        unsigned char byte = static_cast<unsigned char>(*text);
-                        Rml::Character codepoint = static_cast<Rml::Character>(0);
-                        int bytes_to_read = 0;
+                    const char* text_end = text + std::strlen(text);
 
-                        // Determine the number of bytes in this UTF-8 sequence
-                        if ((byte & 0x80) == 0) {
-                            // 1-byte character (ASCII): 0xxxxxxx
-                            codepoint = static_cast<Rml::Character>(byte);
-                            bytes_to_read = 0;
-                        } else if ((byte & 0xE0) == 0xC0) {
-                            // 2-byte character: 110xxxxx 10xxxxxx
-                            codepoint = static_cast<Rml::Character>(byte & 0x1F);
-                            bytes_to_read = 1;
-                        } else if ((byte & 0xF0) == 0xE0) {
-                            // 3-byte character: 1110xxxx 10xxxxxx 10xxxxxx
-                            codepoint = static_cast<Rml::Character>(byte & 0x0F);
-                            bytes_to_read = 2;
-                        } else if ((byte & 0xF8) == 0xF0) {
-                            // 4-byte character: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-                            codepoint = static_cast<Rml::Character>(byte & 0x07);
-                            bytes_to_read = 3;
-                        } else {
-                            // Invalid UTF-8 sequence, skip this byte
-                            text++;
-                            continue;
+                    try {
+                        while (text < text_end) {
+                            // Decode next UTF-8 sequence to UTF-32 code point
+                            char32_t codepoint = utf8::next(text, text_end);
+                            // Cast to Rml::Character (which is enum class with char32_t underlying type)
+                            rml_context_->ProcessTextInput(static_cast<Rml::Character>(codepoint));
                         }
-
-                        // Read continuation bytes
-                        text++;
-                        bool valid = true;
-                        for (int i = 0; i < bytes_to_read; i++) {
-                            if (*text == '\0' || (static_cast<unsigned char>(*text) & 0xC0) != 0x80) {
-                                // Invalid continuation byte
-                                valid = false;
-                                break;
-                            }
-                            codepoint = static_cast<Rml::Character>((static_cast<char32_t>(codepoint) << 6) | (static_cast<unsigned char>(*text) & 0x3F));
-                            text++;
-                        }
-
-                        if (valid) {
-                            rml_context_->ProcessTextInput(codepoint);
-                        }
+                    } catch (const utf8::exception& e) {
+                        // Invalid UTF-8 sequence - log and ignore
+                        LOG_WARN("Invalid UTF-8 in text input: {}", e.what());
                     }
                     break;
                 }

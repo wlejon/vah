@@ -96,5 +96,11 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-please read the workflow docs in the docs folder (docs/workflow-*.md). please review the codebase and see how far along we are in achieving the vision in the documents.
+please work through this problem:
+4. Manual UTF-8 Decoding
 
+    Issue: In main.cpp, ProcessInput contains a manual loop to decode UTF-8 bytes from SDL_TEXTINPUT into Rml::Character (UTF-32).
+
+    Why it's a problem: Manual UTF-8 decoding is notoriously difficult to get right, especially with edge cases like invalid sequences, surrogate pairs, or 4-byte characters.
+
+    Suggestion: Since you are using C++17, you could use std::wstring_convert and std::codecvt_utf8 (though they are deprecated in C++17, they are available). A more robust and modern solution would be to use a small, battle-tested, header-only library like utf8.h. This would replace your complex loop with a simple, safe iterator-based conversion, making the code cleaner and more reliable.
