@@ -100,20 +100,6 @@ public:
             return {false, "Database not open"};
         }
 
-        // If no parameters provided, use simple exec for backward compatibility
-        if (va.size() == 0) {
-            char* error_msg = nullptr;
-            int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error_msg);
-
-            if (rc != SQLITE_OK) {
-                std::string error = error_msg ? error_msg : "Unknown error";
-                sqlite3_free(error_msg);
-                return {false, "SQL execution error: " + error};
-            }
-
-            return {true, ""};
-        }
-
         // Prepare statement for parameterized query
         sqlite3_stmt* stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);

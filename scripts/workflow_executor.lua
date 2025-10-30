@@ -313,8 +313,8 @@ local function create_execution_tables(execution_id)
 end
 
 -- Main execution function
-function M.execute_workflow(execution_id, workflow_id)
-    execution.log("INFO", "Starting execution " .. execution_id .. " for workflow " .. workflow_id)
+function M.execute_workflow(execution_id)
+    execution.log("INFO", "Starting execution " .. execution_id)
 
     -- Open database
     local db_handle, err = db.open("data/workflow.db")
@@ -323,6 +323,20 @@ function M.execute_workflow(execution_id, workflow_id)
         update_execution_status(execution_id, "error", "Failed to open database")
         return false
     end
+
+    -- Get workflow_id from execution record
+    local exec_results = db_handle:query([[
+        SELECT workflow_id FROM workflow_executions WHERE id = ?
+    ]], execution_id)
+
+    if #exec_results == 0 then
+        execution.log("ERROR", "Execution " .. execution_id .. " not found in database")
+        db_handle:close()
+        return false
+    end
+
+    local workflow_id = exec_results[1].workflow_id
+    execution.log("INFO", "Executing workflow " .. workflow_id .. " (execution " .. execution_id .. ")")
 
     -- Load workflow nodes
     local nodes = {}

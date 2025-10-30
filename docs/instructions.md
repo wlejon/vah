@@ -96,11 +96,4 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-please work through this problem:
-SQL Logic in C++ Bindings
-
-    Issue: WorkflowExecutionBindings.cpp contains hardcoded SQL strings like INSERT OR REPLACE INTO ... and SELECT value FROM ....
-
-    Why it's a problem: This tightly couples your C++ code to your database schema. If you want to change a table or column name for your workflows, you have to recompile the entire C++ application.
-
-    Suggestion: The C++ code should only provide the primitives. The SqliteBindings already provide a safe db:execute(sql, ...) function. Your WorkflowThread should simply be given a db handle and the Lua script itself (workflow_executor.lua) should be responsible for executing the SQL. The C++ execution.set/get/log functions are essentially a custom, hardcoded ORM. By moving this logic into Lua, your workflows become infinitely more flexible.
+please perform a comprehensive code review

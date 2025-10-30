@@ -2,17 +2,12 @@
 #include "WorkflowLibrary.h"
 #include "Logger.h"
 #include <sol/sol.hpp>
-#include <sqlite3.h>
 #include <thread>
 #include <atomic>
 #include <memory>
-#include <unordered_map>
-#include <mutex>
 
-// Simple thread tracking
+// Thread ID allocation (lock-free)
 static std::atomic<int> g_next_workflow_thread_id{1000};
-static std::mutex g_workflow_threads_mutex;
-static std::unordered_map<int, std::shared_ptr<std::thread>> g_workflow_threads;
 
 // Thread main function
 static void WorkflowThreadMain(int thread_id, int execution_id, const std::vector<std::string>& required_libraries) {
@@ -70,32 +65,8 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
         return;
     }
 
-    // Get workflow_id from execution record
-    sqlite3* db = nullptr;
-    int workflow_id = 0;
-
-    if (sqlite3_open("data/workflow.db", &db) == SQLITE_OK) {
-        std::string sql = "SELECT workflow_id FROM workflow_executions WHERE id = ?";
-        sqlite3_stmt* stmt = nullptr;
-
-        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int(stmt, 1, execution_id);
-            if (sqlite3_step(stmt) == SQLITE_ROW) {
-                workflow_id = sqlite3_column_int(stmt, 0);
-            }
-            sqlite3_finalize(stmt);
-        }
-        sqlite3_close_v2(db);
-    }
-
-    if (workflow_id == 0) {
-        LOG_ERROR("Failed to get workflow_id for execution {}", execution_id);
-        return;
-    }
-
-    LOG_INFO("Workflow thread {} executing workflow {} (execution {})", thread_id, workflow_id, execution_id);
-
-    // Use sol to load and execute the Lua executor
+    // Load and execute the Lua workflow executor
+    // The executor will query workflow_id from execution_id using Lua db bindings
     try {
         // Load the workflow executor module
         sol::load_result load_result = lua.load_file("scripts/workflow_executor.lua");
@@ -115,14 +86,15 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
 
         sol::table executor_module = exec_result;
 
-        // Call execute_workflow function
+        // Call execute_workflow function with execution_id
+        // Lua will query workflow_id from the database
         sol::protected_function execute_workflow = executor_module["execute_workflow"];
         if (!execute_workflow.valid()) {
             LOG_ERROR("workflow_executor.lua does not export execute_workflow function");
             return;
         }
 
-        sol::protected_function_result result = execute_workflow(execution_id, workflow_id);
+        sol::protected_function_result result = execute_workflow(execution_id);
         if (!result.valid()) {
             sol::error err = result;
             LOG_ERROR("Workflow execution {} failed: {}", execution_id, err.what());
@@ -155,7 +127,7 @@ int CreateWorkflowThread(const WorkflowThreadConfig& config) {
         // Allocate thread ID
         int thread_id = g_next_workflow_thread_id.fetch_add(1, std::memory_order_relaxed);
 
-        // Create and start thread
+        // Create and detach thread (it will clean up itself)
         auto thread = std::make_shared<std::thread>(
             WorkflowThreadMain,
             thread_id,
@@ -163,13 +135,6 @@ int CreateWorkflowThread(const WorkflowThreadConfig& config) {
             config.required_libraries
         );
 
-        // Store thread in registry
-        {
-            std::lock_guard<std::mutex> lock(g_workflow_threads_mutex);
-            g_workflow_threads[thread_id] = thread;
-        }
-
-        // Detach thread (it will clean up itself)
         thread->detach();
 
         LOG_INFO("Created workflow thread {} for workflow {} execution {}",

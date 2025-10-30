@@ -32,21 +32,10 @@ namespace {
         lua_setmetatable(L, -2);
     }
 
-    // Helper to extract image handle from userdata or integer
+    // Helper to extract image handle from userdata
     int GetImageHandle(lua_State* L, int idx) {
-        // Check if it's a userdata with our metatable
-        if (lua_isuserdata(L, idx)) {
-            NVGImageHandle* img = static_cast<NVGImageHandle*>(luaL_checkudata(L, idx, IMAGE_METATABLE));
-            return img->handle;
-        }
-        // Fallback: accept raw integer for backwards compatibility (but not recommended)
-        else if (lua_isinteger(L, idx)) {
-            return static_cast<int>(lua_tointeger(L, idx));
-        }
-        else {
-            luaL_error(L, "Expected image handle (userdata or integer)");
-            return -1;
-        }
+        NVGImageHandle* img = static_cast<NVGImageHandle*>(luaL_checkudata(L, idx, IMAGE_METATABLE));
+        return img->handle;
     }
 
     // ============================================================================
