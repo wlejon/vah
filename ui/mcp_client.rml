@@ -38,14 +38,16 @@
                 No tools available. Click "Reload Tools" to refresh.
             </div>
 
-            <div data-if="mcp_client_data.tools_loaded > 0" class="tools-list" data-model="mcp_tools">
-                <div data-for="tool : mcp_tools">
-                    <div class="tool-item" data-attr-data-tool-name="tool.name" onclick="
-                        local tool_name = event.current_element:GetAttribute('data-tool-name')
-                        emit('mcp_select_tool', {tool_name = tool_name})
-                    ">
-                        <div class="tool-name">{{tool.name}}</div>
-                        <div class="tool-description">{{tool.description}}</div>
+            <div data-if="mcp_client_data.tools_loaded > 0">
+                <div class="tools-list" data-model="mcp_tools">
+                    <div data-for="tool : mcp_tools">
+                        <div class="tool-item" data-attr-data-tool-name="tool.name" onclick="
+                            local tool_name = event.current_element:GetAttribute('data-tool-name')
+                            emit('mcp_select_tool', {tool_name = tool_name})
+                        ">
+                            <div class="tool-name">{{tool.name}}</div>
+                            <div class="tool-description">{{tool.description}}</div>
+                        </div>
                     </div>
                 </div>
             </div>

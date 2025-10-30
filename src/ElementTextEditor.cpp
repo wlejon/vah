@@ -44,49 +44,63 @@ void ElementTextEditor::OnChildAdd(Rml::Element* element) {
         AddEventListener(Rml::EventId::Dragend, this);
         AddEventListener(Rml::EventId::Textinput, this);
 
-        // Initialize font from computed styles
-        const auto& computed = GetComputedValues();
-        Rml::FontFaceHandle font_handle = computed.font_face_handle();
-        auto font_engine = Rml::GetFontEngineInterface();
-
-        if (!font_handle || !font_engine) {
-            LOG_ERROR("ElementTextEditor: Failed to get font handle or font engine");
-            return;
-        }
-
-        const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
-
-        // Measure a single character width
-        Rml::String test_string = "x";
-        Rml::String language = "en";
-        Rml::TextShapingContext context{language};
-        int char_advance = font_engine->GetStringWidth(font_handle, test_string, context);
-
-        if (char_advance <= 0) {
-            LOG_ERROR("ElementTextEditor: Invalid character width measurement: {}", char_advance);
-            return;
-        }
-
-        // Store the measurements in layout
-        layout_->SetFontMetrics(metrics.line_spacing, static_cast<float>(char_advance));
-
-        // Get font parameters for reference (used by renderer)
-        std::string font_family = "jetbrains mono";
-        if (auto p = GetProperty(Rml::PropertyId::FontFamily)) {
-            Rml::String rml_family = p->Get<Rml::String>();
-            if (!rml_family.empty()) {
-                font_family = std::string(rml_family);
-            }
-        }
-
-        // Get style and weight from computed values
-        Rml::Style::FontStyle font_style = computed.font_style();
-        Rml::Style::FontWeight font_weight = computed.font_weight();
-        int font_size = static_cast<int>(computed.font_size());
-
-        // Store font info in layout for renderer to use
-        layout_->SetFontInfo(font_family, font_style, font_weight, font_size);
+        // Try to initialize font from computed styles
+        // NOTE: This may fail for elements in data-bound templates that haven't been
+        // fully processed yet. That's OK - we'll lazily initialize on first render.
+        InitializeFontMetrics();
     }
+}
+
+bool ElementTextEditor::InitializeFontMetrics() {
+    // Skip if already initialized
+    if (layout_->HasFontMetrics()) {
+        return true;
+    }
+
+    // Try to get font handle from computed styles
+    const auto& computed = GetComputedValues();
+    Rml::FontFaceHandle font_handle = computed.font_face_handle();
+    auto font_engine = Rml::GetFontEngineInterface();
+
+    if (!font_handle || !font_engine) {
+        // Not ready yet - will try again on next render
+        return false;
+    }
+
+    const Rml::FontMetrics& metrics = font_engine->GetFontMetrics(font_handle);
+
+    // Measure a single character width
+    Rml::String test_string = "x";
+    Rml::String language = "en";
+    Rml::TextShapingContext context{language};
+    int char_advance = font_engine->GetStringWidth(font_handle, test_string, context);
+
+    if (char_advance <= 0) {
+        LOG_WARN("ElementTextEditor: Invalid character width measurement: {}", char_advance);
+        return false;
+    }
+
+    // Store the measurements in layout
+    layout_->SetFontMetrics(metrics.line_spacing, static_cast<float>(char_advance));
+
+    // Get font parameters for reference (used by renderer)
+    std::string font_family = "jetbrains mono";
+    if (auto p = GetProperty(Rml::PropertyId::FontFamily)) {
+        Rml::String rml_family = p->Get<Rml::String>();
+        if (!rml_family.empty()) {
+            font_family = std::string(rml_family);
+        }
+    }
+
+    // Get style and weight from computed values
+    Rml::Style::FontStyle font_style = computed.font_style();
+    Rml::Style::FontWeight font_weight = computed.font_weight();
+    int font_size = static_cast<int>(computed.font_size());
+
+    // Store font info in layout for renderer to use
+    layout_->SetFontInfo(font_family, font_style, font_weight, font_size);
+
+    return true;
 }
 
 void ElementTextEditor::OnChildRemove(Rml::Element* element) {
@@ -423,6 +437,13 @@ void ElementTextEditor::OnUpdate() {
 }
 
 void ElementTextEditor::OnRender() {
+    // Lazily initialize font metrics if not done yet
+    // (needed for elements in data-bound templates)
+    if (!InitializeFontMetrics()) {
+        // Font not ready yet, skip rendering
+        return;
+    }
+
     // Get absolute position
     Rml::Vector2f absolute_offset = GetAbsoluteOffset(Rml::BoxArea::Content);
 

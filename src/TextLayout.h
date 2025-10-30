@@ -23,6 +23,7 @@ public:
     // Get font metrics
     float GetCharWidth() const { return char_width_; }
     float GetLineHeight() const { return line_height_; }
+    bool HasFontMetrics() const { return char_width_ > 0.0f && line_height_ > 0.0f; }
     const std::string& GetFontFamily() const { return font_family_; }
     Rml::Style::FontStyle GetFontStyle() const { return font_style_; }
     Rml::Style::FontWeight GetFontWeight() const { return font_weight_; }

@@ -85,6 +85,7 @@ private:
     void OnContentChange();
     void OnSave();
     void PushUndoSnapshot();  // Push current state to undo stack before making changes
+    bool InitializeFontMetrics();  // Lazy initialization of font metrics, returns true if successful
 
     std::unique_ptr<TextBuffer> buffer_;
     std::unique_ptr<TextLayout> layout_;
