@@ -244,6 +244,14 @@ namespace Commands {
     };
 
     // HTTP server commands
+    // Response structure for HTTP requests
+    struct HttpResponse {
+        int status_code;
+        std::string content_type;
+        std::string body;
+        std::unordered_map<std::string, std::string> headers;
+    };
+
     struct HttpRequest {
         int request_id;
         int target_thread_id;  // Which thread should handle this
@@ -251,6 +259,7 @@ namespace Commands {
         std::string path;      // /mcp
         std::string body;
         std::unordered_map<std::string, std::string> headers;
+        std::shared_ptr<std::promise<HttpResponse>> promise;  // Promise-in-command pattern
     };
 
     struct HttpResponseCommand {

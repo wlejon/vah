@@ -3,6 +3,7 @@
 #include "Commands.h"
 #include <memory>
 #include <functional>
+#include <unordered_map>
 
 // Forward declarations
 class ThreadManager;
@@ -33,4 +34,7 @@ private:
     EventDispatcher* event_dispatcher_;
     HttpServerThread* http_server_thread_;
     std::function<void()> on_close_application_;
+
+    // Pending HTTP request promises (accessed only by main thread - no lock needed)
+    std::unordered_map<int, std::shared_ptr<std::promise<Commands::HttpResponse>>> pending_http_promises_;
 };

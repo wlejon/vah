@@ -96,12 +96,4 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-we're looking to expand the workflow app to include execution. 
-
-each node will execute. we'll trace the path as it goes. we need to design this system in a way that works well in our architecture. the architecture should support this use case exceptionally well. please review what we have and after you have earned your understanding.
-
-you've performed some work and have implemented the first pass of this system.
-
-currently, i'm trying to get the node editing functionality working. the save button doesn't save the inputs given. we have a working example of both the texteditor (our custom element) in the template testing app and the sqlite demo. the workflow app's save doesn't function at all.
-
-please review your work, determine how well aligned it is, and report back.
+you added a mutex to the HttpServerThread code. please review this in depth. please read the docs/architecture/lock-free-philosophy.md file. 

@@ -279,6 +279,11 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
         else if constexpr (std::is_same_v<T, Commands::HttpRequest>) {
             LOG_INFO("Processing HttpRequest command for thread {}", command.target_thread_id);
 
+            // Store promise for later (main thread only, no lock needed)
+            if (command.promise) {
+                pending_http_promises_[command.request_id] = command.promise;
+            }
+
             // Forward the HTTP request to the target Lua thread via event
             PayloadMap payload;
             payload["request_id"] = static_cast<int64_t>(command.request_id);
@@ -298,15 +303,22 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
         else if constexpr (std::is_same_v<T, Commands::HttpResponseCommand>) {
             LOG_INFO("Processing HttpResponseCommand for request {}", command.request_id);
 
-            if (http_server_thread_) {
-                HttpResponse response;
-                response.request_id = command.request_id;
+            // Find the promise for this request and set it (promise-in-command pattern)
+            auto it = pending_http_promises_.find(command.request_id);
+            if (it != pending_http_promises_.end()) {
+                Commands::HttpResponse response;
                 response.status_code = command.status_code;
                 response.content_type = command.content_type;
                 response.body = command.body;
                 response.headers = command.headers;
 
-                http_server_thread_->GetResponseQueue()->enqueue(std::move(response));
+                // Set promise to wake waiting HTTP handler thread
+                it->second->set_value(std::move(response));
+
+                // Clean up promise (no longer needed)
+                pending_http_promises_.erase(it);
+            } else {
+                LOG_WARN("Received HttpResponseCommand for unknown request_id {}", command.request_id);
             }
         }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)
