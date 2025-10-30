@@ -497,19 +497,12 @@ function start_server()
     update_ui_state()
 
     -- Create HTTP server
-    print("Creating HttpServer instance...")
     http_server = HttpServer.new()
-    print("HttpServer created successfully")
 
     -- Setup routes
-    print("Setting up POST route...")
     http_server:route("POST", "/mcp", handle_mcp_post)
-    print("Setting up GET route...")
     http_server:route("GET", "/mcp", handle_mcp_get)
-    print("Setting up DELETE route...")
     http_server:route("DELETE", "/mcp", handle_mcp_delete)
-
-    print("MCP server configured, starting to listen on " .. config.server.host .. ":" .. config.server.port)
 
     -- Send notification
     event.trigger_global("notification_success", {
@@ -564,32 +557,20 @@ end
 function register_events()
     -- Local events (from UI)
     event.register("mcp_start_server", function(payload)
-        local success, err = pcall(start_server)
-        if not success then
-            print("ERROR starting MCP server: " .. tostring(err))
-        end
+        start_server()
     end)
 
     event.register("mcp_stop_server", function(payload)
-        local success, err = pcall(stop_server)
-        if not success then
-            print("ERROR stopping MCP server: " .. tostring(err))
-        end
+        stop_server()
     end)
 
     -- Global events
     event.register_global("mcp_start_server", function(payload)
-        local success, err = pcall(start_server)
-        if not success then
-            print("ERROR starting MCP server (global): " .. tostring(err))
-        end
+        start_server()
     end)
 
     event.register_global("mcp_stop_server", function(payload)
-        local success, err = pcall(stop_server)
-        if not success then
-            print("ERROR stopping MCP server (global): " .. tostring(err))
-        end
+        stop_server()
     end)
 end
 
