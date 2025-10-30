@@ -1,0 +1,59 @@
+<rml>
+<head>
+    <title>Workflow Approval</title>
+    <link type="text/rcss" href="workflow_approval_dialog.rcss"/>
+    <script>
+    function approve_workflow(approved, remember)
+        local request_data = data and data.get and data.get("approval_request") or {}
+        if #request_data > 0 then
+            local request = request_data[1]
+            emit('workflow_approval_response', {
+                workflow_id = request.workflow_id,
+                approved = approved,
+                remember = remember
+            })
+        end
+    end
+    </script>
+</head>
+<body>
+    <div id="approval_dialog" class="approval-dialog" data-model="approval_request" data-if="approval_request.size > 0" data-for="request,i : approval_request">
+        <div class="approval-header">
+            <h2>Workflow Approval Required</h2>
+        </div>
+
+        <div class="approval-content">
+            <p class="approval-message">
+                Workflow "{{ request.workflow_name }}" wants to run with the following libraries:
+            </p>
+
+            <div class="library-list" data-model="approval_libraries" data-for="library,j : approval_libraries">
+                <div class="library-item">
+                    <div class="library-icon">!</div>
+                    <div class="library-info">
+                        <div class="library-name">{{ library.name }}</div>
+                        <div class="library-description">{{ library.description }}</div>
+                        <div class="library-access">{{ library.access_description }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="approval-question">
+                Do you want to allow this workflow to run?
+            </p>
+        </div>
+
+        <div class="approval-buttons">
+            <button class="btn-deny" onclick="approve_workflow(false, false)">
+                Deny
+            </button>
+            <button class="btn-allow-once" onclick="approve_workflow(true, false)">
+                Allow Once
+            </button>
+            <button class="btn-always-allow" onclick="approve_workflow(true, true)">
+                Always Allow
+            </button>
+        </div>
+    </div>
+</body>
+</rml>

@@ -96,12 +96,184 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-can you figure this out for me, please:
+please read the workflow docs in the docs folder (docs/workflow-*.md). please review the codebase and see how far along we are in achieving the vision in the documents.
 
-[2025-10-30 01:14:38.389] [info] [Lua Thread 5] MCP Client started
-[2025-10-30 01:14:38.389] [info] Processing LoadUIDocument command: ui/mcp_client.rml
-[2025-10-30 01:14:38.393] [warning] [RmlUi] Could not find variable name 'mcp_client_data.tools_loaded' in data model.
-[2025-10-30 01:14:38.393] [warning] [RmlUi] Error in data expression at 28. Could not find data variable with name 'mcp_client_data.tools_loaded'.
-[2025-10-30 01:14:38.393] [warning] [RmlUi]   "mcp_client_data.tools_loaded > 0"
-[2025-10-30 01:14:38.393] [warning] [RmlUi]                                ^
-[2025-10-30 01:14:38.393] [warning] [RmlUi] Could not add data-if view to element: div.tools-list < div.tools-section < div.container < body
+the current implementation also has a deadlock on exit after executing workflows. we might need to update it to use promise's and use the command queue if it's not. please determine why the application deadlocks. 
+
+## current log
+
+[2025-10-30 14:50:57.589] [info] Initializing Vah Engine...
+[2025-10-30 14:50:57.792] [info] RmlGL3: 
+[2025-10-30 14:50:57.798] [info] [RmlUi] Loaded font face 'Roboto' [regular] from 'ui/fonts/roboto-static/Roboto-Regular.ttf'.
+[2025-10-30 14:50:57.798] [info] [RmlUi] Loaded font face 'Roboto' [bold] from 'ui/fonts/roboto-static/Roboto-Bold.ttf'.
+[2025-10-30 14:50:57.798] [info] [RmlUi] Loaded font face 'Roboto' [italic] from 'ui/fonts/roboto-static/Roboto-Italic.ttf'.
+[2025-10-30 14:50:57.799] [info] [RmlUi] Loaded font face 'Roboto' [weight=300] from 'ui/fonts/roboto-static/Roboto-Light.ttf'.
+[2025-10-30 14:50:57.799] [info] [RmlUi] Loaded font face 'Roboto' [weight=500] from 'ui/fonts/roboto-static/Roboto-Medium.ttf'.
+[2025-10-30 14:50:57.799] [info] [RmlUi] Loaded font face 'JetBrains Mono' [regular] from 'ui/fonts/jetbrains-mono-static/JetBrainsMono-Regular.ttf'.
+[2025-10-30 14:50:57.799] [info] [RmlUi] Loading Lua plugin using a new Lua state.
+[2025-10-30 14:50:57.800] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [regular] from 'memory'.
+[2025-10-30 14:50:57.800] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [italic] from 'memory'.
+[2025-10-30 14:50:57.805] [info] Registered custom element: canvas
+[2025-10-30 14:50:57.805] [info] Registered custom element: texteditor
+[2025-10-30 14:50:57.805] [info] Registered Lua bindings for ElementTextEditor
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: math (Math Operations)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: string (String Operations)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: table (Table Operations)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: db (Database Access)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: fs (File System Access)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: http (Network Access)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: ui (User Interface)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: thread (Threading Utilities)
+[2025-10-30 14:50:57.805] [debug] Registered workflow library: event (Event System)
+[2025-10-30 14:50:57.805] [info] Registered 9 built-in workflow libraries
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=14 ctrl=true shift=false alt=false -> command='command_copy'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=33 ctrl=true shift=false alt=false -> command='command_paste'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=35 ctrl=true shift=false alt=false -> command='command_cut'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=12 ctrl=true shift=false alt=false -> command='command_select_all'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=37 ctrl=true shift=false alt=false -> command='command_undo'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=36 ctrl=true shift=false alt=false -> command='command_redo'
+[2025-10-30 14:50:57.805] [info] Mapped keybinding: key=30 ctrl=true shift=false alt=false -> command='command_save'
+[2025-10-30 14:50:57.805] [info] NanoVG bindings registered in Lua state
+[2025-10-30 14:50:57.805] [info] RmlUiBridge: Registered emit(), data, and DOM introspection functions in RmlUI lua state
+[2025-10-30 14:50:57.805] [info] EventDispatcher: Registered thread 0
+[2025-10-30 14:50:57.806] [info] ThreadManager: Spawned thread 0 for script 'scripts/main.lua'
+[2025-10-30 14:50:57.806] [info] Watching ui/ directory for RML/RCSS changes
+[2025-10-30 14:50:57.806] [info] Vah Engine initialized successfully
+[2025-10-30 14:50:57.808] [info] Lua thread 0 running
+[2025-10-30 14:50:57.829] [info] [Lua Thread 0] Main Lua thread started
+[2025-10-30 14:50:57.829] [info] Processing SpawnThread command: scripts/notifications.lua (parent: 0)
+[2025-10-30 14:50:57.829] [info] EventDispatcher: Registered thread 1
+[2025-10-30 14:50:57.829] [info] ThreadManager: Spawned thread 1 for script 'scripts/notifications.lua'
+[2025-10-30 14:50:57.829] [info] Processing SpawnThread command: scripts/menu.lua (parent: 0)
+[2025-10-30 14:50:57.829] [info] EventDispatcher: Registered thread 2
+[2025-10-30 14:50:57.829] [info] ThreadManager: Spawned thread 2 for script 'scripts/menu.lua'
+[2025-10-30 14:50:57.829] [info] Processing SpawnThread command: scripts/mcp_server.lua (parent: 0)
+[2025-10-30 14:50:57.829] [info] EventDispatcher: Registered thread 3
+[2025-10-30 14:50:57.829] [info] ThreadManager: Spawned thread 3 for script 'scripts/mcp_server.lua'
+[2025-10-30 14:50:57.829] [info] Processing SpawnThread command: scripts/launcher.lua (parent: 0)
+[2025-10-30 14:50:57.830] [info] EventDispatcher: Registered thread 4
+[2025-10-30 14:50:57.830] [info] ThreadManager: Spawned thread 4 for script 'scripts/launcher.lua'
+[2025-10-30 14:50:57.833] [info] Lua thread 4 running
+[2025-10-30 14:50:57.840] [info] Lua thread 3 running
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] MCP server system starting...
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Initializing type registry...
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Types directory: mcp_views/types
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Templates directory: mcp_views/templates
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: application
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: database
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: directory
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: document
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: file
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: row
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3]   Loaded type: table
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Type registry initialized with 7 types
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Type registry initialized
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: list
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: detail
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: summary
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: search
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: diff
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: status
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Navigation tools registered: list, detail, summary, search, diff, status
+[2025-10-30 14:50:57.960] [info] [Lua Thread 1] Notifications system started
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Navigation tools registered
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'add_notification' registered to thread 1
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'mcp_start_server' registered to thread 3
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'notification_success' registered to thread 1
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'mcp_stop_server' registered to thread 3
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'notification_error' registered to thread 1
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: echo
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'notification_info' registered to thread 1
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] Registered MCP tool: get_time
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'notification_warning' registered to thread 1
+[2025-10-30 14:50:57.960] [info] [Lua Thread 2] Menu system starting...
+[2025-10-30 14:50:57.960] [info] [Lua Thread 3] MCP server system ready (use start command to launch server)
+[2025-10-30 14:50:57.960] [info] [Lua Thread 4] Launcher started (thread_id: 4)
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'return_to_launcher' registered to thread 4
+[2025-10-30 14:50:57.960] [info] EventDispatcher: Global event 'close_application' registered to thread 4
+[2025-10-30 14:50:57.960] [info] Processing LoadUIDocument command: ui/launcher.rml
+[2025-10-30 14:50:57.979] [info] Stored document with ID: launcher
+[2025-10-30 14:50:57.983] [info] Loaded UI document: ui/launcher.rml
+[2025-10-30 14:50:57.983] [info] [Lua Thread 4] Launcher ready
+[2025-10-30 14:50:57.983] [info] Lua thread 2 running
+[2025-10-30 14:50:57.984] [info] EventDispatcher: Global event 'menu_register' registered to thread 2
+[2025-10-30 14:50:57.984] [info] EventDispatcher: Global event 'menu_unregister' registered to thread 2
+[2025-10-30 14:50:57.984] [info] EventDispatcher: Global event 'menu_update_status' registered to thread 2
+[2025-10-30 14:50:57.984] [info] EventDispatcher: Global event 'close_all_menus' registered to thread 2
+[2025-10-30 14:50:57.984] [info] Processing LoadUIDocument command: ui/internal/menu.rml
+[2025-10-30 14:50:57.987] [info] Stored document with ID: app_menu
+[2025-10-30 14:50:57.988] [info] Loaded UI document: ui/internal/menu.rml
+[2025-10-30 14:50:57.988] [info] [Lua Thread 2] Menu system started
+[2025-10-30 14:50:57.988] [info] Lua thread 1 running
+[2025-10-30 14:50:57.988] [info] EventDispatcher: Broadcast event 'system_ready' to 5 thread(s)
+[2025-10-30 14:50:57.988] [info] EventDispatcher: System 'menu' marked ready
+[2025-10-30 14:50:57.989] [info] Processing LoadUIDocument command: ui/internal/notifications_badge.rml
+[2025-10-30 14:50:57.992] [info] Stored document with ID: notifications_badge
+[2025-10-30 14:50:57.993] [info] Loaded UI document: ui/internal/notifications_badge.rml
+[2025-10-30 14:50:57.993] [info] Processing LoadUIDocument command: ui/internal/notifications_panel.rml
+[2025-10-30 14:50:57.999] [info] Lua thread 4 called menu_ready()
+[2025-10-30 14:50:58.006] [info] Lua thread 3 called menu_ready()
+[2025-10-30 14:50:58.081] [info] Stored document with ID: notifications_panel
+[2025-10-30 14:50:58.084] [info] Loaded UI document: ui/internal/notifications_panel.rml
+[2025-10-30 14:50:58.084] [info] [Lua Thread 1] Notifications system ready
+[2025-10-30 14:50:58.129] [warning] [RmlUi] Could not get value from data variable 'menus[0].items[1].visible'.
+[2025-10-30 14:50:58.129] [warning] [RmlUi] Could not get value from data variable 'menus[0].items[1].item_id'.
+[2025-10-30 14:50:58.959] [info] [Lua Thread 4] Launching app: Workflow Editor
+[2025-10-30 14:50:58.960] [info] Hiding document: launcher
+[2025-10-30 14:50:58.960] [info] Processing SpawnThread command: scripts/workflow_app.lua (parent: 4)
+[2025-10-30 14:50:58.960] [info] EventDispatcher: Registered thread 5
+[2025-10-30 14:50:58.960] [info] ThreadManager: Spawned thread 5 for script 'scripts/workflow_app.lua' (parent: 4)
+[2025-10-30 14:50:58.967] [info] [Lua Thread 5] Workflow Application started (thread_id: 5)
+[2025-10-30 14:50:58.967] [info] [Lua Thread 5] Workflow database opened successfully
+[2025-10-30 14:50:58.967] [info] [Lua Thread 5] Database indexes created
+[2025-10-30 14:50:58.967] [info] [Lua Thread 5] Workflow database initialized successfully
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'workflow_switch_to_list_view' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'workflow_switch_to_node_editor' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'workflow_switch_to_main_view' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'new_workflow' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'execute_workflow' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'workflow_approval_needed' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'show_workflow_config' registered to thread 5
+[2025-10-30 14:50:58.967] [info] EventDispatcher: Global event 'show_execution_history' registered to thread 5
+[2025-10-30 14:50:58.989] [info] [Lua Thread 1] Added notification: 'Workflow App Started' (type=success, ttl=5.0, timestamp=1761853858, expires=1761853863)
+[2025-10-30 14:50:58.989] [info] [Lua Thread 4] Thread spawned: 5 for script: scripts/workflow_app.lua
+[2025-10-30 14:50:58.989] [info] [Lua Thread 4] Tracking thread ID: 5
+[2025-10-30 14:50:59.054] [info] [Lua Thread 1] Added notification: 'Welcome to Workflow App' (type=question, ttl=0.0, timestamp=1761853859, expires=1761853859)
+[2025-10-30 14:50:59.125] [info] [Lua Thread 1] Added notification: 'Workflow System Info' (type=info, ttl=0.0, timestamp=1761853859, expires=1761853859)
+[2025-10-30 14:50:59.202] [info] Lua thread 5 running
+[2025-10-30 14:50:59.203] [info] Processing LoadUIDocument command: ui/workflow_app.rml
+[2025-10-30 14:50:59.219] [info] ElementCanvas created
+[2025-10-30 14:50:59.219] [info] Loaded default NanoVG font 'roboto'
+[2025-10-30 14:50:59.219] [info] NanoVG context created successfully
+[2025-10-30 14:50:59.219] [info] ElementCanvas added to document tree
+[2025-10-30 14:50:59.231] [info] Canvas resized to 1920x1080
+[2025-10-30 14:50:59.231] [info] Stored document with ID: workflow_app
+[2025-10-30 14:50:59.240] [info] Loaded UI document: ui/workflow_app.rml
+[2025-10-30 14:51:02.373] [info] [Lua Thread 5] Workflow requires 0 libraries
+[2025-10-30 14:51:02.373] [info] [Lua Thread 5] Workflow approved, starting execution...
+[2025-10-30 14:51:02.389] [info] Created workflow thread 1000 for workflow 2 execution 7
+[2025-10-30 14:51:02.389] [info] Workflow thread 1000 starting for execution 7
+[2025-10-30 14:51:02.389] [info] Registered 0/0 requested libraries in workflow lua_State
+[2025-10-30 14:51:02.389] [info] Workflow thread 1000 registered 0 libraries
+[2025-10-30 14:51:02.389] [info] Workflow thread 1000 registered execution API for execution 7
+[2025-10-30 14:51:02.390] [info] [Lua Thread 5] Starting workflow execution: 7
+[2025-10-30 14:51:02.393] [info] Workflow thread 1000 loading workflow 2
+[2025-10-30 14:51:02.394] [info] Loaded workflow 2: 3 nodes, 2 connections, 0 callbacks
+[2025-10-30 14:51:02.394] [info] Workflow thread 1000 executing workflow 2
+[2025-10-30 14:51:02.394] [info] Starting execution 7 for workflow 2
+[2025-10-30 14:51:02.404] [info] Execution 7 status updated to: error
+[2025-10-30 14:51:02.404] [error] Workflow execution 7 failed
+[2025-10-30 14:51:02.404] [info] Workflow thread 1000 finished
+[2025-10-30 14:51:02.415] [info] [Lua Thread 1] Added notification: 'Workflow Executing' (type=info, ttl=5.0, timestamp=1761853862, expires=1761853867)
+[2025-10-30 14:51:02.513] [info] [Lua Thread 1] Added notification: 'Workflow Failed' (type=error, ttl=0.0, timestamp=1761853862, expires=1761853862)
+[2025-10-30 14:51:05.822] [info] [Lua Thread 5] Loaded 7 execution records
+[2025-10-30 14:51:07.270] [info] [Lua Thread 5] Execution error: Node 3 has no script
+[2025-10-30 14:51:07.271] [info] [Lua Thread 5] Loaded execution details for execution 7
+[2025-10-30 14:51:22.262] [info] Shutting down Vah Engine...
+[2025-10-30 14:51:22.262] [info] ThreadManager: Stopping all 6 threads
+[2025-10-30 14:51:22.262] [info] Lua thread 0 finished normally
+[2025-10-30 14:51:22.263] [info] EventDispatcher: Unregistered thread 0
+[2025-10-30 14:51:22.269] [info] Lua thread 5 finished normally
+[2025-10-30 14:51:22.272] [info] Lua thread 2 finished normally
+[2025-10-30 14:51:22.287] [info] Lua thread 4 finished normally
+[2025-10-30 14:51:22.294] [info] Lua thread 3 finished normally

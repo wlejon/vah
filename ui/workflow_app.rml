@@ -100,6 +100,43 @@
         })
     end
 
+    -- Save workflow config - gather values including library checkboxes
+    function save_workflow_config(document, event)
+        print("[RML] save_workflow_config called")
+
+        -- Get name from dedicated input
+        local name_input = document:GetElementById('workflow_name_input')
+        local name = name_input and name_input:GetAttribute('value') or ""
+
+        -- Get description from dedicated textarea
+        local desc_textarea = document:GetElementById('workflow_description_textarea')
+        local description = desc_textarea and desc_textarea:GetAttribute('value') or ""
+
+        print("[RML] name=" .. tostring(name) .. ", description=" .. tostring(description))
+
+        -- Gather selected libraries from checkboxes
+        local requires = {}
+        local library_data = data and data.get and data.get("library_list") or {}
+
+        -- Iterate through library checkboxes by index
+        for i = 1, #library_data do
+            local checkbox = document:GetElementById('library_checkbox_' .. i)
+            if checkbox then
+                local is_checked = checkbox:GetAttribute('checked')
+                if is_checked == 'true' or is_checked == true then
+                    table.insert(requires, library_data[i].id)
+                    print("[RML] Library selected: " .. library_data[i].id)
+                end
+            end
+        end
+
+        emit('save_workflow_config', {
+            name = name,
+            description = description,
+            requires = requires
+        })
+    end
+
     </script>
 </head>
 <body>
@@ -120,7 +157,7 @@
                         <div class="progress-bar">
                             <div class="progress-fill" data-attr-style-width="(exec.completed_nodes / exec.total_nodes * 100) + '%'"></div>
                         </div>
-                        <div class="progress-text">{{ exec.completed_nodes }}/{{ exec.total_nodes }} nodes ({{ math.floor(exec.completed_nodes / exec.total_nodes * 100) }}%)</div>
+                        <div class="progress-text">{{ exec.completed_nodes }}/{{ exec.total_nodes }} nodes ({{ exec.progress_percent }}%)</div>
                     </div>
                     <div class="execution-status">
                         <span class="status-label">Status:</span>
@@ -128,7 +165,7 @@
                     </div>
                     <div class="execution-time">
                         <span class="time-label">Time:</span>
-                        <span class="time-value">{{ string.format('%.1f', exec.elapsed_time or 0) }}s</span>
+                        <span class="time-value">{{ exec.elapsed_time_str }}</span>
                     </div>
                 </div>
                 <div class="execution-buttons">
@@ -276,19 +313,19 @@
                 <div class="config-form" data-model="workflow_config" data-if="workflow_config.size > 0" data-for="config,i : workflow_config">
                     <div class="form-section">
                         <label>Workflow Name:</label>
-                        <input type="text" name="workflow_name" data-attr-value="config.name" />
+                        <input type="text" id="workflow_name_input" name="workflow_name" data-attr-value="config.name" />
                     </div>
 
                     <div class="form-section">
                         <label>Description:</label>
-                        <textarea name="workflow_description" rows="4" data-attr-value="config.description"></textarea>
+                        <textarea id="workflow_description_textarea" name="workflow_description" rows="4" data-attr-value="config.description"></textarea>
                     </div>
 
                     <div class="form-section">
                         <label>Required Libraries:</label>
                         <div class="libraries-list" data-model="library_list" data-for="library,j : library_list">
                             <div class="library-item">
-                                <input type="checkbox" data-attr-name="'library_' + j" data-attr-checked="library.enabled" />
+                                <input type="checkbox" data-attr-id="'library_checkbox_' + j" data-attr-name="'library_' + j" data-attr-checked="library.enabled" />
                                 <div class="library-info">
                                     <div class="library-name">{{ library.name }}</div>
                                     <div class="library-description">{{ library.description }}</div>
@@ -299,7 +336,7 @@
                     </div>
 
                     <div class="button-group">
-                        <button class="save-btn" onclick="emit('save_workflow_config', {workflow_id = config.workflow_id, name = document:GetElementById('workflow-config-view'):GetElementsByTagName('input')[0].value, description = document:GetElementById('workflow-config-view'):GetElementsByTagName('textarea')[0].value})">Save</button>
+                        <button class="save-btn" onclick="save_workflow_config(document, event)">Save</button>
                         <button onclick="switch_to_workflow_view(document)">Cancel</button>
                     </div>
                 </div>
@@ -403,7 +440,7 @@
                                     <td>
                                         <span class="status-badge" data-attr-data-status="exec.status">{{ exec.status }}</span>
                                     </td>
-                                    <td>{{ string.format('%.1f', exec.duration) }}s</td>
+                                    <td>{{ exec.duration }}</td>
                                     <td>{{ exec.completed_nodes }}/{{ exec.total_nodes }}</td>
                                     <td>
                                         <button class="view-btn" data-attr-data-execution-id="exec.execution_id" onclick="emit('view_execution', {execution_id = tonumber(event.current_element:GetAttribute('data-execution-id'))}); switch_to_execution_details_view(document)">View Details</button>
@@ -448,8 +485,14 @@
                         </div>
                         <div class="summary-item">
                             <span class="summary-label">Duration:</span>
-                            <span class="summary-value">{{ string.format('%.1f', details.duration) }}s</span>
+                            <span class="summary-value">{{ details.duration }}</span>
                         </div>
+                    </div>
+
+                    <!-- Error Message (if present) -->
+                    <div class="error-section" data-if="details.error_message != ''">
+                        <h3>Error Message</h3>
+                        <div class="error-message-box">{{ details.error_message }}</div>
                     </div>
 
                     <!-- Node Results Section -->

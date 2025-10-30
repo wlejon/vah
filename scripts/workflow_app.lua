@@ -32,6 +32,10 @@ local time_since_poll = 0
 -- Node config editing state
 local editing_node_config = nil
 
+-- Approval dialog state
+local approval_dialog_doc = nil
+local pending_approval = nil  -- Stores {workflow_id, requires_hash}
+
 -- ============================================
 -- View Switching Functions
 -- ============================================
@@ -326,6 +330,9 @@ local function poll_execution_state()
         elapsed = 0  -- Would need proper time parsing
     end
 
+    -- Calculate progress percentage
+    local progress_percent = total_count > 0 and math.floor((completed_count / total_count) * 100) or 0
+
     -- Bind execution state to UI
     datamodel.bind_table("execution_state", {{
         execution_id = active_execution_id,
@@ -334,7 +341,9 @@ local function poll_execution_state()
         thread_id = execution.thread_id,
         total_nodes = total_count,
         completed_nodes = completed_count,
+        progress_percent = progress_percent,
         elapsed_time = elapsed,
+        elapsed_time_str = string.format("%.1fs", elapsed),
         error_message = execution.error_message,
         nodes = nodes_map
     }})
@@ -494,28 +503,28 @@ local function handle_execute_workflow(payload)
 
     -- Load workflow config to get requires list
     local config_json = workflow_db.load_workflow_config(active_workflow.id)
-    local config = {}
     local requires = {}
 
-    if config_json then
-        -- Parse JSON (assuming json library available or simple format)
-        -- For now, we'll assume a simple format or use a simple parser
-        -- In production, you'd use a proper JSON library
-        config = {requires = {}}  -- Simplified
-        requires = config.requires or {}
+    if config_json and config_json ~= "" then
+        local ok, config = pcall(json.decode, config_json)
+        if ok and config then
+            requires = config.requires or {}
+        end
     end
+
+    print("Workflow requires " .. #requires .. " libraries")
 
     -- Compute hash of requires list
     local requires_hash = compute_requires_hash(requires)
 
-    -- Check approval
-    local is_approved = workflow_db.check_workflow_approval(active_workflow.id, requires_hash)
+    -- Check approval (skip if no libraries required)
+    local is_approved = (#requires == 0) or workflow_db.check_workflow_approval(active_workflow.id, requires_hash)
 
     if not is_approved then
         -- Load library info for approval dialog
         local libraries = load_library_info(requires)
 
-        -- Trigger approval needed event
+        -- Show approval dialog
         event.trigger_global("workflow_approval_needed", {
             workflow_id = active_workflow.id,
             workflow_name = active_workflow.name,
@@ -526,6 +535,8 @@ local function handle_execute_workflow(payload)
         print("Workflow approval required")
         return
     end
+
+    print("Workflow approved, starting execution...")
 
     -- Create execution record
     local execution_id = workflow_db.create_execution_record(active_workflow.id, nil)
@@ -630,17 +641,63 @@ end
 -- Approval System Event Handlers
 -- ============================================
 
+-- Show approval dialog
+local function show_approval_dialog(payload)
+    -- Store pending approval info
+    pending_approval = {
+        workflow_id = payload.workflow_id,
+        requires_hash = payload.requires_hash or "empty"
+    }
+
+    -- Bind approval request data
+    datamodel.bind_table("approval_request", {{
+        workflow_id = payload.workflow_id,
+        workflow_name = payload.workflow_name or "Unknown"
+    }})
+
+    -- Bind libraries separately for nested data-for
+    datamodel.bind_table("approval_libraries", payload.requires or {})
+
+    -- Load and show approval dialog if not already loaded
+    if not approval_dialog_doc then
+        approval_dialog_doc = ui.load_document("ui/workflow_approval_dialog.rml", false, "workflow_approval")
+        print("Approval dialog loaded")
+    else
+        ui.show_document("workflow_approval")
+    end
+end
+
+-- Hide approval dialog
+local function hide_approval_dialog()
+    if approval_dialog_doc then
+        ui.close_document("workflow_approval")
+        approval_dialog_doc = nil
+    end
+    pending_approval = nil
+end
+
 -- Handle user's approval decision
 local function handle_workflow_approval_response(payload)
     if not payload.workflow_id then
         print("ERROR: No workflow_id in approval response payload")
+        hide_approval_dialog()
         return
     end
 
     local workflow_id = payload.workflow_id
     local approved = payload.approved or false
     local remember = payload.remember or false
-    local requires_hash = payload.requires_hash or "empty"
+
+    -- Get requires_hash from pending_approval or payload
+    local requires_hash = "empty"
+    if pending_approval and pending_approval.workflow_id == workflow_id then
+        requires_hash = pending_approval.requires_hash
+    elseif payload.requires_hash then
+        requires_hash = payload.requires_hash
+    end
+
+    -- Hide the dialog first
+    hide_approval_dialog()
 
     if not approved then
         -- User denied approval
@@ -665,24 +722,105 @@ end
 -- Configuration Event Handlers
 -- ============================================
 
+-- Show workflow configuration view
+local function handle_show_workflow_config(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow to configure")
+        event.trigger_global("notification_error", {
+            title = "Configuration Error",
+            message = "No active workflow to configure"
+        })
+        return
+    end
+
+    -- Load current workflow config from database
+    local config_json = workflow_db.load_workflow_config(active_workflow.id)
+    local config = {
+        workflow_id = active_workflow.id,
+        name = active_workflow.name or "Unnamed Workflow",
+        description = "",
+        requires = {}
+    }
+
+    -- Parse config JSON if it exists
+    if config_json and config_json ~= "" then
+        local ok, parsed = pcall(json.decode, config_json)
+        if ok and parsed then
+            config.description = parsed.description or ""
+            config.requires = parsed.requires or {}
+        end
+    end
+
+    -- Bind workflow config
+    datamodel.bind_table("workflow_config", {{
+        workflow_id = config.workflow_id,
+        name = config.name,
+        description = config.description
+    }})
+
+    -- Load all available libraries and mark which ones are required
+    local all_libs = workflow_db.get_library_definitions()
+    local library_list = {}
+
+    for _, lib in ipairs(all_libs) do
+        local is_enabled = false
+        for _, req in ipairs(config.requires) do
+            if req == lib.id then
+                is_enabled = true
+                break
+            end
+        end
+
+        table.insert(library_list, {
+            id = lib.id,
+            name = lib.name,
+            description = lib.description,
+            access_description = lib.access_description,
+            enabled = is_enabled
+        })
+    end
+
+    -- Bind library list
+    datamodel.bind_table("library_list", library_list)
+
+    -- Switch to config view
+    switch_to_view("workflow_config")
+    print("Workflow config view loaded")
+end
+
 -- Save workflow configuration
 local function handle_save_workflow_config(payload)
-    if not payload.workflow_id then
-        print("ERROR: No workflow_id in save_workflow_config payload")
+    if not active_workflow.id then
+        print("ERROR: No active workflow")
         return
     end
 
-    if not payload.config then
-        print("ERROR: No config in save_workflow_config payload")
-        return
+    local workflow_id = active_workflow.id
+
+    -- Update workflow name if provided
+    if payload.name and payload.name ~= "" then
+        local success = workflow_db.db_handle:execute(
+            "UPDATE workflows SET name = ? WHERE id = ?",
+            payload.name,
+            workflow_id
+        )
+        if success then
+            active_workflow.name = payload.name
+            print("Workflow name updated to: " .. payload.name)
+        end
     end
 
-    -- Convert config table to JSON string
-    -- For now, we'll use a simple serialization
-    -- In production, you'd use a proper JSON library
-    local config_json = payload.config  -- Assuming already JSON string
+    -- Build config JSON with description and requires
+    local config = {
+        description = payload.description or "",
+        requires = payload.requires or {}
+    }
 
-    local success = workflow_db.save_workflow_config(payload.workflow_id, config_json)
+    -- Convert to JSON string
+    local config_json = json.encode(config)
+    print("Saving workflow config: " .. config_json)
+
+    local success = workflow_db.save_workflow_config(workflow_id, config_json)
     if success then
         print("Workflow configuration saved")
         event.trigger_global("notification_success", {
@@ -690,8 +828,11 @@ local function handle_save_workflow_config(payload)
             message = "Workflow configuration has been saved"
         })
 
-        -- Update workflows list to reflect any changes
+        -- Update workflows list to reflect name change
         load_workflows()
+
+        -- Switch back to workflow view
+        switch_to_view("workflow")
     else
         print("ERROR: Failed to save workflow configuration")
         event.trigger_global("notification_error", {
@@ -909,16 +1050,41 @@ local function handle_show_execution_history(payload)
     -- Load execution history
     local executions = workflow_db.get_workflow_executions(active_workflow.id, 50)
 
-    -- Calculate duration for each execution
+    -- Add formatted data for each execution
     for _, exec in ipairs(executions) do
+        -- Format duration
         if exec.started_at and exec.ended_at then
-            -- Simple duration calculation (would need proper timestamp parsing)
-            exec.duration = 0  -- Placeholder
+            exec.duration = "0.0s"  -- Placeholder - proper parsing needed
+        else
+            exec.duration = "N/A"
         end
+
+        -- Add node counts (query from execution_nodes table)
+        local count_sql = [[
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+            FROM execution_nodes
+            WHERE execution_id = ?
+        ]]
+        local counts, err = workflow_db.db_handle:query(count_sql, exec.id)
+        if counts and #counts > 0 then
+            exec.total_nodes = counts[1].total or 0
+            exec.completed_nodes = counts[1].completed or 0
+        else
+            exec.total_nodes = 0
+            exec.completed_nodes = 0
+        end
+
+        -- Store execution_id for click handlers
+        exec.execution_id = exec.id
     end
 
     -- Bind to UI
     datamodel.bind_table("execution_history", executions)
+
+    -- Switch to history view
+    switch_to_view("execution_history")
 
     print("Loaded " .. #executions .. " execution records")
 end
@@ -932,16 +1098,24 @@ local function handle_view_execution(payload)
 
     local execution_id = payload.execution_id
 
-    -- Load execution details
-    local execution = workflow_db.get_execution(execution_id)
-    if not execution then
-        print("ERROR: Execution " .. execution_id .. " not found")
-        event.trigger_global("notification_error", {
-            title = "View Failed",
-            message = "Execution not found"
-        })
+    -- Load execution from database
+    local exec_sql = "SELECT * FROM workflow_executions WHERE id = ?"
+    local exec_results, err = workflow_db.db_handle:query(exec_sql, execution_id)
+    if not exec_results or #exec_results == 0 then
+        print("ERROR: Execution not found: " .. execution_id)
         return
     end
+
+    local execution = exec_results[1]
+
+    -- Format duration
+    execution.duration = execution.started_at and execution.ended_at and "0.0s" or "N/A"
+    execution.execution_id = execution.id
+
+    -- Get workflow name
+    local wf_sql = "SELECT name FROM workflows WHERE id = ?"
+    local wf_results = workflow_db.db_handle:query(wf_sql, execution.workflow_id)
+    execution.workflow_name = (wf_results and #wf_results > 0) and wf_results[1].name or "Unknown"
 
     -- Query execution nodes
     local nodes_sql = [[
@@ -957,15 +1131,29 @@ local function handle_view_execution(payload)
         return
     end
 
-    -- Query execution logs
-    local logs = workflow_db.get_execution_logs(execution_id)
+    -- Add node names to results
+    local nodes = {}
+    for _, node in ipairs(node_results or {}) do
+        -- Get node type name (would need to join with workflow_nodes table)
+        node.node_name = "Node " .. node.node_id
+        table.insert(nodes, node)
+    end
 
     -- Bind detailed data to UI
     datamodel.bind_table("execution_details", {{
-        execution = execution,
-        nodes = node_results or {},
-        logs = logs
+        execution_id = execution.id,
+        status = execution.status,
+        workflow_name = execution.workflow_name,
+        started_at = execution.started_at or "N/A",
+        duration = execution.duration,
+        error_message = execution.error_message or "",
+        nodes = nodes
     }})
+
+    -- Log error for debugging
+    if execution.error_message and execution.error_message ~= "" then
+        print("Execution error: " .. execution.error_message)
+    end
 
     print("Loaded execution details for execution " .. execution_id)
 end
@@ -1200,6 +1388,11 @@ local function register_workflow_menu()
                 action = "workflow_switch_to_node_editor"
             },
             {
+                item_id = "configure_workflow_menu",
+                label = "Configure Workflow",
+                action = "show_workflow_config"
+            },
+            {
                 item_id = "execute_workflow_menu",
                 label = "Execute Workflow",
                 action = "execute_workflow"
@@ -1326,9 +1519,12 @@ Version: 1.0.0</pre>
     event.register("step_execution", handle_step_execution)
 
     -- Register approval system event handlers
+    event.register_global("workflow_approval_needed", show_approval_dialog)
     event.register("workflow_approval_response", handle_workflow_approval_response)
 
     -- Register configuration event handlers
+    event.register("show_workflow_config", handle_show_workflow_config)
+    event.register_global("show_workflow_config", handle_show_workflow_config)  -- Also register as global for menu
     event.register("save_workflow_config", handle_save_workflow_config)
     event.register("edit_node", handle_edit_node)
     event.register("cancel_node_config", handle_cancel_node_config)

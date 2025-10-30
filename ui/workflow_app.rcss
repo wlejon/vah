@@ -731,7 +731,7 @@ textarea:focus {
 }
 
 #node-config-view textarea {
-    font-family: monospace;
+    font-family: "JetBrains Mono";
     min-height: 300px;
 }
 
@@ -1038,7 +1038,7 @@ textarea:focus {
 }
 
 .json-content {
-    font-family: monospace;
+    font-family: "JetBrains Mono";
     font-size: 12px;
     color: #b0b0b0;
     background-color: #252729;
@@ -1080,7 +1080,7 @@ textarea:focus {
 
 .log-timestamp {
     color: #808080;
-    font-family: monospace;
+    font-family: "JetBrains Mono";
     white-space: nowrap;
 }
 
@@ -1110,4 +1110,32 @@ textarea:focus {
 .log-message {
     color: #dcdcdc;
     flex: 1;
+}
+
+/* Error display styles */
+.error-section {
+    margin-top: 24px;
+    padding: 16px;
+    background-color: #3a2020;
+    border-left-width: 4px;
+    border-left-color: #c44a4a;
+    border-radius: 4px;
+}
+
+.error-section h3 {
+    margin: 0 0 12px 0;
+    color: #c44a4a;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.error-message-box {
+    padding: 12px;
+    background-color: #2a1a1a;
+    border-radius: 4px;
+    color: #ff9999;
+    font-family: "JetBrains Mono";
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
