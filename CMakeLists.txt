@@ -81,7 +81,6 @@ add_executable(vah
     src/TextEditorInput.cpp
     src/ElementTextEditor.cpp
     src/WorkflowLibrary.cpp
-    src/WorkflowExecutionBindings.cpp
     src/WorkflowThread.cpp
 )
 

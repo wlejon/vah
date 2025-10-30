@@ -1,6 +1,5 @@
 #include "WorkflowThread.h"
 #include "WorkflowLibrary.h"
-#include "WorkflowExecutionBindings.h"
 #include "Logger.h"
 #include <sol/sol.hpp>
 #include <sqlite3.h>
@@ -33,9 +32,43 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
     int registered = WorkflowLibrary::WorkflowLibraryRegistry::RegisterRequestedLibraries(lua, required_libraries);
     LOG_INFO("Workflow thread {} registered {} workflow libraries", thread_id, registered);
 
-    // Register execution API
-    WorkflowExecutionBindings::RegisterExecutionAPI(lua.lua_state(), execution_id);
-    LOG_INFO("Workflow thread {} registered execution API for execution {}", thread_id, execution_id);
+    // Register execution API using Lua implementation (no more hardcoded SQL in C++)
+    try {
+        sol::load_result load_result = lua.load_file("scripts/execution_api.lua");
+        if (!load_result.valid()) {
+            sol::error err = load_result;
+            LOG_ERROR("Failed to load execution_api.lua: {}", err.what());
+            return;
+        }
+
+        sol::protected_function_result exec_result = load_result();
+        if (!exec_result.valid()) {
+            sol::error err = exec_result;
+            LOG_ERROR("Failed to execute execution_api.lua: {}", err.what());
+            return;
+        }
+
+        sol::table execution_api_module = exec_result;
+        sol::protected_function create_execution_api = execution_api_module["create_execution_api"];
+
+        if (!create_execution_api.valid()) {
+            LOG_ERROR("execution_api.lua does not export create_execution_api function");
+            return;
+        }
+
+        sol::protected_function_result api_result = create_execution_api(execution_id);
+        if (!api_result.valid()) {
+            sol::error err = api_result;
+            LOG_ERROR("Failed to create execution API: {}", err.what());
+            return;
+        }
+
+        lua["execution"] = api_result.get<sol::table>();
+        LOG_INFO("Workflow thread {} registered Lua-based execution API for execution {}", thread_id, execution_id);
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception while registering execution API: {}", e.what());
+        return;
+    }
 
     // Get workflow_id from execution record
     sqlite3* db = nullptr;

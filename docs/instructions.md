@@ -97,10 +97,10 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 this task will fit in your context, there is no need to use subagents.
 
 please work through this problem:
-HTTP Stream Parsing
+SQL Logic in C++ Bindings
 
-    Issue: In HttpBindings.cpp, the ParseSSEStream function (and the Post streaming lambda) implements an SSE parser (event:, data:) inside the httplib content receiver lambda.
+    Issue: WorkflowExecutionBindings.cpp contains hardcoded SQL strings like INSERT OR REPLACE INTO ... and SELECT value FROM ....
 
-    Why it's a problem: This is complex logic living inside a lambda within a binding function. It also buffers all data from a line (event_data += line.substr(6)), which could be problematic if a single data: line is very large.
+    Why it's a problem: This tightly couples your C++ code to your database schema. If you want to change a table or column name for your workflows, you have to recompile the entire C++ application.
 
-    Suggestion: Extract this SSE parsing logic into a small, separate SseParser class. This class could have a void ProcessChunk(const char* data, size_t len) method and take a std::function<void(std::string event, std::string data)> callback. The httplib lambda would then just call sseParser.ProcessChunk(...). This cleans up the bindings file considerably.
+    Suggestion: The C++ code should only provide the primitives. The SqliteBindings already provide a safe db:execute(sql, ...) function. Your WorkflowThread should simply be given a db handle and the Lua script itself (workflow_executor.lua) should be responsible for executing the SQL. The C++ execution.set/get/log functions are essentially a custom, hardcoded ORM. By moving this logic into Lua, your workflows become infinitely more flexible.
