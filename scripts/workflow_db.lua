@@ -1052,7 +1052,7 @@ function M.load_workflow(workflow_id)
 
     -- Load nodes
     local nodes_result, nodes_error = M.db_handle:query([[
-        SELECT node_id, node_type_id, x, y
+        SELECT node_id, node_type_id, x, y, config
         FROM workflow_nodes
         WHERE workflow_id = ?
         ORDER BY id
@@ -1080,12 +1080,25 @@ function M.load_workflow(workflow_id)
     local nodes = {}
     if nodes_result then
         for _, node in ipairs(nodes_result) do
-            table.insert(nodes, {
+            local node_data = {
                 id = node.node_id,
                 type_index = node.node_type_id,
                 x = node.x,
                 y = node.y
-            })
+            }
+
+            -- Parse config if it exists
+            if node.config and node.config ~= "" then
+                local parse_ok, config = pcall(json.decode, node.config)
+                if parse_ok and config then
+                    node_data.label = config.label
+                    node_data.inputs = config.inputs or {}
+                    node_data.outputs = config.outputs or {}
+                    node_data.script = config.script
+                end
+            end
+
+            table.insert(nodes, node_data)
         end
     end
 

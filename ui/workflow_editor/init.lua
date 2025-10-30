@@ -49,8 +49,8 @@ local function build_nodes_from_server()
                     name = node_type.name,
                     label = node_data.label,  -- Include custom label from data
                     color = node_module.create_color(node_type),
-                    inputs = node_type.inputs or {},
-                    outputs = node_type.outputs or {},
+                    inputs = node_data.inputs or node_type.inputs or {},  -- Use custom or default
+                    outputs = node_data.outputs or node_type.outputs or {},  -- Use custom or default
                 }
                 table.insert(new_nodes, node)
                 max_id = math.max(max_id, node_data.id)
