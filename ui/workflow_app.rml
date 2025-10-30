@@ -86,6 +86,20 @@
         doc:GetElementById('execution-details-view'):SetClass('active', true)
     end
 
+    -- Save node config - gather values from form inputs
+    function save_node_config(document, event)
+        print("[RML] save_node_config called")
+        local label = document:GetElementById('node_label_input'):GetAttribute('value')
+        local inputs = document:GetElementById('node_inputs_input'):GetAttribute('value')
+        local outputs = document:GetElementById('node_outputs_input'):GetAttribute('value')
+        print("[RML] label=" .. tostring(label) .. ", inputs=" .. tostring(inputs) .. ", outputs=" .. tostring(outputs))
+        emit('save_node_config_from_dialog', {
+            label = label or '',
+            inputs = inputs or '',
+            outputs = outputs or ''
+        })
+    end
+
     </script>
 </head>
 <body>
@@ -295,22 +309,22 @@
         <!-- Node Configuration Dialog -->
         <div id="node-config-view" class="view" data-class-active="v.view == 'node_config'">
             <div class="dialog-overlay">
-                <div class="dialog-box" data-model="node_config" data-if="node_config.size > 0" data-for="node,i : node_config">
+                <div class="dialog-box">
                     <h2>Configure Node</h2>
 
                     <div class="form-section">
                         <label>Node Label:</label>
-                        <input type="text" name="node_label" data-attr-value="node.label" onchange="emit('node_label_changed', {value = event.parameters.value})" />
+                        <input type="text" id="node_label_input" name="label" />
                     </div>
 
                     <div class="form-section">
                         <label>Inputs (comma-separated):</label>
-                        <input type="text" name="node_inputs" data-attr-value="node.inputs" onchange="emit('node_inputs_changed', {value = event.parameters.value})" />
+                        <input type="text" id="node_inputs_input" name="inputs" />
                     </div>
 
                     <div class="form-section">
                         <label>Outputs (comma-separated):</label>
-                        <input type="text" name="node_outputs" data-attr-value="node.outputs" onchange="emit('node_outputs_changed', {value = event.parameters.value})" />
+                        <input type="text" id="node_outputs_input" name="outputs" />
                     </div>
 
                     <div class="form-section">
@@ -321,7 +335,7 @@
                     </div>
 
                     <div class="button-group">
-                        <button class="save-btn" onclick="emit('save_node_config_from_dialog')">Save</button>
+                        <button class="save-btn" onclick="save_node_config(document, event)">Save</button>
                         <button onclick="emit('cancel_node_config')">Cancel</button>
                     </div>
                 </div>

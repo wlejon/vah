@@ -31,7 +31,6 @@ local time_since_poll = 0
 
 -- Node config editing state
 local editing_node_config = nil
-local node_config_texteditor_populated = false
 
 -- ============================================
 -- View Switching Functions
@@ -716,6 +715,7 @@ local function handle_edit_node(payload)
 
     -- Load current node config from database
     local config = workflow_db.load_node_config(active_workflow.id, payload.node_id)
+    print("Loaded config from DB: " .. tostring(config))
 
     -- Parse config or create default
     local node_config_data = {
@@ -728,9 +728,7 @@ local function handle_edit_node(payload)
     }
 
     if config and config ~= "" then
-        -- Parse JSON config (simple parsing - in production use proper JSON library)
-        -- For now, assume config contains: script, inputs, outputs, label
-        -- This is a placeholder - proper JSON parsing needed
+        print("Config exists, parsing...")
         node_config_data.script = config.script or ""
 
         if config.inputs then
@@ -767,74 +765,36 @@ local function handle_edit_node(payload)
 
     -- Store in editing state
     editing_node_config = node_config_data
-    node_config_texteditor_populated = false
-
-    -- Bind config data (without script, since we'll use texteditor)
-    data.bind("node_config", {node_config_data})
 
     -- Switch to node config view
     switch_to_view("node_config")
+
+    -- Set input field values via DOM manipulation
+    ui.set_element_attribute("node_label_input", "value", node_config_data.label or "")
+    ui.set_element_attribute("node_inputs_input", "value", node_config_data.inputs or "")
+    ui.set_element_attribute("node_outputs_input", "value", node_config_data.outputs or "")
+
+    -- Set texteditor content
+    ui.set_texteditor_content("node_script_editor", editing_node_config.script or "")
+    ui.set_texteditor_editable("node_script_editor", true)
 end
 
 -- Handle cancel button
 local function handle_cancel_node_config(payload)
     editing_node_config = nil
+    data.bind("node_config", {})  -- Clear to empty array
     switch_to_view("workflow")
-end
-
--- Handle save button from dialog
-local function handle_save_node_config_from_dialog(payload)
-    if not editing_node_config then
-        print("ERROR: No node config being edited")
-        return
-    end
-
-    -- Get form values using ui.get_input_value() or by querying the document
-    -- For now, we'll emit an event that includes getting the values
-    local doc_info = ui.get_document_info("workflow_app")
-    if not doc_info then
-        print("ERROR: Could not get workflow_app document")
-        return
-    end
-
-    -- Trigger the save with stored editing_node_config data
-    handle_save_node_config({
-        workflow_id = editing_node_config.workflow_id,
-        node_id = editing_node_config.node_id,
-        label = editing_node_config.label,  -- We'd ideally get from form, but for now use stored
-        inputs = editing_node_config.inputs,
-        outputs = editing_node_config.outputs
-    })
-end
-
--- Handle script modifications from texteditor
-local function handle_node_script_modified(payload)
-    if editing_node_config and payload.content then
-        editing_node_config.script = payload.content
-    end
-end
-
--- Handle form field changes
-local function handle_node_label_changed(payload)
-    if editing_node_config and payload.value then
-        editing_node_config.label = payload.value
-    end
-end
-
-local function handle_node_inputs_changed(payload)
-    if editing_node_config and payload.value then
-        editing_node_config.inputs = payload.value
-    end
-end
-
-local function handle_node_outputs_changed(payload)
-    if editing_node_config and payload.value then
-        editing_node_config.outputs = payload.value
-    end
 end
 
 -- Save node configuration
 local function handle_save_node_config(payload)
+    print("handle_save_node_config called")
+    print("  workflow_id: " .. tostring(payload.workflow_id))
+    print("  node_id: " .. tostring(payload.node_id))
+    print("  label: " .. tostring(payload.label))
+    print("  inputs: " .. tostring(payload.inputs))
+    print("  outputs: " .. tostring(payload.outputs))
+
     if not payload.workflow_id or not payload.node_id then
         print("ERROR: Missing workflow_id or node_id in save_node_config payload")
         return
@@ -885,6 +845,7 @@ local function handle_save_node_config(payload)
 
         -- Clear editing state
         editing_node_config = nil
+        data.bind("node_config", {})  -- Clear to empty array
 
         -- Switch back to workflow view
         switch_to_view("workflow")
@@ -894,6 +855,39 @@ local function handle_save_node_config(payload)
             title = "Save Failed",
             message = "Failed to save node configuration"
         })
+    end
+end
+
+-- Handle save button from dialog
+local function handle_save_node_config_from_dialog(payload)
+    print("save_node_config_from_dialog called")
+    print("Payload: label=" .. tostring(payload.label) .. ", inputs=" .. tostring(payload.inputs) .. ", outputs=" .. tostring(payload.outputs))
+
+    if not editing_node_config then
+        print("ERROR: No node config being edited")
+        return
+    end
+
+    print("editing_node_config.script length: " .. tostring(#(editing_node_config.script or "")))
+    print("editing_node_config.workflow_id: " .. tostring(editing_node_config.workflow_id))
+    print("editing_node_config.node_id: " .. tostring(editing_node_config.node_id))
+
+    -- Use form values from payload (queried from DOM in RML)
+    print("About to call handle_save_node_config")
+    handle_save_node_config({
+        workflow_id = editing_node_config.workflow_id,
+        node_id = editing_node_config.node_id,
+        label = payload.label or editing_node_config.label,
+        inputs = payload.inputs or editing_node_config.inputs,
+        outputs = payload.outputs or editing_node_config.outputs
+    })
+    print("handle_save_node_config returned")
+end
+
+-- Handle script modifications from texteditor
+local function handle_node_script_modified(payload)
+    if editing_node_config and payload.content then
+        editing_node_config.script = payload.content
     end
 end
 
@@ -1340,9 +1334,6 @@ Version: 1.0.0</pre>
     event.register("cancel_node_config", handle_cancel_node_config)
     event.register("save_node_config_from_dialog", handle_save_node_config_from_dialog)
     event.register("node_script_modified", handle_node_script_modified)
-    event.register("node_label_changed", handle_node_label_changed)
-    event.register("node_inputs_changed", handle_node_inputs_changed)
-    event.register("node_outputs_changed", handle_node_outputs_changed)
     event.register("save_node_config", handle_save_node_config)
 
     -- Register texteditor command handlers for keybindings
@@ -1399,7 +1390,7 @@ Version: 1.0.0</pre>
     data.bind("execution_state", {})
     data.bind("workflow_config", {})
     data.bind("library_list", {})
-    data.bind("node_config", {})
+    data.bind("node_config", {})  -- Empty array initially
     data.bind("approval_request", {})
     data.bind("execution_history", {})
     data.bind("execution_details", {})
@@ -1457,15 +1448,6 @@ function update(dt)
         if time_since_poll >= 0.1 then  -- Poll every 100ms
             poll_execution_state()
             time_since_poll = 0
-        end
-    end
-
-    -- Populate texteditor when node config view is shown
-    if active_view == "node_config" and editing_node_config and not node_config_texteditor_populated then
-        local success = ui.set_texteditor_content("node_script_editor", editing_node_config.script or "")
-        if success then
-            ui.set_texteditor_editable("node_script_editor", true)
-            node_config_texteditor_populated = true
         end
     end
 end
