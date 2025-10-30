@@ -11,6 +11,8 @@
 class DataStore;
 class EventDispatcher;
 
+class CommandProcessor;
+
 class ThreadManager {
 public:
     ThreadManager(moodycamel::ConcurrentQueue<Command>* command_queue,
@@ -18,6 +20,7 @@ public:
                   DataStore* data_store);
 
     void SetEventDispatcher(EventDispatcher* event_dispatcher) { event_dispatcher_ = event_dispatcher; }
+    void SetCommandProcessor(CommandProcessor* command_processor) { command_processor_ = command_processor; }
     ~ThreadManager();
 
     // Thread lifecycle
@@ -67,6 +70,7 @@ private:
     moodycamel::ConcurrentQueue<Command>* command_queue_;
     EventDispatcher* event_dispatcher_;
     DataStore* data_store_;
+    CommandProcessor* command_processor_ = nullptr;
 
     std::vector<std::unique_ptr<LuaThread>> threads_;
 };

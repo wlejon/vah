@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <moodycamel/concurrentqueue.h>
 
 // Forward declarations
 class ThreadManager;
@@ -24,6 +25,10 @@ public:
 
     // Process a single command
     void ProcessCommand(Command&& cmd);
+
+    // Process all pending commands from the queue (used during shutdown)
+    // Returns the number of commands processed
+    int ProcessPendingCommands(moodycamel::ConcurrentQueue<Command>* command_queue);
 
 private:
     ThreadManager* thread_manager_;

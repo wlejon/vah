@@ -1,6 +1,7 @@
 #include "ThreadManager.h"
 #include "Logger.h"
 #include "EventDispatcher.h"
+#include "CommandProcessor.h"
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
@@ -252,10 +253,33 @@ void ThreadManager::StopAll() {
 
     LOG_INFO("ThreadManager: Stopping all {} threads", thread_count);
 
-    // Second pass: join and delete all threads
+    // Second pass: join threads while draining command queue
+    // This ensures any blocking calls from thread shutdown (e.g., ui.hide_document)
+    // get their promises fulfilled, preventing deadlock
     for (size_t i = 0; i < threads_.size(); ++i) {
         if (threads_[i] != nullptr) {
+            // Keep processing commands while waiting for thread to finish
+            auto thread_state = threads_[i]->GetState();
+            while (thread_state != LuaThread::State::Stopped &&
+                   thread_state != LuaThread::State::Error) {
+
+                // Process pending commands to fulfill any waiting promises
+                if (command_processor_ && command_queue_) {
+                    int processed = command_processor_->ProcessPendingCommands(command_queue_);
+                    if (processed > 0) {
+                        LOG_DEBUG("Processed {} commands while waiting for thread {} to finish", processed, i);
+                    }
+                }
+
+                // Small sleep to avoid busy-waiting
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+                // Re-check thread state
+                thread_state = threads_[i]->GetState();
+            }
+
             threads_[i]->Join();
+            LOG_INFO("Lua thread {} finished normally", i);
             threads_[i].reset();
 
             // Unregister from EventDispatcher

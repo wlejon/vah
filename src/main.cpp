@@ -279,6 +279,9 @@ public:
             [this]() { running_ = false; }  // Callback to close application
         );
 
+        // Set command processor on thread manager for shutdown command draining
+        thread_manager_->SetCommandProcessor(command_processor_.get());
+
         // Setup RmlUI lua bindings - pass context so we can create data models
         lua_State* rml_lua = Rml::Lua::Interpreter::GetLuaState();
 

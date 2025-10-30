@@ -290,3 +290,20 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
 
     }, std::move(cmd));
 }
+
+int CommandProcessor::ProcessPendingCommands(moodycamel::ConcurrentQueue<Command>* command_queue) {
+    if (!command_queue) {
+        return 0;
+    }
+
+    int processed = 0;
+    Command cmd;
+
+    // Process all commands currently in the queue
+    while (command_queue->try_dequeue(cmd)) {
+        ProcessCommand(std::move(cmd));
+        processed++;
+    }
+
+    return processed;
+}
