@@ -82,8 +82,8 @@ function update_file_list()
     end
 
     -- Update browser info
-    data.bind("browser_info", {{current_path = current_path}})
-    data.bind("files", browser_data.files)
+    datamodel.bind_table("browser_info", {{current_path = current_path}})
+    datamodel.bind_table("files", browser_data.files)
 end
 
 function navigate_to(target)
@@ -142,7 +142,7 @@ function open_file(file_path)
     editor_data.file_type = file_type
     editor_data.is_editable = is_editable
     editor_data.is_modified = false
-    data.bind("editor_info", {editor_data})
+    datamodel.bind_table("editor_info", {editor_data})
 
     -- Set text in editor first (renders immediately with no highlighting)
     ui.set_texteditor_content("code_editor", content)
@@ -304,14 +304,14 @@ function startup()
         -- Mark as not modified
         ui.set_texteditor_modified("code_editor", false)
         editor_data.is_modified = false
-        data.bind("editor_info", {editor_data})
+        datamodel.bind_table("editor_info", {editor_data})
     end)
 
     -- Register modified event handler (triggered when editor content changes)
     event.register("modified", function(payload)
         if payload.element_id == "code_editor" then
             editor_data.is_modified = payload.modified
-            data.bind("editor_info", {editor_data})
+            datamodel.bind_table("editor_info", {editor_data})
 
             -- Re-highlight immediately when content is modified
             if payload.modified and payload.content and current_file_ext then
@@ -324,7 +324,7 @@ function startup()
     update_file_list()
 
     -- Update editor info (no file open)
-    data.bind("editor_info", {editor_data})
+    datamodel.bind_table("editor_info", {editor_data})
 
     -- Load UI
     ui.load_document("ui/file_editor.rml", true, "file_editor")

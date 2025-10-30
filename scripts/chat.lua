@@ -19,7 +19,7 @@ local chat_state = {
 
 -- Bind initial state
 function update_ui()
-    data.bind("chat", {chat_state})
+    datamodel.bind_table("chat", {chat_state})
 end
 
 -- Add a message to the chat

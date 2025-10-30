@@ -180,7 +180,7 @@ function startup()
     end
 
     -- Bind initial data model BEFORE loading UI
-    data.bind("stream", {stream_data})
+    datamodel.bind_table("stream", {stream_data})
 
     -- Load UI (data model must exist first)
     ui.load_document("ui/streaming.rml", true, "data_stream")
@@ -215,7 +215,7 @@ function update(dt)
 
     -- Only update data model when we have changes (reduces log spam)
     if needs_update then
-        data.bind("stream", {stream_data})
+        datamodel.bind_table("stream", {stream_data})
     end
 end
 

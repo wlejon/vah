@@ -122,11 +122,23 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
         else if constexpr (std::is_same_v<T, Commands::TextEditorRedo>) {
             document_manager_->TextEditorRedo(command.element_id);
         }
-        else if constexpr (std::is_same_v<T, Commands::UpdateDataModel>) {
+        else if constexpr (std::is_same_v<T, Commands::BindDataTable>) {
+            // Synchronous data binding - update model and then wake Lua thread
             data_model_manager_->UpdateModel(command.model_name, std::move(command.data));
+
+            // Set promise to wake the blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value();
+            }
         }
-        else if constexpr (std::is_same_v<T, Commands::UpdateDataObject>) {
+        else if constexpr (std::is_same_v<T, Commands::BindDataObject>) {
+            // Synchronous data binding - update object and then wake Lua thread
             data_model_manager_->UpdateObject(command.object_name, std::move(command.data));
+
+            // Set promise to wake the blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value();
+            }
         }
         else if constexpr (std::is_same_v<T, Commands::ReloadUIDocument>) {
             document_manager_->ReloadDocument(command.document_id);

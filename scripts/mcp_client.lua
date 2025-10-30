@@ -45,7 +45,7 @@ function update_client_data()
     client_data.is_disconnected = (client_status == "disconnected") and 1 or 0
 
     -- Bind tools separately as a table (for data-for iteration)
-    data.bind("mcp_tools", client_data.tools)
+    datamodel.bind_table("mcp_tools", client_data.tools)
 
     -- Bind status fields as object (tools array removed from here)
     local status_data = {
@@ -59,7 +59,7 @@ function update_client_data()
         result = client_data.result,
         is_calling = client_data.is_calling
     }
-    data.bind_object("mcp_client_data", status_data)
+    datamodel.bind_object("mcp_client_data", status_data)
 end
 
 -- Send JSON-RPC request
@@ -430,6 +430,7 @@ function shutdown()
     print("MCP Client shutting down")
 
     -- Disconnect if connected
+    -- Note: datamodel.bind_* calls during shutdown are automatically skipped by C++ to avoid deadlock
     if client_status == "connected" then
         disconnect_from_server()
     end

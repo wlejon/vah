@@ -56,7 +56,7 @@ end
 -- Update menu data model
 function update_menu_data()
     generate_menu_data()
-    data.bind("menus", menu_data)
+    datamodel.bind_table("menus", menu_data)
 end
 
 -- Register a menu

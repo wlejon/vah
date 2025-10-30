@@ -18,7 +18,7 @@ local server_data = {
 }
 
 function update_model()
-    data.bind("http_server", {server_data})
+    datamodel.bind_table("http_server", {server_data})
 end
 
 function startup()

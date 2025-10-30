@@ -96,6 +96,12 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-i originally wanted to have our mcp system dynamically update the tools available based on the tools called. for example, i wanted it so that when we added specific types, "workflow" for example, we would only show workflow specific tools if the mcp client (claude code) called list() on the "workflow" type. however, after implementing and testing that path (now reverted) it doesn't work. the claude code client doesn't update the tools available when the server updates them. so what i want instead is to have _separate_ mcp servers for types. the issue i'm working through is that once we have a lot of apps, we're going to have a lot of different mcp types. hundreds would be a low number, i think. we don't want to send hundreds of tools to a mcp client as that will flood the context with mostly unused information. so instead, the user will need to connect their mcp client to specific types they're working on in the given moment. we'll need to be able to switch types easily. currently that means exiting claude code, modifying the configuration, and relaunching it. that's fine enough. 
+can you figure this out for me, please:
 
-we need to figure out how to support it on the vah side. let's explore our foundation and see what we have and what approach would likely work best here. 
+[2025-10-30 01:14:38.389] [info] [Lua Thread 5] MCP Client started
+[2025-10-30 01:14:38.389] [info] Processing LoadUIDocument command: ui/mcp_client.rml
+[2025-10-30 01:14:38.393] [warning] [RmlUi] Could not find variable name 'mcp_client_data.tools_loaded' in data model.
+[2025-10-30 01:14:38.393] [warning] [RmlUi] Error in data expression at 28. Could not find data variable with name 'mcp_client_data.tools_loaded'.
+[2025-10-30 01:14:38.393] [warning] [RmlUi]   "mcp_client_data.tools_loaded > 0"
+[2025-10-30 01:14:38.393] [warning] [RmlUi]                                ^
+[2025-10-30 01:14:38.393] [warning] [RmlUi] Could not add data-if view to element: div.tools-list < div.tools-section < div.container < body

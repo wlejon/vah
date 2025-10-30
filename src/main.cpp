@@ -661,42 +661,10 @@ private:
             commands.push_back(std::move(cmd));
         }
 
-        // Separate commands into categories for proper ordering:
-        // 1. First-time data model registrations (must happen FIRST)
-        // 2. Other commands (LoadUIDocument, etc.)
-        // 3. Coalesced data model updates (can happen last)
-        std::vector<Command> first_time_data_commands;
-        std::unordered_map<std::string, Commands::UpdateDataModel> latest_data_updates;
-        std::vector<Command> other_commands;
-
+        // Process commands in order
+        // Note: Data binding (BindDataTable/BindDataObject) is now synchronous,
+        // so Lua threads block until binding completes. No special ordering needed.
         for (auto& cmd : commands) {
-            if (std::holds_alternative<Commands::UpdateDataModel>(cmd)) {
-                auto& update_cmd = std::get<Commands::UpdateDataModel>(cmd);
-
-                // Check if this is the first time we're seeing this model
-                if (!data_model_manager_->IsModelRegistered(update_cmd.model_name)) {
-                    // First time - must process BEFORE any LoadUIDocument commands
-                    first_time_data_commands.push_back(std::move(cmd));
-                } else {
-                    // Model exists - can be coalesced and processed last
-                    latest_data_updates[update_cmd.model_name] = std::move(update_cmd);
-                }
-            } else {
-                other_commands.push_back(std::move(cmd));
-            }
-        }
-
-        // STEP 1: Process first-time data model registrations FIRST
-        // This ensures all data models exist before any UI documents load
-        if (!first_time_data_commands.empty()) {
-            LOG_INFO("Processing {} first-time data model registrations", first_time_data_commands.size());
-        }
-        for (auto& cmd : first_time_data_commands) {
-            command_processor_->ProcessCommand(std::move(cmd));
-        }
-
-        // STEP 2: Process other commands (LoadUIDocument, etc.)
-        for (auto& cmd : other_commands) {
             // Handle FileChanged specially (needs custom path processing logic)
             if (std::holds_alternative<Commands::FileChanged>(cmd)) {
                 const auto& command = std::get<Commands::FileChanged>(cmd);
@@ -724,11 +692,6 @@ private:
                 // Delegate all other commands to CommandProcessor
                 command_processor_->ProcessCommand(std::move(cmd));
             }
-        }
-
-        // STEP 3: Process coalesced data model updates (only latest per model)
-        for (auto& [model_name, update_cmd] : latest_data_updates) {
-            command_processor_->ProcessCommand(std::move(update_cmd));
         }
     }
 

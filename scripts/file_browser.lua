@@ -68,9 +68,9 @@ function update_file_list()
 
     -- Bind updated models separately
     -- browser_info contains just the current_path for display
-    data.bind("browser_info", {{current_path = current_path}})
+    datamodel.bind_table("browser_info", {{current_path = current_path}})
     -- files is the flat array of file entries for iteration and event handling
-    data.bind("files", browser_data.files)
+    datamodel.bind_table("files", browser_data.files)
 end
 
 function navigate_to(target)

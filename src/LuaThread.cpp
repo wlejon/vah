@@ -578,32 +578,66 @@ void LuaThread::SetupLuaBindings() {
     // Bind clipboard operations
     ClipboardBindings::SetupBindings(*lua_);
 
-    // Bind data model operations
-    auto data_table = lua_->create_table();
+    // Bind data model operations (synchronous via promise-in-command pattern)
+    auto datamodel_table = lua_->create_table();
 
-    data_table["bind"] = [this](const std::string& model_name, sol::table data) {
-        // Convert Lua table to DynamicTable
+    datamodel_table["bind_table"] = [this](const std::string& model_name, sol::table data) {
+        // If thread is shutting down, skip binding to avoid deadlock
+        // (Main thread may be blocked in Join() waiting for us to exit)
+        if (should_stop_.load(std::memory_order_acquire)) {
+            LOG_DEBUG("Skipping bind_table('{}') - thread {} is shutting down", model_name, id_);
+            return;
+        }
+
+        // Convert Lua table to DynamicTable (array of objects)
         DynamicTable dynamic_data = TableToDynamicTable(data);
 
-        // Send command to main thread to update DataStore and dirty the model
-        Commands::UpdateDataModel cmd;
+        // Create promise/future pair for synchronous blocking
+        auto promise = std::make_shared<std::promise<void>>();
+        auto future = promise->get_future();
+
+        // Send command to main thread with promise
+        Commands::BindDataTable cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = next_request_id_++;
         cmd.model_name = model_name;
         cmd.data = std::move(dynamic_data);
+        cmd.promise = promise;
         command_queue_->enqueue(std::move(cmd));
+
+        // Block until main thread processes the binding
+        future.get();
     };
 
-    data_table["bind_object"] = [this](const std::string& object_name, sol::table data) {
+    datamodel_table["bind_object"] = [this](const std::string& object_name, sol::table data) {
+        // If thread is shutting down, skip binding to avoid deadlock
+        // (Main thread may be blocked in Join() waiting for us to exit)
+        if (should_stop_.load(std::memory_order_acquire)) {
+            LOG_DEBUG("Skipping bind_object('{}') - thread {} is shutting down", object_name, id_);
+            return;
+        }
+
         // Convert Lua table to DynamicRow (single object)
         DynamicRow dynamic_data = TableToDynamicRow(data);
 
-        // Send command to main thread to update DataStore and dirty the object
-        Commands::UpdateDataObject cmd;
+        // Create promise/future pair for synchronous blocking
+        auto promise = std::make_shared<std::promise<void>>();
+        auto future = promise->get_future();
+
+        // Send command to main thread with promise
+        Commands::BindDataObject cmd;
+        cmd.requesting_thread_id = id_;
+        cmd.request_id = next_request_id_++;
         cmd.object_name = object_name;
         cmd.data = std::move(dynamic_data);
+        cmd.promise = promise;
         command_queue_->enqueue(std::move(cmd));
+
+        // Block until main thread processes the binding
+        future.get();
     };
 
-    (*lua_)["data"] = data_table;
+    (*lua_)["datamodel"] = datamodel_table;
 
     // Bind thread query operations (synchronous - blocks until response arrives)
     auto thread_table = lua_->create_table();

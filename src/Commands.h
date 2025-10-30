@@ -138,14 +138,22 @@ namespace Commands {
         std::string element_id;
     };
 
-    struct UpdateDataModel {
+    // Synchronous data binding commands (promise-in-command pattern)
+    // Promise is set by main thread when binding completes to wake blocked Lua thread
+    struct BindDataTable {
+        int requesting_thread_id;
+        uint64_t request_id;
         std::string model_name;
         DynamicTable data;
+        std::shared_ptr<std::promise<void>> promise;
     };
 
-    struct UpdateDataObject {
+    struct BindDataObject {
+        int requesting_thread_id;
+        uint64_t request_id;
         std::string object_name;
         DynamicRow data;
+        std::shared_ptr<std::promise<void>> promise;
     };
 
     struct TriggerTextEditorModified {
@@ -273,8 +281,8 @@ using Command = std::variant<
     Commands::TextEditorSelectAll,
     Commands::TextEditorUndo,
     Commands::TextEditorRedo,
-    Commands::UpdateDataModel,
-    Commands::UpdateDataObject,
+    Commands::BindDataTable,
+    Commands::BindDataObject,
     Commands::TriggerTextEditorModified,
     Commands::FileChanged,
     Commands::AddFileWatch,

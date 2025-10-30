@@ -113,7 +113,7 @@ function load_notifications()
     end
 
     -- Bind data to the model (triggers UI update)
-    data.bind("notifications", notifications)
+    datamodel.bind_table("notifications", notifications)
 
     -- Update UI state with notification count
     update_ui_state()
@@ -122,7 +122,7 @@ end
 -- Update UI state data model
 function update_ui_state()
     -- Bind as a single object (not an array)
-    data.bind_object("notification_ui_state", {
+    datamodel.bind_object("notification_ui_state", {
         expanded = ui_state.expanded and 1 or 0,
         count = #notifications
     })

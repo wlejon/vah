@@ -77,8 +77,8 @@ function startup()
     db:close()
 
     -- Bind data to view (template handles rendering)
-    data.bind("%s_data", rows)
-    data.bind_object("%s_stats", {row_count = row_count})
+    datamodel.bind_table("%s_data", rows)
+    datamodel.bind_object("%s_stats", {row_count = row_count})
 
     -- Load view
     ui.load_document("ui/generated/%s_view.rml", true)
@@ -133,7 +133,7 @@ function startup()
     db:close()
 
     if rows then
-        data.bind("%s_data", rows)
+        datamodel.bind_table("%s_data", rows)
         ui.load_document("ui/generated/%s_list.rml", true)
     end
 end
@@ -187,7 +187,7 @@ function startup()
     db:close()
 
     if rows and #rows > 0 then
-        data.bind("%s_detail", rows)
+        datamodel.bind_table("%s_detail", rows)
         ui.load_document("ui/generated/%s_detail.rml", true)
     end
 end
@@ -242,7 +242,7 @@ function startup()
     db:close()
 
     -- Bind statistics to view
-    data.bind("dashboard_stats", stats)
+    datamodel.bind_table("dashboard_stats", stats)
     ui.load_document("ui/generated/%s_dashboard.rml", true)
 end
 

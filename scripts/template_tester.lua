@@ -66,7 +66,7 @@ function render_template()
     if not parse_ok then
         output_data.error = "JSON Parse Error: " .. tostring(parse_result)
         output_data.content = ""
-        data.bind("output", {output_data})
+        datamodel.bind_table("output", {output_data})
         return
     end
 
@@ -102,7 +102,7 @@ function render_template()
         end
     end
 
-    data.bind("output", {output_data})
+    datamodel.bind_table("output", {output_data})
 end
 
 function startup()

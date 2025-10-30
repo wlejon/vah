@@ -353,7 +353,7 @@ local function load_visualization(viz_id)
     end
 
     -- Bind node types to UI (must happen first)
-    data.bind("node_types", node_types_data)
+    datamodel.bind_table("node_types", node_types_data)
 
     -- Prepare workflow data
     local nodes = {}
@@ -396,21 +396,21 @@ local function load_visualization(viz_id)
     nodes = auto_layout_nodes(nodes, connections)
 
     -- Bind workflow data
-    data.bind("workflow_nodes", nodes)
-    data.bind("workflow_connections", connections)
+    datamodel.bind_table("workflow_nodes", nodes)
+    datamodel.bind_table("workflow_connections", connections)
 
     -- Bind metadata
-    data.bind("active_visualization", {{
+    datamodel.bind_table("active_visualization", {{
         name = workflow_data.name or "Untitled",
         description = workflow_data.description or ""
     }})
 
     -- Clear selected node info when loading new visualization
-    data.bind("selected_node_info", {})
+    datamodel.bind_table("selected_node_info", {})
     last_selected_node = nil
 
     -- Trigger reload in the workflow editor canvas
-    data.bind("workflow_reload_trigger", {timestamp = os.time()})
+    datamodel.bind_table("workflow_reload_trigger", {timestamp = os.time()})
     return true
 end
 
@@ -601,10 +601,10 @@ function startup()
     print("Loaded " .. #visualizations .. " visualizations")
 
     -- Bind visualization list
-    data.bind("visualizations", visualizations)
+    datamodel.bind_table("visualizations", visualizations)
 
     -- Bind empty selected_node_info initially (required before UI loads)
-    data.bind("selected_node_info", {})
+    datamodel.bind_table("selected_node_info", {})
 
     -- Load first visualization by default (BEFORE loading UI)
     if #visualizations > 0 then
@@ -632,7 +632,7 @@ function startup()
         if node_id then
             print("Node selected: " .. tostring(node_id))
             local info = build_node_info(node_id)
-            data.bind("selected_node_info", info)
+            datamodel.bind_table("selected_node_info", info)
             last_selected_node = node_id
         end
     end)
@@ -640,7 +640,7 @@ function startup()
     -- Register event handler for node deselection
     event.register("node_deselected", function(payload)
         print("Node deselected")
-        data.bind("selected_node_info", {})
+        datamodel.bind_table("selected_node_info", {})
         last_selected_node = nil
     end)
 

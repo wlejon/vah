@@ -39,7 +39,7 @@ local editing_node_config = nil
 local function switch_to_view(view_name)
     active_view = view_name
     -- Bind as an array with a single element
-    data.bind("active_view", {{view = view_name}})
+    datamodel.bind_table("active_view", {{view = view_name}})
 end
 
 local function handle_switch_to_list_view(payload)
@@ -70,7 +70,7 @@ local function load_node_types()
     node_types_data = workflow_db.load_node_types()
 
     -- Bind data to the UI for workflow editor
-    data.bind("node_types", node_types_data)
+    datamodel.bind_table("node_types", node_types_data)
 
     -- Also update the editor's copy for node type editor
     editor.node_types = {}
@@ -111,7 +111,7 @@ local function load_workflows()
     workflows_list = workflow_db.get_workflows()
 
     -- Bind to UI
-    data.bind("workflows", workflows_list)
+    datamodel.bind_table("workflows", workflows_list)
 end
 
 -- Create a new workflow
@@ -164,10 +164,10 @@ function select_workflow(payload)
 
     -- Bind workflow data to make it available to workflow editor
     -- Include a timestamp to force client to reinitialize
-    data.bind("workflow_nodes", nodes)
-    data.bind("workflow_connections", connections)
-    data.bind("active_workflow", {active_workflow})
-    data.bind("workflow_reload_trigger", {timestamp = os.time()})
+    datamodel.bind_table("workflow_nodes", nodes)
+    datamodel.bind_table("workflow_connections", connections)
+    datamodel.bind_table("active_workflow", {active_workflow})
+    datamodel.bind_table("workflow_reload_trigger", {timestamp = os.time()})
 
     -- Switch back to workflow view
     switch_to_view("workflow")
@@ -186,7 +186,7 @@ local function rename_workflow(payload)
     local success = workflow_db.update_workflow(active_workflow.id, new_name)
     if success then
         active_workflow.name = new_name
-        data.bind("active_workflow", {active_workflow})
+        datamodel.bind_table("active_workflow", {active_workflow})
         load_workflows()
     else
         print("ERROR: Failed to rename workflow")
@@ -211,9 +211,9 @@ local function delete_workflow(payload)
         if active_workflow.id == workflow_id then
             active_workflow.id = nil
             active_workflow.name = nil
-            data.bind("active_workflow", {})
-            data.bind("workflow_nodes", {})
-            data.bind("workflow_connections", {})
+            datamodel.bind_table("active_workflow", {})
+            datamodel.bind_table("workflow_nodes", {})
+            datamodel.bind_table("workflow_connections", {})
         end
 
         -- Reload workflows list
@@ -327,7 +327,7 @@ local function poll_execution_state()
     end
 
     -- Bind execution state to UI
-    data.bind("execution_state", {{
+    datamodel.bind_table("execution_state", {{
         execution_id = active_execution_id,
         status = execution.status,
         workflow_id = execution.workflow_id,
@@ -363,7 +363,7 @@ local function poll_execution_state()
         end
 
         -- Clear execution state binding
-        data.bind("execution_state", {})
+        datamodel.bind_table("execution_state", {})
     end
 end
 
@@ -395,8 +395,8 @@ local function on_workflow_node_created(payload)
     -- Reload workflow from database and push to client
     local nodes, connections = workflow_db.load_workflow(active_workflow.id)
     if nodes then
-        data.bind("workflow_nodes", nodes)
-        data.bind("workflow_connections", connections)
+        datamodel.bind_table("workflow_nodes", nodes)
+        datamodel.bind_table("workflow_connections", connections)
     end
 end
 
@@ -422,8 +422,8 @@ local function on_workflow_node_moved(payload)
     -- Reload workflow from database and push to client
     local nodes, connections = workflow_db.load_workflow(active_workflow.id)
     if nodes then
-        data.bind("workflow_nodes", nodes)
-        data.bind("workflow_connections", connections)
+        datamodel.bind_table("workflow_nodes", nodes)
+        datamodel.bind_table("workflow_connections", connections)
     end
 end
 
@@ -444,8 +444,8 @@ local function on_workflow_node_deleted(payload)
     -- Reload workflow from database and push to client
     local nodes, connections = workflow_db.load_workflow(active_workflow.id)
     if nodes then
-        data.bind("workflow_nodes", nodes)
-        data.bind("workflow_connections", connections)
+        datamodel.bind_table("workflow_nodes", nodes)
+        datamodel.bind_table("workflow_connections", connections)
     end
 end
 
@@ -472,8 +472,8 @@ local function on_workflow_connection_added(payload)
     -- Reload workflow from database and push to client
     local nodes, connections = workflow_db.load_workflow(active_workflow.id)
     if nodes then
-        data.bind("workflow_nodes", nodes)
-        data.bind("workflow_connections", connections)
+        datamodel.bind_table("workflow_nodes", nodes)
+        datamodel.bind_table("workflow_connections", connections)
     end
 end
 
@@ -782,7 +782,7 @@ end
 -- Handle cancel button
 local function handle_cancel_node_config(payload)
     editing_node_config = nil
-    data.bind("node_config", {})  -- Clear to empty array
+    datamodel.bind_table("node_config", {})  -- Clear to empty array
     switch_to_view("workflow")
 end
 
@@ -839,13 +839,13 @@ local function handle_save_node_config(payload)
         -- Reload workflow from database and bind
         local nodes, connections = workflow_db.load_workflow(payload.workflow_id)
         if nodes then
-            data.bind("workflow_nodes", nodes)
-            data.bind("workflow_connections", connections)
+            datamodel.bind_table("workflow_nodes", nodes)
+            datamodel.bind_table("workflow_connections", connections)
         end
 
         -- Clear editing state
         editing_node_config = nil
-        data.bind("node_config", {})  -- Clear to empty array
+        datamodel.bind_table("node_config", {})  -- Clear to empty array
 
         -- Switch back to workflow view
         switch_to_view("workflow")
@@ -918,7 +918,7 @@ local function handle_show_execution_history(payload)
     end
 
     -- Bind to UI
-    data.bind("execution_history", executions)
+    datamodel.bind_table("execution_history", executions)
 
     print("Loaded " .. #executions .. " execution records")
 end
@@ -961,7 +961,7 @@ local function handle_view_execution(payload)
     local logs = workflow_db.get_execution_logs(execution_id)
 
     -- Bind detailed data to UI
-    data.bind("execution_details", {{
+    datamodel.bind_table("execution_details", {{
         execution = execution,
         nodes = node_results or {},
         logs = logs
@@ -997,7 +997,7 @@ local function select_node_type(payload)
             editor.selected_node = editor.node_types[i]
 
             -- Update data model - wrap selected_node in an array for data binding
-            data.bind("selected_node", {editor.selected_node})
+            datamodel.bind_table("selected_node", {editor.selected_node})
             return
         end
     end
@@ -1023,7 +1023,7 @@ local function add_input_port(payload)
     end
 
     table.insert(editor.selected_node.inputs, "New Input")
-    data.bind("selected_node", {editor.selected_node})
+    datamodel.bind_table("selected_node", {editor.selected_node})
 end
 
 -- Add output port to selected node
@@ -1033,7 +1033,7 @@ local function add_output_port(payload)
     end
 
     table.insert(editor.selected_node.outputs, "New Output")
-    data.bind("selected_node", {editor.selected_node})
+    datamodel.bind_table("selected_node", {editor.selected_node})
 end
 
 -- Delete input port
@@ -1045,7 +1045,7 @@ local function delete_input_port(payload)
     local index = tonumber(payload.index)
     if index and index >= 1 and index <= #editor.selected_node.inputs then
         table.remove(editor.selected_node.inputs, index)
-        data.bind("selected_node", {editor.selected_node})
+        datamodel.bind_table("selected_node", {editor.selected_node})
     end
 end
 
@@ -1058,7 +1058,7 @@ local function delete_output_port(payload)
     local index = tonumber(payload.index)
     if index and index >= 1 and index <= #editor.selected_node.outputs then
         table.remove(editor.selected_node.outputs, index)
-        data.bind("selected_node", {editor.selected_node})
+        datamodel.bind_table("selected_node", {editor.selected_node})
     end
 end
 
@@ -1142,7 +1142,7 @@ local function save_node_type(payload)
             editor.selected_index = i
             editor.selected_node = editor.node_types[i]
             -- Update selected_node binding with fresh database values
-            data.bind("selected_node", {editor.selected_node})
+            datamodel.bind_table("selected_node", {editor.selected_node})
             break
         end
     end
@@ -1168,7 +1168,7 @@ local function delete_node_type(payload)
     -- Clear selection
     editor.selected_index = nil
     editor.selected_node = nil
-    data.bind("selected_node", {})
+    datamodel.bind_table("selected_node", {})
 
     -- Reload node types
     load_node_types()
@@ -1379,21 +1379,21 @@ Version: 1.0.0</pre>
     event.register("view_execution", handle_view_execution)
 
     -- Initialize data bindings
-    data.bind("selected_node", {})
-    data.bind("workflows", {})
-    data.bind("active_workflow", {})
-    data.bind("workflow_nodes", {})
-    data.bind("workflow_connections", {})
-    data.bind("active_view", {{view = "workflow"}})
+    datamodel.bind_table("selected_node", {})
+    datamodel.bind_table("workflows", {})
+    datamodel.bind_table("active_workflow", {})
+    datamodel.bind_table("workflow_nodes", {})
+    datamodel.bind_table("workflow_connections", {})
+    datamodel.bind_table("active_view", {{view = "workflow"}})
 
     -- Initialize execution-related data models (prevents warnings)
-    data.bind("execution_state", {})
-    data.bind("workflow_config", {})
-    data.bind("library_list", {})
-    data.bind("node_config", {})  -- Empty array initially
-    data.bind("approval_request", {})
-    data.bind("execution_history", {})
-    data.bind("execution_details", {})
+    datamodel.bind_table("execution_state", {})
+    datamodel.bind_table("workflow_config", {})
+    datamodel.bind_table("library_list", {})
+    datamodel.bind_table("node_config", {})  -- Empty array initially
+    datamodel.bind_table("approval_request", {})
+    datamodel.bind_table("execution_history", {})
+    datamodel.bind_table("execution_details", {})
 
     -- Load node types from database
     load_node_types()

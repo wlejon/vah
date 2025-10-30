@@ -14,7 +14,7 @@ local client_data = {
 local message_count = 0
 
 function update_model()
-    data.bind("http_client", {client_data})
+    datamodel.bind_table("http_client", {client_data})
 end
 
 function startup()

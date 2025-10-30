@@ -497,7 +497,7 @@ function update_ui()
     agent_state.has_scripts = #agent_state.generated_scripts > 0
     agent_state.has_schema = agent_state.proposed_schema ~= false
 
-    data.bind("manufold", {agent_state})
+    datamodel.bind_table("manufold", {agent_state})
 end
 
 -- Event handlers

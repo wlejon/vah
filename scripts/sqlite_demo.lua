@@ -65,7 +65,7 @@ function load_contacts()
     print("Loaded " .. #contacts .. " contacts")
 
     -- Bind data to the model (automatically updates and refreshes view)
-    data.bind("contacts", contacts)
+    datamodel.bind_table("contacts", contacts)
 end
 
 function add_contact(name, email, phone, company, notes)

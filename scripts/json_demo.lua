@@ -32,7 +32,7 @@ function load_and_bind_json()
     }
 
     -- Bind to data model
-    data.bind("jsondata", {json_model})
+    datamodel.bind_table("jsondata", {json_model})
     return true
 end
 
