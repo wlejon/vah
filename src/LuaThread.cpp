@@ -418,25 +418,6 @@ void LuaThread::SetupLuaBindings() {
         command_queue_->enqueue(std::move(cmd));
     };
 
-    command_table["http_response"] = [this](int request_id, int status_code, const std::string& content_type, const std::string& body, sol::optional<sol::table> headers_table) {
-        Commands::HttpResponseCommand cmd;
-        cmd.request_id = request_id;
-        cmd.status_code = status_code;
-        cmd.content_type = content_type;
-        cmd.body = body;
-
-        // Convert headers table to unordered_map
-        if (headers_table) {
-            for (const auto& [key, value] : headers_table.value()) {
-                if (key.is<std::string>() && value.is<std::string>()) {
-                    cmd.headers[key.as<std::string>()] = value.as<std::string>();
-                }
-            }
-        }
-
-        command_queue_->enqueue(std::move(cmd));
-    };
-
     (*lua_)["command"] = command_table;
 
     // Bind system operations

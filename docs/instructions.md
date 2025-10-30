@@ -96,4 +96,6 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-you added a mutex to the HttpServerThread code. please review this in depth. please read the docs/architecture/lock-free-philosophy.md file. 
+i originally wanted to have our mcp system dynamically update the tools available based on the tools called. for example, i wanted it so that when we added specific types, "workflow" for example, we would only show workflow specific tools if the mcp client (claude code) called list() on the "workflow" type. however, after implementing and testing that path (now reverted) it doesn't work. the claude code client doesn't update the tools available when the server updates them. so what i want instead is to have _separate_ mcp servers for types. the issue i'm working through is that once we have a lot of apps, we're going to have a lot of different mcp types. hundreds would be a low number, i think. we don't want to send hundreds of tools to a mcp client as that will flood the context with mostly unused information. so instead, the user will need to connect their mcp client to specific types they're working on in the given moment. we'll need to be able to switch types easily. currently that means exiting claude code, modifying the configuration, and relaunching it. that's fine enough. 
+
+we need to figure out how to support it on the vah side. let's explore our foundation and see what we have and what approach would likely work best here. 

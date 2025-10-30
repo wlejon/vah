@@ -1,6 +1,7 @@
 -- MCP Server
 -- Model Context Protocol server implementation
--- Provides tools and resources via JSON-RPC 2.0 over HTTP with SSE
+-- Provides tools and resources via JSON-RPC 2.0 over HTTP
+-- Now uses HttpServer directly (runs on Lua thread)
 
 -- Load configuration
 local config = require("mcp_config")
@@ -14,6 +15,7 @@ local SESSION_CLEANUP_INTERVAL = 60  -- Seconds between session cleanup checks
 local sessions = {}
 local server_status = "stopped"  -- "stopped", "running"
 local time_since_cleanup = 0.0  -- Track time since last session cleanup
+local http_server = nil  -- HttpServer instance
 
 -- Server capabilities (from config)
 local capabilities = config.capabilities
@@ -24,14 +26,7 @@ local server_info = config.info
 -- Supported protocol version (from config)
 local PROTOCOL_VERSION = config.server.protocol_version
 
--- MCP endpoint (from config)
-local MCP_ENDPOINT = config.server.endpoint
-
--- Server port (from config)
-local SERVER_PORT = config.server.port
-local SERVER_HOST = config.server.host
-
--- Tool definitions (all possible tools)
+-- Tool definitions (all tools registered upfront)
 -- Maps tool_name -> {name, description, inputSchema, handler}
 local tool_definitions = {}
 
@@ -42,7 +37,7 @@ function update_ui_state()
     -- Status text for display
     local status_text
     if server_status == "running" then
-        status_text = "Running on " .. SERVER_HOST .. ":" .. SERVER_PORT
+        status_text = "Running on " .. config.server.host .. ":" .. config.server.port
     elseif server_status == "starting" then
         status_text = "Starting..."
     elseif server_status == "stopping" then
@@ -61,13 +56,10 @@ end
 
 -- Generate cryptographically random session ID
 function generate_session_id()
-    -- Generate a random session ID using timestamp and random components
-    -- Format: session-<timestamp>-<random>
     local timestamp = os.time()
     local random_part = ""
 
     -- Generate random hex string (16 characters = 64 bits of randomness)
-    -- Use math.random which is seeded from os.time and process ID
     for i = 1, 16 do
         random_part = random_part .. string.format("%x", math.random(0, 15))
     end
@@ -86,58 +78,17 @@ function register_tool(name, description, input_schema, handler)
     print("Registered MCP tool: " .. name)
 end
 
--- Get tool definition by name
-function get_tool_definition(name)
-    return tool_definitions[name]
-end
-
--- Get tools available for a session
-function get_session_tools(session)
-    if not session or not session.available_tools then
-        return {}
-    end
-
+-- Get all tool definitions as list
+function get_all_tools()
     local tool_list = {}
-    for _, tool_name in ipairs(session.available_tools) do
-        local tool_def = tool_definitions[tool_name]
-        if tool_def then
-            table.insert(tool_list, {
-                name = tool_def.name,
-                description = tool_def.description,
-                inputSchema = tool_def.inputSchema
-            })
-        end
+    for _, tool_def in pairs(tool_definitions) do
+        table.insert(tool_list, {
+            name = tool_def.name,
+            description = tool_def.description,
+            inputSchema = tool_def.inputSchema
+        })
     end
-
     return tool_list
-end
-
--- Update session context and rebuild available tools
-function update_session_context(session, type_name, view, id, params)
-    session.current_context = {
-        type = type_name,
-        view = view,
-        id = id,
-        params = params or {}
-    }
-
-    -- Rebuild available tools list
-    session.available_tools = {}
-
-    -- Add core navigation tools
-    for _, tool_name in ipairs(config.core_tools) do
-        table.insert(session.available_tools, tool_name)
-    end
-
-    -- Add type-specific tools if we have a type
-    if type_name and type_registry then
-        local type_def = type_registry.get(type_name)
-        if type_def and type_def.tools then
-            for _, tool in ipairs(type_def.tools) do
-                table.insert(session.available_tools, tool.name)
-            end
-        end
-    end
 end
 
 -- Add action to session history
@@ -266,7 +217,7 @@ function handle_initialize(message, session_id)
     -- Check session limit before creating new session
     check_session_limit()
 
-    -- Create session with navigation context
+    -- Create session
     local current_time = os.time()
     local session = {
         client_capabilities = params.capabilities or {},
@@ -274,20 +225,8 @@ function handle_initialize(message, session_id)
         initialized = false,
         created_at = current_time,
         last_activity = current_time,
-        current_context = {
-            type = nil,
-            view = nil,
-            id = nil,
-            params = {}
-        },
-        available_tools = {},
         recent_actions = {}
     }
-
-    -- Initialize with core navigation tools only
-    for _, tool_name in ipairs(config.core_tools) do
-        table.insert(session.available_tools, tool_name)
-    end
 
     sessions[session_id] = session
 
@@ -296,7 +235,7 @@ function handle_initialize(message, session_id)
         protocolVersion = PROTOCOL_VERSION,
         capabilities = capabilities,
         serverInfo = server_info,
-        instructions = "MCP server running in Vah. Use navigation tools to explore the system."
+        instructions = "MCP server running in Vah. All tools are available."
     })
 end
 
@@ -315,7 +254,7 @@ function handle_tools_list(message, session)
         return json_rpc_success(message.id, {tools = {}})
     end
 
-    local tool_list = get_session_tools(session)
+    local tool_list = get_all_tools()
 
     return json_rpc_success(message.id, {
         tools = tool_list
@@ -334,19 +273,6 @@ function handle_tools_call(message, session)
 
     if not session then
         return json_rpc_error(message.id, -32600, "No active session")
-    end
-
-    -- Check if tool is available in this session
-    local tool_available = false
-    for _, available_tool in ipairs(session.available_tools) do
-        if available_tool == tool_name then
-            tool_available = true
-            break
-        end
-    end
-
-    if not tool_available then
-        return json_rpc_error(message.id, -32601, "Tool not available in current context: " .. tool_name)
     end
 
     local tool = tool_definitions[tool_name]
@@ -414,36 +340,34 @@ function validate_request_id(id)
 end
 
 -- Handle MCP POST request
-function handle_mcp_post(body, headers)
+function handle_mcp_post(req)
     -- Parse JSON-RPC message
     local message
     local parse_success, parse_error = pcall(function()
-        message = json.decode(body)
+        message = json.decode(req.body)
     end)
 
     if not parse_success or not message then
         local err_response = json_rpc_error(nil, -32700, "Parse error")
         return {
             status = 400,
-            content_type = "application/json",
-            body = json.encode(err_response),
-            session_id = nil
+            headers = {["Content-Type"] = "application/json"},
+            body = json.encode(err_response)
         }
     end
 
-    -- Validate request ID if present (requests have IDs, notifications don't)
+    -- Validate request ID if present
     if message.id ~= nil and not validate_request_id(message.id) then
         local err_response = json_rpc_error(nil, -32600, "Invalid Request: ID must be string, number, or null")
         return {
             status = 400,
-            content_type = "application/json",
-            body = json.encode(err_response),
-            session_id = nil
+            headers = {["Content-Type"] = "application/json"},
+            body = json.encode(err_response)
         }
     end
 
     -- Get or create session
-    local session_id = headers["mcp-session-id"] or headers["Mcp-Session-Id"]
+    local session_id = req.headers["mcp-session-id"] or req.headers["Mcp-Session-Id"]
     local session = nil
     local is_initialize = (message.method == "initialize")
 
@@ -456,9 +380,8 @@ function handle_mcp_post(body, headers)
             local err_response = json_rpc_error(message.id, -32600, "Missing session ID")
             return {
                 status = 400,
-                content_type = "application/json",
-                body = json.encode(err_response),
-                session_id = nil
+                headers = {["Content-Type"] = "application/json"},
+                body = json.encode(err_response)
             }
         end
 
@@ -467,9 +390,8 @@ function handle_mcp_post(body, headers)
             local err_response = json_rpc_error(message.id, -32600, "Invalid session ID")
             return {
                 status = 400,
-                content_type = "application/json",
-                body = json.encode(err_response),
-                session_id = nil
+                headers = {["Content-Type"] = "application/json"},
+                body = json.encode(err_response)
             }
         end
     end
@@ -481,39 +403,64 @@ function handle_mcp_post(body, headers)
         response = handle_initialize(message, session_id)
         return {
             status = 200,
-            content_type = "application/json",
-            body = json.encode(response),
-            session_id = session_id
+            headers = {
+                ["Content-Type"] = "application/json",
+                ["Mcp-Session-Id"] = session_id
+            },
+            body = json.encode(response)
         }
     elseif message.id then
         -- Request - needs response
         response = handle_request(message, session)
         return {
             status = 200,
-            content_type = "application/json",
-            body = json.encode(response),
-            session_id = nil
+            headers = {["Content-Type"] = "application/json"},
+            body = json.encode(response)
         }
     else
         -- Notification - no response needed
         handle_notification(message, session)
         return {
             status = 202,
-            content_type = "application/json",
-            body = "",
-            session_id = nil
+            headers = {["Content-Type"] = "application/json"},
+            body = ""
         }
     end
 end
 
--- Handle MCP DELETE request (session termination)
-function handle_mcp_delete(headers)
-    local session_id = headers["mcp-session-id"] or headers["Mcp-Session-Id"]
+-- Handle MCP GET request
+function handle_mcp_get(req)
+    local session_id = req.headers["mcp-session-id"] or req.headers["Mcp-Session-Id"]
+
+    if session_id then
+        -- TODO: Implement SSE stream for server-initiated messages
+        return {
+            status = 501,
+            headers = {["Content-Type"] = "text/plain"},
+            body = "SSE streaming not yet implemented"
+        }
+    else
+        -- Health check response
+        return {
+            status = 200,
+            headers = {["Content-Type"] = "application/json"},
+            body = json.encode({
+                name = server_info.name,
+                version = server_info.version,
+                status = "running"
+            })
+        }
+    end
+end
+
+-- Handle MCP DELETE request
+function handle_mcp_delete(req)
+    local session_id = req.headers["mcp-session-id"] or req.headers["Mcp-Session-Id"]
 
     if not session_id then
         return {
             status = 400,
-            content_type = "text/plain",
+            headers = {["Content-Type"] = "text/plain"},
             body = "Missing session ID"
         }
     end
@@ -522,7 +469,7 @@ function handle_mcp_delete(headers)
     if not session then
         return {
             status = 404,
-            content_type = "text/plain",
+            headers = {["Content-Type"] = "text/plain"},
             body = "Session not found"
         }
     end
@@ -533,7 +480,7 @@ function handle_mcp_delete(headers)
 
     return {
         status = 204,
-        content_type = "text/plain",
+        headers = {["Content-Type"] = "text/plain"},
         body = ""
     }
 end
@@ -549,13 +496,44 @@ function start_server()
     server_status = "running"
     update_ui_state()
 
-    print("MCP server listening on " .. SERVER_HOST .. ":" .. SERVER_PORT)
+    -- Create HTTP server
+    print("Creating HttpServer instance...")
+    http_server = HttpServer.new()
+    print("HttpServer created successfully")
+
+    -- Setup routes
+    print("Setting up POST route...")
+    http_server:route("POST", "/mcp", handle_mcp_post)
+    print("Setting up GET route...")
+    http_server:route("GET", "/mcp", handle_mcp_get)
+    print("Setting up DELETE route...")
+    http_server:route("DELETE", "/mcp", handle_mcp_delete)
+
+    print("MCP server configured, starting to listen on " .. config.server.host .. ":" .. config.server.port)
 
     -- Send notification
     event.trigger_global("notification_success", {
-        title = "MCP Server Started",
-        message = "Server listening on " .. SERVER_HOST .. ":" .. SERVER_PORT
+        title = "MCP Server Starting",
+        message = "Server will listen on " .. config.server.host .. ":" .. config.server.port
     })
+
+    -- This blocks the Lua thread (intentional)
+    local success, err = http_server:listen(config.server.host, config.server.port)
+
+    if not success then
+        print("Failed to start MCP server: " .. (err or "unknown error"))
+        server_status = "stopped"
+        update_ui_state()
+
+        event.trigger_global("notification_error", {
+            title = "MCP Server Failed",
+            message = "Failed to start: " .. (err or "unknown error")
+        })
+    else
+        print("MCP server stopped normally")
+        server_status = "stopped"
+        update_ui_state()
+    end
 end
 
 -- Stop the MCP server
@@ -566,8 +544,12 @@ function stop_server()
     end
 
     print("Stopping MCP server...")
-    server_status = "stopped"
-    update_ui_state()
+
+    if http_server then
+        http_server:stop()
+    end
+
+    -- Note: server_status will be set to "stopped" when listen() returns
 
     -- Clear sessions
     sessions = {}
@@ -578,87 +560,36 @@ function stop_server()
     })
 end
 
--- Register event handlers
+-- Register event handlers for menu
 function register_events()
-    -- HTTP request handler (from HttpServerThread via main thread)
-    event.register("http_request", function(payload)
-        local request_id = payload.request_id
-        local method = payload.method
-        local path = payload.path
-        local body = payload.body
-        local headers = payload.headers
-
-        print("Received HTTP " .. method .. " " .. path .. " (request_id=" .. request_id .. ")")
-
-        -- Only process if server is running
-        if server_status ~= "running" then
-            command.http_response(request_id, 503, "application/json",
-                json.encode({error = "MCP server not running"}))
-            return
-        end
-
-        local response
-        if method == "POST" and path == "/mcp" then
-            response = handle_mcp_post(body, headers)
-        elseif method == "GET" and path == "/mcp" then
-            -- GET without session: health check or server info
-            -- GET with session: SSE stream (not yet implemented)
-            local session_id = headers["mcp-session-id"]
-            if session_id then
-                -- TODO: Implement SSE stream for server-initiated messages
-                response = {
-                    status = 501,
-                    content_type = "text/plain",
-                    body = "SSE streaming not yet implemented"
-                }
-            else
-                -- Health check response
-                response = {
-                    status = 200,
-                    content_type = "application/json",
-                    body = json.encode({
-                        name = "VahMCPServer",
-                        version = "1.0.0",
-                        status = "running"
-                    })
-                }
-            end
-        elseif method == "DELETE" and path == "/mcp" then
-            response = handle_mcp_delete(headers)
-        else
-            response = {
-                status = 404,
-                content_type = "text/plain",
-                body = "Not Found"
-            }
-        end
-
-        -- Send response back via command queue
-        -- Add Mcp-Session-Id header if present
-        local response_headers = {}
-        if response.session_id then
-            response_headers["Mcp-Session-Id"] = response.session_id
-        end
-
-        command.http_response(request_id, response.status, response.content_type, response.body, response_headers)
-    end)
-
     -- Local events (from UI)
     event.register("mcp_start_server", function(payload)
-        start_server()
+        local success, err = pcall(start_server)
+        if not success then
+            print("ERROR starting MCP server: " .. tostring(err))
+        end
     end)
 
     event.register("mcp_stop_server", function(payload)
-        stop_server()
+        local success, err = pcall(stop_server)
+        if not success then
+            print("ERROR stopping MCP server: " .. tostring(err))
+        end
     end)
 
     -- Global events
     event.register_global("mcp_start_server", function(payload)
-        start_server()
+        local success, err = pcall(start_server)
+        if not success then
+            print("ERROR starting MCP server (global): " .. tostring(err))
+        end
     end)
 
     event.register_global("mcp_stop_server", function(payload)
-        stop_server()
+        local success, err = pcall(stop_server)
+        if not success then
+            print("ERROR stopping MCP server (global): " .. tostring(err))
+        end
     end)
 end
 
@@ -705,10 +636,21 @@ function startup()
     type_registry.init(config.type_registry)
     print("Type registry initialized")
 
+    -- Register all tools upfront (no session-based filtering)
     -- Load navigation tools
     local navigation = require(config.navigation_tools)
-    navigation.register(register_tool, type_registry, update_session_context)
+    navigation.register(register_tool, type_registry, nil)  -- No update_context needed
     print("Navigation tools registered")
+
+    -- Register type-specific action tools
+    for _, type_name in ipairs(type_registry.get_all_names()) do
+        local type_def = type_registry.get(type_name)
+        if type_def and type_def.tools then
+            for _, tool in ipairs(type_def.tools) do
+                register_tool(tool.name, tool.description, tool.inputSchema, tool.handler)
+            end
+        end
+    end
 
     -- Register events
     register_events()
@@ -766,5 +708,5 @@ return {
     register_tool = register_tool,
     is_running = function() return server_status == "running" end,
     get_status = function() return server_status end,
-    get_url = function() return "http://" .. SERVER_HOST .. ":" .. SERVER_PORT .. MCP_ENDPOINT end
+    get_url = function() return "http://" .. config.server.host .. ":" .. config.server.port .. "/mcp" end
 }

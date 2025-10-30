@@ -3,7 +3,6 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "EventDispatcher.h"
-#include "HttpServerThread.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
@@ -11,14 +10,12 @@ CommandProcessor::CommandProcessor(
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
     EventDispatcher* event_dispatcher,
-    HttpServerThread* http_server_thread,
     std::function<void()> on_close_application
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
     , event_dispatcher_(event_dispatcher)
-    , http_server_thread_(http_server_thread)
     , on_close_application_(on_close_application)
 {
 }
@@ -274,51 +271,6 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
                 } else {
                     command.promise->set_value(std::move(response_data));
                 }
-            }
-        }
-        else if constexpr (std::is_same_v<T, Commands::HttpRequest>) {
-            LOG_INFO("Processing HttpRequest command for thread {}", command.target_thread_id);
-
-            // Store promise for later (main thread only, no lock needed)
-            if (command.promise) {
-                pending_http_promises_[command.request_id] = command.promise;
-            }
-
-            // Forward the HTTP request to the target Lua thread via event
-            PayloadMap payload;
-            payload["request_id"] = static_cast<int64_t>(command.request_id);
-            payload["method"] = command.method;
-            payload["path"] = command.path;
-            payload["body"] = command.body;
-
-            // Send headers as nested map
-            DynamicRow headers_map;
-            for (const auto& [key, value] : command.headers) {
-                headers_map[key] = value;
-            }
-            payload["headers"] = std::make_shared<DynamicMap>(DynamicMap{headers_map});
-
-            event_dispatcher_->DispatchToThread(command.target_thread_id, "http_request", payload);
-        }
-        else if constexpr (std::is_same_v<T, Commands::HttpResponseCommand>) {
-            LOG_INFO("Processing HttpResponseCommand for request {}", command.request_id);
-
-            // Find the promise for this request and set it (promise-in-command pattern)
-            auto it = pending_http_promises_.find(command.request_id);
-            if (it != pending_http_promises_.end()) {
-                Commands::HttpResponse response;
-                response.status_code = command.status_code;
-                response.content_type = command.content_type;
-                response.body = command.body;
-                response.headers = command.headers;
-
-                // Set promise to wake waiting HTTP handler thread
-                it->second->set_value(std::move(response));
-
-                // Clean up promise (no longer needed)
-                pending_http_promises_.erase(it);
-            } else {
-                LOG_WARN("Received HttpResponseCommand for unknown request_id {}", command.request_id);
             }
         }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)

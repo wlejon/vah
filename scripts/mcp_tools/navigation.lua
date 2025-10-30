@@ -93,11 +93,6 @@ local function tool_list(args, session)
     local template_path = type_registry.get_template_path(type_name, "list")
     local rendered = render_view(template_path, template_data)
 
-    -- Update session context
-    if update_context_fn then
-        update_context_fn(session, type_name, "list", nil, query_context)
-    end
-
     return rendered
 end
 
@@ -151,11 +146,6 @@ local function tool_detail(args, session)
     local template_path = type_registry.get_template_path(type_name, "detail")
     local rendered = render_view(template_path, template_data)
 
-    -- Update session context
-    if update_context_fn then
-        update_context_fn(session, type_name, "detail", id, query_context)
-    end
-
     return rendered
 end
 
@@ -201,11 +191,6 @@ local function tool_summary(args, session)
     -- Render template
     local template_path = type_registry.get_template_path(type_name, "summary")
     local rendered = render_view(template_path, template_data)
-
-    -- Update session context
-    if update_context_fn then
-        update_context_fn(session, type_name, "summary", nil, query_context)
-    end
 
     return rendered
 end
@@ -259,11 +244,6 @@ local function tool_search(args, session)
     -- Render template
     local template_path = type_registry.get_template_path(type_name, "search")
     local rendered = render_view(template_path, template_data)
-
-    -- Update session context
-    if update_context_fn then
-        update_context_fn(session, type_name, "search", nil, query_context)
-    end
 
     return rendered
 end
@@ -365,9 +345,9 @@ local function tool_status(args, session)
 end
 
 -- Register all navigation tools
-function M.register(register_fn, registry, update_context)
+function M.register(register_fn, registry)
     type_registry = registry
-    update_context_fn = update_context
+    update_context_fn = nil  -- No longer needed (removed session-based tools)
 
     -- Build available types list for descriptions
     local available_types = registry.get_all_names()

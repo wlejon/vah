@@ -243,32 +243,6 @@ namespace Commands {
         std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
-    // HTTP server commands
-    // Response structure for HTTP requests
-    struct HttpResponse {
-        int status_code;
-        std::string content_type;
-        std::string body;
-        std::unordered_map<std::string, std::string> headers;
-    };
-
-    struct HttpRequest {
-        int request_id;
-        int target_thread_id;  // Which thread should handle this
-        std::string method;    // GET, POST, DELETE, etc.
-        std::string path;      // /mcp
-        std::string body;
-        std::unordered_map<std::string, std::string> headers;
-        std::shared_ptr<std::promise<HttpResponse>> promise;  // Promise-in-command pattern
-    };
-
-    struct HttpResponseCommand {
-        int request_id;
-        int status_code;
-        std::string content_type;
-        std::string body;
-        std::unordered_map<std::string, std::string> headers;
-    };
 }
 
 // Variant holding all possible command types
@@ -316,9 +290,7 @@ using Command = std::variant<
     Commands::QueryThreadList,
     Commands::QueryThreadInfo,
     Commands::QueryDocumentList,
-    Commands::QueryDocumentInfo,
-    Commands::HttpRequest,
-    Commands::HttpResponseCommand
+    Commands::QueryDocumentInfo
 >;
 
 // Response sent from main thread to lua thread
