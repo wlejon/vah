@@ -52,6 +52,7 @@ add_executable(vah
     src/JsonBindings.cpp
     src/SqliteBindings.cpp
     src/HttpBindings.cpp
+    src/SseParser.cpp
     src/ClipboardBindings.cpp
     src/KeybindingRegistry.cpp
     src/UndoStack.cpp

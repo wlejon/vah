@@ -97,16 +97,10 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 this task will fit in your context, there is no need to use subagents.
 
 please work through this problem:
-UndoStack Implementation
+HTTP Stream Parsing
 
-    Issue: The UndoStack logic in UndoStack.cpp is unconventional. It uses a single undo_stack_ and a current_index_ that points to the next available slot (one-past-the-end of the current state).
+    Issue: In HttpBindings.cpp, the ParseSSEStream function (and the Post streaming lambda) implements an SSE parser (event:, data:) inside the httplib content receiver lambda.
 
-    Why it's a problem: While it appears functionally correct after tracing it (see ElementTextEditor::PushUndoSnapshot calling it before a change), it's confusing. Undo decrements the index and then returns the item at that index. CanRedo checks current_index_ < undo_stack_.size() - 1.
+    Why it's a problem: This is complex logic living inside a lambda within a binding function. It also buffers all data from a line (event_data += line.substr(6)), which could be problematic if a single data: line is very large.
 
-    Suggestion: A more conventional and easier-to-reason-about implementation uses two stacks: std::vector<Snapshot> undo_stack_ and std::vector<Snapshot> redo_stack_.
-
-        Push: Add current state to undo_stack_. Clear redo_stack_.
-
-        Undo: Pop state from undo_stack_ (call it S_undo). Push current state to redo_stack_. Apply S_undo.
-
-        Redo: Pop state from redo_stack_ (call it S_redo). Push current state to undo_stack_. Apply S_redo. This model is simpler to implement and debug. Your current implementation is fine if you're comfortable with it, but it's a potential source of off-by-one errors.
+    Suggestion: Extract this SSE parsing logic into a small, separate SseParser class. This class could have a void ProcessChunk(const char* data, size_t len) method and take a std::function<void(std::string event, std::string data)> callback. The httplib lambda would then just call sseParser.ProcessChunk(...). This cleans up the bindings file considerably.

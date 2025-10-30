@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "JsonBindings.h"
 #include "LuaThread.h"
+#include "SseParser.h"
 #include <httplib.h>
 #include <sstream>
 #include <regex>
@@ -74,82 +75,27 @@ bool ParseSSEStream(
     client->set_connection_timeout(DEFAULT_CONNECTION_TIMEOUT);
     client->set_read_timeout(STREAMING_READ_TIMEOUT);
 
-    std::string event_type;
-    std::string event_data;
-    std::string buffer;
-    const size_t MAX_BUFFER_SIZE = 10 * 1024 * 1024;  // 10MB limit to prevent unbounded growth
+    // Create SSE parser with callbacks
+    sol::state_view lua(on_event.lua_state());
+    SseParser::ErrorCallback error_callback = nullptr;
+    if (on_error) {
+        error_callback = [on_error](const std::string& error) {
+            (*on_error)(error);
+        };
+    }
+
+    SseParser parser(
+        lua,
+        [on_event](std::string event, sol::object data) {
+            on_event(event, data);
+        },
+        error_callback,
+        thread
+    );
 
     auto res = client->Get(path, headers,
-        [&](const char* data, size_t len) {
-            // Check if thread is stopping (abort the stream)
-            if (thread && thread->ShouldStop()) {
-                return false;
-            }
-
-            // Check buffer size to prevent unbounded memory growth
-            if (buffer.size() + len > MAX_BUFFER_SIZE) {
-                if (on_error) {
-                    (*on_error)("Buffer size exceeded maximum limit (10MB)");
-                }
-                return false;
-            }
-
-            buffer.append(data, len);
-
-            // Process complete lines
-            size_t pos;
-            while ((pos = buffer.find('\n')) != std::string::npos) {
-                std::string line = buffer.substr(0, pos);
-                buffer = buffer.substr(pos + 1);
-
-                // Remove \r if present
-                if (!line.empty() && line.back() == '\r') {
-                    line.pop_back();
-                }
-
-                if (line.empty()) {
-                    // Empty line marks end of event
-                    if (!event_data.empty()) {
-                        try {
-                            sol::state_view lua(on_event.lua_state());
-
-                            // Try to parse as JSON
-                            sol::object lua_data = sol::nil;
-                            try {
-                                auto json_obj = nlohmann::json::parse(event_data);
-                                lua_data = JsonBindings::JsonToLua(lua, json_obj);
-                            } catch (...) {
-                                // If not JSON, pass as string
-                                lua_data = sol::make_object(lua, event_data);
-                            }
-
-                            // Call Lua callback with event type and data
-                            std::string evt = event_type.empty() ? "message" : event_type;
-                            on_event(evt, lua_data);
-                        }
-                        catch (const std::exception& e) {
-                            if (on_error) {
-                                (*on_error)(std::string("Parse error: ") + e.what());
-                            }
-                            return false; // Stop streaming
-                        }
-                    }
-                    event_type.clear();
-                    event_data.clear();
-                }
-                else if (line.find("event: ") == 0) {
-                    event_type = line.substr(7);
-                }
-                else if (line.find("data: ") == 0) {
-                    if (!event_data.empty()) {
-                        event_data += "\n";
-                    }
-                    event_data += line.substr(6);
-                }
-                // Ignore other SSE fields (id, retry, etc.)
-            }
-
-            return true; // Continue streaming
+        [&parser](const char* data, size_t len) {
+            return parser.ProcessChunk(data, len);
         });
 
     if (!res) {
@@ -341,82 +287,26 @@ std::tuple<sol::object, std::string> Post(
             client->set_connection_timeout(DEFAULT_CONNECTION_TIMEOUT);
             client->set_read_timeout(timeout);
 
-            std::string event_type;
-            std::string event_data;
-            std::string buffer;
-            const size_t MAX_BUFFER_SIZE = 10 * 1024 * 1024;  // 10MB limit to prevent unbounded growth
+            // Create SSE parser with callbacks
+            SseParser::ErrorCallback error_callback = nullptr;
+            if (on_error) {
+                error_callback = [on_error](const std::string& error) {
+                    (*on_error)(error);
+                };
+            }
+
+            SseParser parser(
+                lua,
+                [on_event](std::string event, sol::object data) {
+                    (*on_event)(event, data);
+                },
+                error_callback,
+                thread
+            );
 
             auto res = client->Post(url_parts.path, headers, body, content_type,
-                [&](const char* data, size_t len) {
-                    // Check if thread is stopping (abort the stream)
-                    if (thread && thread->ShouldStop()) {
-                        return false;
-                    }
-
-                    // Check buffer size to prevent unbounded memory growth
-                    if (buffer.size() + len > MAX_BUFFER_SIZE) {
-                        if (on_error) {
-                            (*on_error)("Buffer size exceeded maximum limit (10MB)");
-                        }
-                        return false;
-                    }
-
-                    buffer.append(data, len);
-
-                    // Process complete lines
-                    size_t pos;
-                    while ((pos = buffer.find('\n')) != std::string::npos) {
-                        std::string line = buffer.substr(0, pos);
-                        buffer = buffer.substr(pos + 1);
-
-                        // Remove \r if present
-                        if (!line.empty() && line.back() == '\r') {
-                            line.pop_back();
-                        }
-
-                        if (line.empty()) {
-                            // Empty line marks end of event
-                            if (!event_data.empty()) {
-                                try {
-                                    sol::state_view lua(on_event.value().lua_state());
-
-                                    // Try to parse as JSON
-                                    sol::object lua_data = sol::nil;
-                                    try {
-                                        auto json_obj = nlohmann::json::parse(event_data);
-                                        lua_data = JsonBindings::JsonToLua(lua, json_obj);
-                                    } catch (...) {
-                                        // If not JSON, pass as string
-                                        lua_data = sol::make_object(lua, event_data);
-                                    }
-
-                                    // Call Lua callback with event type and data
-                                    std::string evt = event_type.empty() ? "message" : event_type;
-                                    on_event.value()(evt, lua_data);
-                                }
-                                catch (const std::exception& e) {
-                                    if (on_error) {
-                                        (*on_error)(std::string("Parse error: ") + e.what());
-                                    }
-                                    return false; // Stop streaming
-                                }
-                            }
-                            event_type.clear();
-                            event_data.clear();
-                        }
-                        else if (line.find("event: ") == 0) {
-                            event_type = line.substr(7);
-                        }
-                        else if (line.find("data: ") == 0) {
-                            if (!event_data.empty()) {
-                                event_data += "\n";
-                            }
-                            event_data += line.substr(6);
-                        }
-                        // Ignore other SSE fields (id, retry, etc.)
-                    }
-
-                    return true; // Continue streaming
+                [&parser](const char* data, size_t len) {
+                    return parser.ProcessChunk(data, len);
                 });
 
             if (!res) {
