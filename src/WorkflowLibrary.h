@@ -4,11 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
-
-// Forward declarations
-extern "C" {
-    typedef struct lua_State lua_State;
-}
+#include <sol/forward.hpp>
 
 namespace WorkflowLibrary {
 
@@ -21,7 +17,7 @@ struct LibraryDefinition {
     std::string name;                   // Human-readable name (e.g., "Database Access")
     std::string description;            // Full description of what the library does
     std::string access_description;     // Description of what data/resources it can access
-    std::function<void(lua_State*)> register_func;  // Function to register bindings in lua_State
+    std::function<void(sol::state&)> register_func;  // Function to register bindings in sol::state
 };
 
 /**
@@ -51,13 +47,13 @@ public:
     static bool IsLibraryAvailable(const std::string& id);
 
     /**
-     * Register requested libraries into a lua_State.
+     * Register requested libraries into a sol::state.
      * Only the requested libraries will be made available in the state.
-     * @param L The lua_State to register libraries into
+     * @param lua The sol::state to register libraries into
      * @param library_ids List of library IDs to register
      * @return Number of libraries successfully registered
      */
-    static int RegisterRequestedLibraries(lua_State* L, const std::vector<std::string>& library_ids);
+    static int RegisterRequestedLibraries(sol::state& lua, const std::vector<std::string>& library_ids);
 
     /**
      * Get the definition for a specific library.

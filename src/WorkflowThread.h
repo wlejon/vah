@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+namespace sol { class state; }
+
 /**
  * Configuration for creating a workflow execution thread.
  */
@@ -25,3 +27,11 @@ struct WorkflowThreadConfig {
  * @return Thread ID on success, or -1 on failure
  */
 int CreateWorkflowThread(const WorkflowThreadConfig& config);
+
+/**
+ * Register workflow thread bindings into a Lua state.
+ * Adds thread.create_workflow_thread() function.
+ *
+ * @param lua The sol::state to register bindings into
+ */
+void RegisterWorkflowThreadBindings(sol::state& lua);

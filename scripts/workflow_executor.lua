@@ -55,7 +55,7 @@ local function topological_sort(nodes, connections)
 
     -- Check for cycles
     if #result ~= #nodes then
-        print("ERROR: Workflow has a cycle - cannot execute")
+        execution.log("ERROR", "Workflow has a cycle - cannot execute")
         return nil
     end
 
@@ -85,7 +85,7 @@ end
 -- Helper: Execute a single node's script in sandboxed environment
 local function execute_node(node, inputs, execution_id, workflow_id, node_outputs)
     if not node.config or not node.config.script then
-        print("ERROR: Node " .. node.id .. " has no script")
+        execution.log("ERROR", "Node " .. node.id .. " has no script", node.id)
         return false, "Node has no script"
     end
 
@@ -108,14 +108,14 @@ local function execute_node(node, inputs, execution_id, workflow_id, node_output
     -- Load the script
     local func, load_err = load(node.config.script, "node_" .. node.id, "t", env)
     if not func then
-        print("ERROR: Node " .. node.id .. " script load error: " .. tostring(load_err))
+        execution.log("ERROR", "Node " .. node.id .. " script load error: " .. tostring(load_err), node.id)
         return false, "Script load error: " .. tostring(load_err)
     end
 
     -- Execute the script
     local success, result = pcall(func)
     if not success then
-        print("ERROR: Node " .. node.id .. " execution error: " .. tostring(result))
+        execution.log("ERROR", "Node " .. node.id .. " execution error: " .. tostring(result), node.id)
         return false, "Script execution error: " .. tostring(result)
     end
 
@@ -130,10 +130,10 @@ end
 local function execute_callback_nodes(callback_nodes, callback_type, context, execution_id)
     for _, node in ipairs(callback_nodes) do
         if node.config and node.config.callback_type == callback_type then
-            print("Executing callback node " .. node.id .. " (" .. callback_type .. ")")
+            execution.log("INFO", "Executing callback node " .. node.id .. " (" .. callback_type .. ")", node.id)
 
             if not node.config.script then
-                print("WARNING: Callback node " .. node.id .. " has no script")
+                execution.log("WARN", "Callback node " .. node.id .. " has no script", node.id)
             else
                 -- Create sandboxed environment
                 local env = {}
@@ -150,10 +150,10 @@ local function execute_callback_nodes(callback_nodes, callback_type, context, ex
                 if func then
                     local success, err = pcall(func)
                     if not success then
-                        print("ERROR: Callback node " .. node.id .. " execution error: " .. tostring(err))
+                        execution.log("ERROR", "Callback node " .. node.id .. " execution error: " .. tostring(err), node.id)
                     end
                 else
-                    print("ERROR: Callback node " .. node.id .. " load error: " .. tostring(load_err))
+                    execution.log("ERROR", "Callback node " .. node.id .. " load error: " .. tostring(load_err), node.id)
                 end
             end
         end
@@ -174,10 +174,10 @@ local function check_control_command(execution_id)
         local command = results[1].command
 
         if command == "stop" then
-            print("Stop command received for execution " .. execution_id)
+            execution.log("INFO", "Stop command received for execution " .. execution_id)
             return false
         elseif command == "pause" then
-            print("Pause command received for execution " .. execution_id)
+            execution.log("INFO", "Pause command received for execution " .. execution_id)
 
             -- Wait until command changes
             while command == "pause" do
@@ -209,7 +209,7 @@ end
 local function update_execution_status(execution_id, status, error_message)
     local db_handle, err = db.open("data/workflow.db")
     if err ~= "" then
-        print("ERROR: Failed to update execution status - cannot open database")
+        execution.log("ERROR", "Failed to update execution status - cannot open database")
         return
     end
 
@@ -223,14 +223,14 @@ local function update_execution_status(execution_id, status, error_message)
     end
 
     db_handle:close()
-    print("Execution " .. execution_id .. " status updated to: " .. status)
+    execution.log("INFO", "Execution " .. execution_id .. " status updated to: " .. status)
 end
 
 -- Helper: Update node status in database
 local function update_node_status(execution_id, node_id, status, outputs, error_message)
     local db_handle, err = db.open("data/workflow.db")
     if err ~= "" then
-        print("ERROR: Failed to update node status - cannot open database")
+        execution.log("ERROR", "Failed to update node status - cannot open database", node_id)
         return
     end
 
@@ -285,7 +285,7 @@ end
 local function create_execution_tables(execution_id)
     local db_handle, err = db.open("data/workflow.db")
     if err ~= "" then
-        print("ERROR: Failed to create execution tables - cannot open database")
+        execution.log("ERROR", "Failed to create execution tables - cannot open database")
         return
     end
 
@@ -314,12 +314,12 @@ end
 
 -- Main execution function
 function M.execute_workflow(execution_id, workflow_id)
-    print("Starting execution " .. execution_id .. " for workflow " .. workflow_id)
+    execution.log("INFO", "Starting execution " .. execution_id .. " for workflow " .. workflow_id)
 
     -- Open database
     local db_handle, err = db.open("data/workflow.db")
     if err ~= "" then
-        print("ERROR: Failed to open database: " .. err)
+        execution.log("ERROR", "Failed to open database: " .. err)
         update_execution_status(execution_id, "error", "Failed to open database")
         return false
     end
@@ -371,7 +371,7 @@ function M.execute_workflow(execution_id, workflow_id)
 
     db_handle:close()
 
-    print("Loaded workflow " .. workflow_id .. ": " .. #nodes .. " nodes, " .. #connections .. " connections, " .. #callback_nodes .. " callbacks")
+    execution.log("INFO", "Loaded workflow " .. workflow_id .. ": " .. #nodes .. " nodes, " .. #connections .. " connections, " .. #callback_nodes .. " callbacks")
 
     -- Create execution tables
     create_execution_tables(execution_id)
@@ -450,7 +450,7 @@ function M.execute_workflow(execution_id, workflow_id)
             outputs = outputs
         }, execution_id)
 
-        print("Node " .. node_id .. " executed successfully")
+        execution.log("INFO", "Node " .. node_id .. " executed successfully", node_id)
 
         -- Small delay for visualization
         thread.sleep(0.1)
@@ -465,7 +465,7 @@ function M.execute_workflow(execution_id, workflow_id)
     -- Update execution status
     update_execution_status(execution_id, "completed")
 
-    print("Execution " .. execution_id .. " completed successfully")
+    execution.log("INFO", "Execution " .. execution_id .. " completed successfully")
     return true
 end
 

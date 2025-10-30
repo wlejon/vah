@@ -558,9 +558,6 @@ local function handle_execute_workflow(payload)
     print("Starting workflow execution: " .. execution_id)
 
     -- Call thread.create_workflow_thread() to start execution
-    -- NOTE: This is a C++ function that needs to be implemented
-    -- It should create a new thread and load the workflow executor script
-    -- For now, this will fail gracefully if the function doesn't exist
     local has_thread_func = thread and thread.create_workflow_thread
     if not has_thread_func then
         print("WARNING: thread.create_workflow_thread() not implemented yet")
@@ -573,7 +570,8 @@ local function handle_execute_workflow(payload)
         return
     end
 
-    local thread_id = thread.create_workflow_thread(active_workflow.id, execution_id)
+    -- Pass the requires array so the workflow has access to requested libraries
+    local thread_id = thread.create_workflow_thread(active_workflow.id, execution_id, requires)
 
     if not thread_id then
         print("ERROR: Failed to create workflow thread")

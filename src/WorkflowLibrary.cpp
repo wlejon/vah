@@ -3,6 +3,7 @@
 #include "SqliteBindings.h"
 #include "FileWatcherBindings.h"
 #include "HttpBindings.h"
+#include "JsonBindings.h"
 #include <lua.hpp>
 #include <sol/sol.hpp>
 
@@ -11,73 +12,55 @@ namespace WorkflowLibrary {
 // Static member initialization
 std::unordered_map<std::string, LibraryDefinition> WorkflowLibraryRegistry::s_libraries;
 
-// Forward declarations for binding functions that may exist elsewhere
-// Note: These will be implemented as we build out the workflow system
-
-// Placeholder binding function for libraries not yet implemented
-static void RegisterPlaceholder(lua_State* L, const std::string& lib_name) {
-    LOG_WARN("Workflow library '{}' not yet implemented - placeholder registered", lib_name);
-    // Create an empty table for the library so scripts don't error
-    lua_newtable(L);
-    lua_setglobal(L, lib_name.c_str());
-}
-
 // Wrapper functions for standard Lua libraries
-static void RegisterMathLibrary(lua_State* L) {
-    luaL_requiref(L, "math", luaopen_math, 1);
-    lua_pop(L, 1);  // Pop the module table
+static void RegisterMathLibrary(sol::state& lua) {
+    lua.open_libraries(sol::lib::math);
     LOG_DEBUG("Registered math library for workflow");
 }
 
-static void RegisterStringLibrary(lua_State* L) {
-    luaL_requiref(L, "string", luaopen_string, 1);
-    lua_pop(L, 1);  // Pop the module table
+static void RegisterStringLibrary(sol::state& lua) {
+    lua.open_libraries(sol::lib::string);
     LOG_DEBUG("Registered string library for workflow");
 }
 
-static void RegisterTableLibrary(lua_State* L) {
-    luaL_requiref(L, "table", luaopen_table, 1);
-    lua_pop(L, 1);  // Pop the module table
+static void RegisterTableLibrary(sol::state& lua) {
+    lua.open_libraries(sol::lib::table);
     LOG_DEBUG("Registered table library for workflow");
 }
 
 // Database bindings wrapper
-static void RegisterDbLibrary(lua_State* L) {
-    // For now, use placeholder until we refactor bindings to work with lua_State*
-    // The existing SqliteBindings::SetupBindings expects sol::state&
-    // which requires ownership, but we only have a non-owning lua_State*
-    LOG_WARN("Database library needs sol::state_view support - using placeholder");
-    RegisterPlaceholder(L, "db");
-    // TODO: Refactor SqliteBindings to accept sol::state_view or lua_State*
+static void RegisterDbLibrary(sol::state& lua) {
+    SqliteBindings::SetupBindings(lua);
+    LOG_DEBUG("Registered db library for workflow");
 }
 
 // File system bindings placeholder
-static void RegisterFsLibrary(lua_State* L) {
-    RegisterPlaceholder(L, "fs");
+static void RegisterFsLibrary(sol::state& lua) {
+    LOG_WARN("File system library not yet implemented for workflows");
+    lua["fs"] = lua.create_table();
     // TODO: Implement file system bindings for workflows
     // This should provide safe file system access with appropriate restrictions
 }
 
 // HTTP bindings wrapper
-static void RegisterHttpLibrary(lua_State* L) {
+static void RegisterHttpLibrary(sol::state& lua) {
     // Note: HttpBindings normally requires LuaThread pointer for server registration
     // For workflows, we may need a different approach or restricted HTTP client only
     LOG_WARN("HTTP library for workflows needs special implementation - placeholder registered");
-    RegisterPlaceholder(L, "http");
+    lua["http"] = lua.create_table();
     // TODO: Implement HTTP bindings for workflows (likely client-only, no server)
 }
 
 // UI bindings placeholder
-static void RegisterUiLibrary(lua_State* L) {
-    RegisterPlaceholder(L, "ui");
+static void RegisterUiLibrary(sol::state& lua) {
+    LOG_WARN("UI library not yet implemented for workflows");
+    lua["ui"] = lua.create_table();
     // TODO: Implement UI bindings for workflows
     // This should allow workflows to create RmlUI windows and interact with UI
 }
 
-// Thread utilities placeholder
-static void RegisterThreadLibrary(lua_State* L) {
-    // Provide basic thread utilities like sleep
-    sol::state_view lua(L);
+// Thread utilities
+static void RegisterThreadLibrary(sol::state& lua) {
     auto thread_table = lua.create_table();
 
     // Sleep function (useful for workflows)
@@ -86,12 +69,19 @@ static void RegisterThreadLibrary(lua_State* L) {
     };
 
     lua["thread"] = thread_table;
-    LOG_DEBUG("Registered thread library for workflow (limited functionality)");
+    LOG_DEBUG("Registered thread library for workflow");
+}
+
+// JSON bindings wrapper
+static void RegisterJsonLibrary(sol::state& lua) {
+    JsonBindings::SetupBindings(lua);
+    LOG_DEBUG("Registered json library for workflow");
 }
 
 // Event system bindings placeholder
-static void RegisterEventLibrary(lua_State* L) {
-    RegisterPlaceholder(L, "event");
+static void RegisterEventLibrary(sol::state& lua) {
+    LOG_WARN("Event system not yet implemented for workflows");
+    lua["event"] = lua.create_table();
     // TODO: Implement event bindings for workflows
     // This should allow workflows to trigger and listen for events
 }
@@ -120,6 +110,14 @@ void WorkflowLibraryRegistry::RegisterBuiltinLibraries() {
         "Table manipulation utilities for sorting, concatenating, and managing Lua tables",
         "No data access - pure computation",
         RegisterTableLibrary
+    });
+
+    RegisterLibrary({
+        "json",
+        "JSON Encoding/Decoding",
+        "Encode and decode JSON data with support for Lua tables",
+        "No data access - pure computation",
+        RegisterJsonLibrary
     });
 
     // System access libraries (require user approval)
@@ -190,7 +188,7 @@ bool WorkflowLibraryRegistry::IsLibraryAvailable(const std::string& id) {
     return s_libraries.find(id) != s_libraries.end();
 }
 
-int WorkflowLibraryRegistry::RegisterRequestedLibraries(lua_State* L, const std::vector<std::string>& library_ids) {
+int WorkflowLibraryRegistry::RegisterRequestedLibraries(sol::state& lua, const std::vector<std::string>& library_ids) {
     int registered_count = 0;
 
     for (const auto& lib_id : library_ids) {
@@ -204,16 +202,16 @@ int WorkflowLibraryRegistry::RegisterRequestedLibraries(lua_State* L, const std:
 
         try {
             // Call the registration function for this library
-            lib_def.register_func(L);
+            lib_def.register_func(lua);
             registered_count++;
-            LOG_DEBUG("Registered library '{}' in workflow lua_State", lib_id);
+            LOG_DEBUG("Registered library '{}' in workflow state", lib_id);
         }
         catch (const std::exception& e) {
             LOG_ERROR("Error registering library '{}': {}", lib_id, e.what());
         }
     }
 
-    LOG_INFO("Registered {}/{} requested libraries in workflow lua_State",
+    LOG_INFO("Registered {}/{} requested libraries in workflow state",
              registered_count, library_ids.size());
 
     return registered_count;

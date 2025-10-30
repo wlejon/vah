@@ -19,22 +19,22 @@ static std::unordered_map<int, std::shared_ptr<std::thread>> g_workflow_threads;
 static void WorkflowThreadMain(int thread_id, int execution_id, const std::vector<std::string>& required_libraries) {
     LOG_INFO("Workflow thread {} starting for execution {}", thread_id, execution_id);
 
-    // Create new lua_State
-    lua_State* L = luaL_newstate();
-    if (!L) {
-        LOG_ERROR("Failed to create lua_State for workflow thread {}", thread_id);
-        return;
-    }
+    // Create new sol::state
+    sol::state lua;
+    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::math,
+                      sol::lib::string, sol::lib::table, sol::lib::os);
 
-    // Open standard Lua libraries
-    luaL_openlibs(L);
+    // Register executor dependencies (always needed for workflow_executor.lua to run)
+    std::vector<std::string> executor_deps = {"db", "json", "thread"};
+    int executor_libs = WorkflowLibrary::WorkflowLibraryRegistry::RegisterRequestedLibraries(lua, executor_deps);
+    LOG_INFO("Workflow thread {} registered {} executor libraries", thread_id, executor_libs);
 
     // Register requested libraries using WorkflowLibraryRegistry
-    int registered = WorkflowLibrary::WorkflowLibraryRegistry::RegisterRequestedLibraries(L, required_libraries);
-    LOG_INFO("Workflow thread {} registered {} libraries", thread_id, registered);
+    int registered = WorkflowLibrary::WorkflowLibraryRegistry::RegisterRequestedLibraries(lua, required_libraries);
+    LOG_INFO("Workflow thread {} registered {} workflow libraries", thread_id, registered);
 
     // Register execution API
-    WorkflowExecutionBindings::RegisterExecutionAPI(L, execution_id);
+    WorkflowExecutionBindings::RegisterExecutionAPI(lua.lua_state(), execution_id);
     LOG_INFO("Workflow thread {} registered execution API for execution {}", thread_id, execution_id);
 
     // Get workflow_id from execution record
@@ -57,7 +57,6 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
 
     if (workflow_id == 0) {
         LOG_ERROR("Failed to get workflow_id for execution {}", execution_id);
-        lua_close(L);
         return;
     }
 
@@ -65,14 +64,11 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
 
     // Use sol to load and execute the Lua executor
     try {
-        sol::state_view lua(L);
-
         // Load the workflow executor module
         sol::load_result load_result = lua.load_file("scripts/workflow_executor.lua");
         if (!load_result.valid()) {
             sol::error err = load_result;
             LOG_ERROR("Failed to load workflow_executor.lua: {}", err.what());
-            lua_close(L);
             return;
         }
 
@@ -81,7 +77,6 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
         if (!exec_result.valid()) {
             sol::error err = exec_result;
             LOG_ERROR("Failed to execute workflow_executor.lua: {}", err.what());
-            lua_close(L);
             return;
         }
 
@@ -91,7 +86,6 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
         sol::protected_function execute_workflow = executor_module["execute_workflow"];
         if (!execute_workflow.valid()) {
             LOG_ERROR("workflow_executor.lua does not export execute_workflow function");
-            lua_close(L);
             return;
         }
 
@@ -112,8 +106,7 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
         LOG_ERROR("Workflow thread {} exception: {}", thread_id, e.what());
     }
 
-    // Clean up
-    lua_close(L);
+    // sol::state destructor handles cleanup
     LOG_INFO("Workflow thread {} finished", thread_id);
 }
 
@@ -154,4 +147,30 @@ int CreateWorkflowThread(const WorkflowThreadConfig& config) {
         LOG_ERROR("Failed to create workflow thread: {}", e.what());
         return -1;
     }
+}
+
+void RegisterWorkflowThreadBindings(sol::state& lua) {
+    // Get or create the thread table
+    auto thread_table = lua["thread"].get_or_create<sol::table>();
+
+    // Register create_workflow_thread function
+    thread_table["create_workflow_thread"] = [](int workflow_id, int execution_id, sol::optional<sol::table> libraries) {
+        WorkflowThreadConfig config;
+        config.workflow_id = workflow_id;
+        config.execution_id = execution_id;
+
+        // Parse required libraries from table
+        if (libraries) {
+            for (const auto& [key, value] : libraries.value()) {
+                if (value.is<std::string>()) {
+                    config.required_libraries.push_back(value.as<std::string>());
+                }
+            }
+        }
+
+        int thread_id = CreateWorkflowThread(config);
+        return thread_id;
+    };
+
+    LOG_DEBUG("Registered workflow thread bindings");
 }
