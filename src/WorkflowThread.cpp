@@ -1,9 +1,8 @@
 #include "WorkflowThread.h"
 #include "WorkflowLibrary.h"
 #include "WorkflowExecutionBindings.h"
-#include "WorkflowExecutor.h"
 #include "Logger.h"
-#include <lua.hpp>
+#include <sol/sol.hpp>
 #include <sqlite3.h>
 #include <thread>
 #include <atomic>
@@ -12,7 +11,7 @@
 #include <mutex>
 
 // Simple thread tracking
-static std::atomic<int> g_next_workflow_thread_id{1000};  // Start at 1000 to distinguish from regular threads
+static std::atomic<int> g_next_workflow_thread_id{1000};
 static std::mutex g_workflow_threads_mutex;
 static std::unordered_map<int, std::shared_ptr<std::thread>> g_workflow_threads;
 
@@ -38,12 +37,7 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
     WorkflowExecutionBindings::RegisterExecutionAPI(L, execution_id);
     LOG_INFO("Workflow thread {} registered execution API for execution {}", thread_id, execution_id);
 
-    // Create workflow executor
-    WorkflowExecutor executor(L, execution_id);
-
-    // Load workflow from database
-    // Note: We need to get workflow_id from the execution record
-    // For now, we'll need to query it from the database
+    // Get workflow_id from execution record
     sqlite3* db = nullptr;
     int workflow_id = 0;
 
@@ -67,22 +61,55 @@ static void WorkflowThreadMain(int thread_id, int execution_id, const std::vecto
         return;
     }
 
-    LOG_INFO("Workflow thread {} loading workflow {}", thread_id, workflow_id);
+    LOG_INFO("Workflow thread {} executing workflow {} (execution {})", thread_id, workflow_id, execution_id);
 
-    if (!executor.LoadWorkflow(workflow_id)) {
-        LOG_ERROR("Failed to load workflow {} for execution {}", workflow_id, execution_id);
-        lua_close(L);
-        return;
-    }
+    // Use sol to load and execute the Lua executor
+    try {
+        sol::state_view lua(L);
 
-    // Execute the workflow
-    LOG_INFO("Workflow thread {} executing workflow {}", thread_id, workflow_id);
-    bool success = executor.Execute();
+        // Load the workflow executor module
+        sol::load_result load_result = lua.load_file("scripts/workflow_executor.lua");
+        if (!load_result.valid()) {
+            sol::error err = load_result;
+            LOG_ERROR("Failed to load workflow_executor.lua: {}", err.what());
+            lua_close(L);
+            return;
+        }
 
-    if (!success) {
-        LOG_ERROR("Workflow execution {} failed", execution_id);
-    } else {
-        LOG_INFO("Workflow execution {} completed successfully", execution_id);
+        // Execute to get the module
+        sol::protected_function_result exec_result = load_result();
+        if (!exec_result.valid()) {
+            sol::error err = exec_result;
+            LOG_ERROR("Failed to execute workflow_executor.lua: {}", err.what());
+            lua_close(L);
+            return;
+        }
+
+        sol::table executor_module = exec_result;
+
+        // Call execute_workflow function
+        sol::protected_function execute_workflow = executor_module["execute_workflow"];
+        if (!execute_workflow.valid()) {
+            LOG_ERROR("workflow_executor.lua does not export execute_workflow function");
+            lua_close(L);
+            return;
+        }
+
+        sol::protected_function_result result = execute_workflow(execution_id, workflow_id);
+        if (!result.valid()) {
+            sol::error err = result;
+            LOG_ERROR("Workflow execution {} failed: {}", execution_id, err.what());
+        } else {
+            bool success = result;
+            if (success) {
+                LOG_INFO("Workflow execution {} completed successfully", execution_id);
+            } else {
+                LOG_ERROR("Workflow execution {} failed", execution_id);
+            }
+        }
+
+    } catch (const std::exception& e) {
+        LOG_ERROR("Workflow thread {} exception: {}", thread_id, e.what());
     }
 
     // Clean up

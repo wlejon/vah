@@ -82,7 +82,6 @@ add_executable(vah
     src/WorkflowLibrary.cpp
     src/WorkflowExecutionBindings.cpp
     src/WorkflowThread.cpp
-    src/WorkflowExecutor.cpp
 )
 
 target_include_directories(vah PRIVATE
