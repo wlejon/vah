@@ -1161,13 +1161,19 @@ function M.save_node_config(workflow_id, node_id, config)
         return false
     end
 
+    -- Convert config to JSON string if it's a table
+    local config_str = config
+    if type(config) == "table" then
+        config_str = json.encode(config)
+    end
+
     local sql = [[
         UPDATE workflow_nodes
         SET config = ?
         WHERE workflow_id = ? AND node_id = ?
     ]]
 
-    local success, error = M.db_handle:execute(sql, config, workflow_id, node_id)
+    local success, error = M.db_handle:execute(sql, config_str, workflow_id, node_id)
     if not success then
         print("M.save_node_config: Error saving node config: " .. error)
         return false
@@ -1195,8 +1201,18 @@ function M.load_node_config(workflow_id, node_id)
         return nil
     end
 
-    if results and #results > 0 then
-        return results[1].config
+    if results and #results > 0 and results[1].config then
+        local config_str = results[1].config
+        -- Decode JSON if it's a string
+        if type(config_str) == "string" and config_str ~= "" then
+            local success, decoded = pcall(json.decode, config_str)
+            if success then
+                return decoded
+            else
+                print("M.load_node_config: Error decoding JSON config: " .. tostring(decoded))
+                return nil
+            end
+        end
     end
 
     return nil

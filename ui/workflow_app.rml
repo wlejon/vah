@@ -300,27 +300,29 @@
 
                     <div class="form-section">
                         <label>Node Label:</label>
-                        <input type="text" name="node_label" data-attr-value="node.label" />
+                        <input type="text" name="node_label" data-attr-value="node.label" onchange="emit('node_label_changed', {value = event.parameters.value})" />
                     </div>
 
                     <div class="form-section">
                         <label>Inputs (comma-separated):</label>
-                        <input type="text" name="node_inputs" data-attr-value="node.inputs" />
+                        <input type="text" name="node_inputs" data-attr-value="node.inputs" onchange="emit('node_inputs_changed', {value = event.parameters.value})" />
                     </div>
 
                     <div class="form-section">
                         <label>Outputs (comma-separated):</label>
-                        <input type="text" name="node_outputs" data-attr-value="node.outputs" />
+                        <input type="text" name="node_outputs" data-attr-value="node.outputs" onchange="emit('node_outputs_changed', {value = event.parameters.value})" />
                     </div>
 
                     <div class="form-section">
                         <label>Script:</label>
-                        <textarea name="node_script" rows="15" data-attr-value="node.script"></textarea>
+                        <div class="script-editor-container">
+                            <texteditor id="node_script_editor" onmodified="emit('node_script_modified', {content = event.parameters.content})" />
+                        </div>
                     </div>
 
                     <div class="button-group">
-                        <button class="save-btn" onclick="emit('save_node_config', {node_id = node.node_id, label = document:GetElementById('node-config-view'):GetElementsByTagName('input')[0].value, inputs = document:GetElementById('node-config-view'):GetElementsByTagName('input')[1].value, outputs = document:GetElementById('node-config-view'):GetElementsByTagName('input')[2].value, script = document:GetElementById('node-config-view'):GetElementsByTagName('textarea')[0].value}); switch_to_workflow_view(document)">Save</button>
-                        <button onclick="switch_to_workflow_view(document)">Cancel</button>
+                        <button class="save-btn" onclick="emit('save_node_config_from_dialog')">Save</button>
+                        <button onclick="emit('cancel_node_config')">Cancel</button>
                     </div>
                 </div>
             </div>

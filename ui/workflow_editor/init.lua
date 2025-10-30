@@ -38,7 +38,8 @@ local function build_nodes_from_server()
 
     for _, node_data in ipairs(workflow_nodes) do
         if node_data.id and node_data.type_index and node_data.x and node_data.y then
-            local node_type = node_types[node_data.type_index]
+            -- Find node type by database ID (not array index)
+            local node_type = node_module.find_type_by_id(node_types, node_data.type_index)
             if node_type then
                 local node = {
                     id = node_data.id,

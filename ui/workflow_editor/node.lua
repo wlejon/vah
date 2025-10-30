@@ -3,6 +3,16 @@
 
 local M = {}
 
+-- Find node type by database ID
+function M.find_type_by_id(node_types, type_id)
+    for _, nt in ipairs(node_types) do
+        if nt.id == type_id then
+            return nt
+        end
+    end
+    return nil
+end
+
 -- Convert node type color components to nvg color
 function M.create_color(node_type)
     return nvg.rgba(
@@ -27,7 +37,7 @@ function M.create(editor, node_types, x, y, node_type_index)
         id = editor.next_node_id,
         x = x,
         y = y,
-        type_index = node_type_index,
+        type_index = node_type.id,  -- Use database ID, not array index
         name = node_type.name,
         color = color,
         inputs = node_type.inputs or {},
@@ -130,14 +140,10 @@ function M.update_from_types(editor, node_types)
             goto continue
         end
 
-        if node.type_index > #node_types then
-            print("[Workflow] Node type_index " .. node.type_index .. " out of range (max: " .. #node_types .. ")")
-            goto continue
-        end
-
-        local node_type = node_types[node.type_index]
+        -- Find node type by database ID (not array index)
+        local node_type = M.find_type_by_id(node_types, node.type_index)
         if not node_type then
-            print("[Workflow] Node type at index " .. node.type_index .. " is nil")
+            print("[Workflow] Node type with id " .. node.type_index .. " not found")
             goto continue
         end
 

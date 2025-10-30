@@ -29,6 +29,10 @@ local active_view = "workflow"
 local active_execution_id = nil
 local time_since_poll = 0
 
+-- Node config editing state
+local editing_node_config = nil
+local node_config_texteditor_populated = false
+
 -- ============================================
 -- View Switching Functions
 -- ============================================
@@ -698,6 +702,137 @@ local function handle_save_workflow_config(payload)
     end
 end
 
+-- Edit node (open config dialog)
+local function handle_edit_node(payload)
+    if not database_initialized or not active_workflow.id then
+        print("ERROR: No active workflow")
+        return
+    end
+
+    if not payload.node_id then
+        print("ERROR: No node_id in edit_node payload")
+        return
+    end
+
+    -- Load current node config from database
+    local config = workflow_db.load_node_config(active_workflow.id, payload.node_id)
+
+    -- Parse config or create default
+    local node_config_data = {
+        node_id = payload.node_id,
+        workflow_id = active_workflow.id,
+        label = "",
+        inputs = "",
+        outputs = "",
+        script = ""
+    }
+
+    if config and config ~= "" then
+        -- Parse JSON config (simple parsing - in production use proper JSON library)
+        -- For now, assume config contains: script, inputs, outputs, label
+        -- This is a placeholder - proper JSON parsing needed
+        node_config_data.script = config.script or ""
+
+        if config.inputs then
+            node_config_data.inputs = table.concat(config.inputs, ", ")
+        end
+
+        if config.outputs then
+            node_config_data.outputs = table.concat(config.outputs, ", ")
+        end
+
+        node_config_data.label = config.label or ""
+    else
+        -- Get node type to provide defaults
+        local node_type = nil
+        for _, nt in ipairs(node_types_data) do
+            if nt.id == payload.type_index then
+                node_type = nt
+                break
+            end
+        end
+
+        if node_type then
+            node_config_data.label = node_type.name
+            if node_type.inputs then
+                node_config_data.inputs = table.concat(node_type.inputs, ", ")
+            end
+            if node_type.outputs then
+                node_config_data.outputs = table.concat(node_type.outputs, ", ")
+            end
+            -- Default script template
+            node_config_data.script = "-- Node: " .. node_type.name .. "\n-- Inputs: " .. node_config_data.inputs .. "\n-- Outputs: " .. node_config_data.outputs .. "\n\nreturn {}\n"
+        end
+    end
+
+    -- Store in editing state
+    editing_node_config = node_config_data
+    node_config_texteditor_populated = false
+
+    -- Bind config data (without script, since we'll use texteditor)
+    data.bind("node_config", {node_config_data})
+
+    -- Switch to node config view
+    switch_to_view("node_config")
+end
+
+-- Handle cancel button
+local function handle_cancel_node_config(payload)
+    editing_node_config = nil
+    switch_to_view("workflow")
+end
+
+-- Handle save button from dialog
+local function handle_save_node_config_from_dialog(payload)
+    if not editing_node_config then
+        print("ERROR: No node config being edited")
+        return
+    end
+
+    -- Get form values using ui.get_input_value() or by querying the document
+    -- For now, we'll emit an event that includes getting the values
+    local doc_info = ui.get_document_info("workflow_app")
+    if not doc_info then
+        print("ERROR: Could not get workflow_app document")
+        return
+    end
+
+    -- Trigger the save with stored editing_node_config data
+    handle_save_node_config({
+        workflow_id = editing_node_config.workflow_id,
+        node_id = editing_node_config.node_id,
+        label = editing_node_config.label,  -- We'd ideally get from form, but for now use stored
+        inputs = editing_node_config.inputs,
+        outputs = editing_node_config.outputs
+    })
+end
+
+-- Handle script modifications from texteditor
+local function handle_node_script_modified(payload)
+    if editing_node_config and payload.content then
+        editing_node_config.script = payload.content
+    end
+end
+
+-- Handle form field changes
+local function handle_node_label_changed(payload)
+    if editing_node_config and payload.value then
+        editing_node_config.label = payload.value
+    end
+end
+
+local function handle_node_inputs_changed(payload)
+    if editing_node_config and payload.value then
+        editing_node_config.inputs = payload.value
+    end
+end
+
+local function handle_node_outputs_changed(payload)
+    if editing_node_config and payload.value then
+        editing_node_config.outputs = payload.value
+    end
+end
+
 -- Save node configuration
 local function handle_save_node_config(payload)
     if not payload.workflow_id or not payload.node_id then
@@ -705,17 +840,37 @@ local function handle_save_node_config(payload)
         return
     end
 
-    if not payload.config then
-        print("ERROR: No config in save_node_config payload")
+    if not editing_node_config then
+        print("ERROR: No node config being edited")
         return
     end
 
-    -- Convert config table to JSON string
-    local config_json = payload.config  -- Assuming already JSON string
+    -- Helper to split CSV into array
+    local function split_csv(str)
+        if not str or str == "" then
+            return {}
+        end
+        local result = {}
+        for item in string.gmatch(str, "([^,]+)") do
+            local trimmed = item:match("^%s*(.-)%s*$")
+            if trimmed ~= "" then
+                table.insert(result, trimmed)
+            end
+        end
+        return result
+    end
 
-    local success = workflow_db.save_node_config(payload.workflow_id, payload.node_id, config_json)
+    -- Build config object from form fields and editing state
+    local config = {
+        label = payload.label or "",
+        script = editing_node_config.script or "",  -- Get from editing state
+        inputs = split_csv(payload.inputs or ""),
+        outputs = split_csv(payload.outputs or "")
+    }
+
+    local success = workflow_db.save_node_config(payload.workflow_id, payload.node_id, config)
     if success then
-        print("Node configuration saved")
+        print("Node configuration saved for node " .. payload.node_id)
         event.trigger_global("notification_success", {
             title = "Configuration Saved",
             message = "Node configuration has been saved"
@@ -727,6 +882,12 @@ local function handle_save_node_config(payload)
             data.bind("workflow_nodes", nodes)
             data.bind("workflow_connections", connections)
         end
+
+        -- Clear editing state
+        editing_node_config = nil
+
+        -- Switch back to workflow view
+        switch_to_view("workflow")
     else
         print("ERROR: Failed to save node configuration")
         event.trigger_global("notification_error", {
@@ -1175,7 +1336,51 @@ Version: 1.0.0</pre>
 
     -- Register configuration event handlers
     event.register("save_workflow_config", handle_save_workflow_config)
+    event.register("edit_node", handle_edit_node)
+    event.register("cancel_node_config", handle_cancel_node_config)
+    event.register("save_node_config_from_dialog", handle_save_node_config_from_dialog)
+    event.register("node_script_modified", handle_node_script_modified)
+    event.register("node_label_changed", handle_node_label_changed)
+    event.register("node_inputs_changed", handle_node_inputs_changed)
+    event.register("node_outputs_changed", handle_node_outputs_changed)
     event.register("save_node_config", handle_save_node_config)
+
+    -- Register texteditor command handlers for keybindings
+    event.register("command_copy", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_copy(payload.element_id)
+        end
+    end)
+
+    event.register("command_paste", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_paste(payload.element_id)
+        end
+    end)
+
+    event.register("command_cut", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_cut(payload.element_id)
+        end
+    end)
+
+    event.register("command_select_all", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_select_all(payload.element_id)
+        end
+    end)
+
+    event.register("command_undo", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_undo(payload.element_id)
+        end
+    end)
+
+    event.register("command_redo", function(payload)
+        if payload.element_tag == "texteditor" then
+            ui.texteditor_redo(payload.element_id)
+        end
+    end)
 
     -- Register history event handlers
     event.register("show_execution_history", handle_show_execution_history)
@@ -1252,6 +1457,15 @@ function update(dt)
         if time_since_poll >= 0.1 then  -- Poll every 100ms
             poll_execution_state()
             time_since_poll = 0
+        end
+    end
+
+    -- Populate texteditor when node config view is shown
+    if active_view == "node_config" and editing_node_config and not node_config_texteditor_populated then
+        local success = ui.set_texteditor_content("node_script_editor", editing_node_config.script or "")
+        if success then
+            ui.set_texteditor_editable("node_script_editor", true)
+            node_config_texteditor_populated = true
         end
     end
 end

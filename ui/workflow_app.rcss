@@ -636,6 +636,20 @@ textarea:focus {
     border-color: #4a7dc4;
 }
 
+.script-editor-container {
+    width: 100%;
+    height: 400px;
+    background-color: #2d2f33;
+    border: 1px #404244;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.script-editor-container texteditor {
+    width: 100%;
+    height: 100%;
+}
+
 .libraries-list {
     display: flex;
     flex-direction: column;

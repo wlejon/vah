@@ -74,6 +74,27 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
             for i = #editor.nodes, 1, -1 do
                 local node = editor.nodes[i]
                 if node_module.is_point_inside(editor, node, world_x, world_y) then
+                    -- Check for double-click on node
+                    local current_time = os.clock()
+                    local DOUBLE_CLICK_TIME = 0.3  -- 300ms
+
+                    if editor.last_click_node == node.id and
+                       editor.last_click_time and
+                       (current_time - editor.last_click_time) < DOUBLE_CLICK_TIME then
+                        -- Double-click detected - open node config
+                        emit('edit_node', {
+                            node_id = node.id,
+                            type_index = node.type_index
+                        })
+                        editor.last_click_node = nil
+                        editor.last_click_time = nil
+                        return
+                    end
+
+                    -- Store click for double-click detection
+                    editor.last_click_node = node.id
+                    editor.last_click_time = current_time
+
                     -- Store potential drag node (won't start dragging until threshold is met)
                     editor.potential_drag_node = node
                     editor.potential_drag_start_x = world_x
