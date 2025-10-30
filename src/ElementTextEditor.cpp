@@ -311,10 +311,15 @@ void ElementTextEditor::SelectAll() {
 void ElementTextEditor::Undo() {
     if (!undo_stack_ || !buffer_ || !input_) return;
 
+    // Get current state
+    std::string current_text = buffer_->GetText();
+    TextBuffer::Position current_cursor_pos = input_->GetCursorPosition();
+
+    // Undo to previous state
     std::string text;
     TextBuffer::Position cursor_pos;
 
-    if (undo_stack_->Undo(text, cursor_pos)) {
+    if (undo_stack_->Undo(current_text, current_cursor_pos, text, cursor_pos)) {
         // Set flag to prevent pushing to undo stack
         applying_undo_redo_ = true;
 
@@ -339,10 +344,15 @@ void ElementTextEditor::Undo() {
 void ElementTextEditor::Redo() {
     if (!undo_stack_ || !buffer_ || !input_) return;
 
+    // Get current state
+    std::string current_text = buffer_->GetText();
+    TextBuffer::Position current_cursor_pos = input_->GetCursorPosition();
+
+    // Redo to next state
     std::string text;
     TextBuffer::Position cursor_pos;
 
-    if (undo_stack_->Redo(text, cursor_pos)) {
+    if (undo_stack_->Redo(current_text, current_cursor_pos, text, cursor_pos)) {
         // Set flag to prevent pushing to undo stack
         applying_undo_redo_ = true;
 

@@ -97,10 +97,16 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 this task will fit in your context, there is no need to use subagents.
 
 please work through this problem:
-4. Manual UTF-8 Decoding
+UndoStack Implementation
 
-    Issue: In main.cpp, ProcessInput contains a manual loop to decode UTF-8 bytes from SDL_TEXTINPUT into Rml::Character (UTF-32).
+    Issue: The UndoStack logic in UndoStack.cpp is unconventional. It uses a single undo_stack_ and a current_index_ that points to the next available slot (one-past-the-end of the current state).
 
-    Why it's a problem: Manual UTF-8 decoding is notoriously difficult to get right, especially with edge cases like invalid sequences, surrogate pairs, or 4-byte characters.
+    Why it's a problem: While it appears functionally correct after tracing it (see ElementTextEditor::PushUndoSnapshot calling it before a change), it's confusing. Undo decrements the index and then returns the item at that index. CanRedo checks current_index_ < undo_stack_.size() - 1.
 
-    Suggestion: Since you are using C++17, you could use std::wstring_convert and std::codecvt_utf8 (though they are deprecated in C++17, they are available). A more robust and modern solution would be to use a small, battle-tested, header-only library like utf8.h. This would replace your complex loop with a simple, safe iterator-based conversion, making the code cleaner and more reliable.
+    Suggestion: A more conventional and easier-to-reason-about implementation uses two stacks: std::vector<Snapshot> undo_stack_ and std::vector<Snapshot> redo_stack_.
+
+        Push: Add current state to undo_stack_. Clear redo_stack_.
+
+        Undo: Pop state from undo_stack_ (call it S_undo). Push current state to redo_stack_. Apply S_undo.
+
+        Redo: Pop state from redo_stack_ (call it S_redo). Push current state to undo_stack_. Apply S_redo. This model is simpler to implement and debug. Your current implementation is fine if you're comfortable with it, but it's a potential source of off-by-one errors.

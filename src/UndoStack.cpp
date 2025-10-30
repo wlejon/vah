@@ -3,7 +3,6 @@
 
 UndoStack::UndoStack(size_t max_size)
     : max_size_(max_size)
-    , current_index_(0)
 {
 }
 
@@ -11,10 +10,8 @@ UndoStack::~UndoStack() {
 }
 
 void UndoStack::PushUndo(const std::string& text, const TextBuffer::Position& cursor_pos) {
-    // If we're in the middle of the stack (after undo), discard redo history
-    if (current_index_ < undo_stack_.size()) {
-        undo_stack_.erase(undo_stack_.begin() + current_index_, undo_stack_.end());
-    }
+    // Clear redo stack when making a new change
+    redo_stack_.clear();
 
     // Add new snapshot
     Snapshot snapshot;
@@ -25,54 +22,67 @@ void UndoStack::PushUndo(const std::string& text, const TextBuffer::Position& cu
     // Enforce max size
     if (undo_stack_.size() > max_size_) {
         undo_stack_.erase(undo_stack_.begin());
-    } else {
-        current_index_++;
     }
 }
 
-bool UndoStack::Undo(std::string& out_text, TextBuffer::Position& out_cursor_pos) {
-    // Need at least 2 states: current and previous
-    if (current_index_ == 0 || undo_stack_.empty()) {
+bool UndoStack::Undo(const std::string& current_text, const TextBuffer::Position& current_cursor_pos,
+                     std::string& out_text, TextBuffer::Position& out_cursor_pos) {
+    if (undo_stack_.empty()) {
         return false;
     }
 
-    // Move back one step
-    current_index_--;
+    // Save current state to redo stack
+    Snapshot current;
+    current.text = current_text;
+    current.cursor_pos = current_cursor_pos;
+    redo_stack_.push_back(current);
 
-    // Return the state we're undoing to
-    const Snapshot& snapshot = undo_stack_[current_index_];
-    out_text = snapshot.text;
-    out_cursor_pos = snapshot.cursor_pos;
+    // Pop previous state from undo stack
+    Snapshot previous = undo_stack_.back();
+    undo_stack_.pop_back();
+
+    out_text = previous.text;
+    out_cursor_pos = previous.cursor_pos;
 
     return true;
 }
 
-bool UndoStack::Redo(std::string& out_text, TextBuffer::Position& out_cursor_pos) {
-    // Check if we can redo
-    if (current_index_ >= undo_stack_.size() - 1) {
+bool UndoStack::Redo(const std::string& current_text, const TextBuffer::Position& current_cursor_pos,
+                     std::string& out_text, TextBuffer::Position& out_cursor_pos) {
+    if (redo_stack_.empty()) {
         return false;
     }
 
-    // Move forward one step
-    current_index_++;
+    // Save current state to undo stack
+    Snapshot current;
+    current.text = current_text;
+    current.cursor_pos = current_cursor_pos;
+    undo_stack_.push_back(current);
 
-    // Return the state we're redoing to
-    const Snapshot& snapshot = undo_stack_[current_index_];
-    out_text = snapshot.text;
-    out_cursor_pos = snapshot.cursor_pos;
+    // Enforce max size on undo stack
+    if (undo_stack_.size() > max_size_) {
+        undo_stack_.erase(undo_stack_.begin());
+    }
+
+    // Pop next state from redo stack
+    Snapshot next = redo_stack_.back();
+    redo_stack_.pop_back();
+
+    out_text = next.text;
+    out_cursor_pos = next.cursor_pos;
 
     return true;
 }
 
 bool UndoStack::CanUndo() const {
-    return current_index_ > 0 && !undo_stack_.empty();
+    return !undo_stack_.empty();
 }
 
 bool UndoStack::CanRedo() const {
-    return current_index_ < undo_stack_.size() - 1;
+    return !redo_stack_.empty();
 }
 
 void UndoStack::Clear() {
     undo_stack_.clear();
-    current_index_ = 0;
+    redo_stack_.clear();
 }
