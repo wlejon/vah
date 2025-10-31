@@ -96,4 +96,4 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-we had an index tracking issue in workflow for rendering nodes. i think the issue is manifesting again when dragging nodes when there are nodes that have been edited (double click, edit config, save). the added pins go away, for example, and the names revert to default. 
+scripts\workflow\app.lua is rather large. please tell me how you'd refactor it into separate logical files. 
