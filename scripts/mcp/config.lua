@@ -24,7 +24,7 @@ return {
     },
 
     -- Navigation tools module
-    navigation_tools = "mcp_tools/navigation",
+    navigation_tools = "mcp.tools.navigation",
 
     -- Type registry settings
     type_registry = {

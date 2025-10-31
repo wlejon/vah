@@ -4,7 +4,7 @@
 -- Now uses HttpServer directly (runs on Lua thread)
 
 -- Load configuration
-local config = require("mcp_config")
+local config = require("mcp.config")
 
 -- Configuration constants
 local SESSION_TIMEOUT = 3600  -- Session timeout in seconds (1 hour)
@@ -613,7 +613,7 @@ function startup()
     print("MCP server system starting...")
 
     -- Load type registry
-    type_registry = require("mcp_type_registry")
+    type_registry = require("mcp.type_registry")
     type_registry.init(config.type_registry)
     print("Type registry initialized")
 
