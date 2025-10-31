@@ -43,60 +43,11 @@
                 <p class="app-description">Visual node-based workflow and node type editor</p>
             </div>
 
-            <!-- Tetris Game -->
-            <div class="app-card" onclick="launch_app('tetris')">
-                <div class="app-icon">[T]</div>
-                <div class="app-name">Tetris</div>
-                <p class="app-description">Classic Tetris game implementation</p>
-            </div>
-
-            <!-- Canvas Test -->
-            <div class="app-card" onclick="launch_app('canvas_test')">
-                <div class="app-icon">[N]</div>
-                <div class="app-name">Canvas Test</div>
-                <p class="app-description">NanoVG custom rendering element demo</p>
-            </div>
-
-            <!-- SQLite Demo -->
-            <div class="app-card" onclick="launch_app('sqlite_demo')">
-                <div class="app-icon">[S]</div>
-                <div class="app-name">SQLite Demo</div>
-                <p class="app-description">Database operations demonstration</p>
-            </div>
-
-            <!-- JSON Viewer -->
-            <div class="app-card" onclick="launch_app('json_demo')">
-                <div class="app-icon">[J]</div>
-                <div class="app-name">JSON Viewer</div>
-                <p class="app-description">Interactive JSON data viewer</p>
-            </div>
-
-            <!-- Data Stream -->
-            <div class="app-card" onclick="launch_app('data_stream')">
-                <div class="app-icon">[D]</div>
-                <div class="app-name">Data Stream</div>
-                <p class="app-description">Streaming data visualization</p>
-            </div>
-
-            <!-- Code Flow Viewer -->
-            <div class="app-card" onclick="launch_app('code_flow_viewer')">
-                <div class="app-icon">[V]</div>
-                <div class="app-name">Code Flow Viewer</div>
-                <p class="app-description">Visualize code flow through C++ and Lua layers</p>
-            </div>
-
             <!-- MCP Client -->
             <div class="app-card" onclick="launch_app('mcp_client')">
                 <div class="app-icon">[P]</div>
                 <div class="app-name">MCP Client</div>
                 <p class="app-description">Model Context Protocol client - connect to MCP servers and call tools</p>
-            </div>
-
-            <!-- Template Tester -->
-            <div class="app-card" onclick="launch_app('template_tester')">
-                <div class="app-icon">[X]</div>
-                <div class="app-name">Template Tester</div>
-                <p class="app-description">Test markdown template rendering with live JSON data binding</p>
             </div>
         </div>
 

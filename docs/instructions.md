@@ -96,4 +96,3 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-please perform a comprehensive code review

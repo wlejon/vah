@@ -29,47 +29,10 @@ local apps = {
         script = "scripts/workflow_app.lua",
         document_id = "workflow_app"
     },
-    tetris = {
-        name = "Tetris",
-        script = nil,  -- Tetris is just a UI document
-        document_id = "tetris",
-        ui_path = "ui/tetris.rml"
-    },
-    canvas_test = {
-        name = "Canvas Test",
-        script = nil,  -- Canvas test is just a UI document
-        document_id = "canvas_test",
-        ui_path = "ui/canvas_test.rml"
-    },
-    sqlite_demo = {
-        name = "SQLite Demo",
-        script = "scripts/sqlite_demo.lua",
-        document_id = "sqlite_demo"
-    },
-    json_demo = {
-        name = "JSON Viewer",
-        script = "scripts/json_demo.lua",
-        document_id = "json_demo"
-    },
-    data_stream = {
-        name = "Data Stream",
-        script = "scripts/data_stream.lua",
-        document_id = "data_stream"
-    },
-    code_flow_viewer = {
-        name = "Code Flow Viewer",
-        script = "scripts/code_flow_viewer.lua",
-        document_id = "code_flow_viewer"
-    },
     mcp_client = {
         name = "MCP Client",
         script = "scripts/mcp_client.lua",
         document_id = "mcp_client"
-    },
-    template_tester = {
-        name = "Template Tester",
-        script = "scripts/template_tester.lua",
-        document_id = "template_tester"
     }
 }
 

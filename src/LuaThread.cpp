@@ -655,6 +655,10 @@ void LuaThread::SetupLuaBindings() {
     // Register workflow thread creation (moved to WorkflowThread.cpp for clarity)
     RegisterWorkflowThreadBindings(*lua_);
 
+    // Expose thread_id and thread_name as globals for convenience
+    (*lua_)["thread_id"] = id_;
+    (*lua_)["thread_name"] = script_path_;
+
     // Bind sleep function
     (*lua_)["sleep"] = [](double seconds) {
         std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
