@@ -2,7 +2,7 @@
 -- Manages connections between nodes
 
 local M = {}
-local node_module = require("ui.workflow_editor.node")
+local node_module = require("ui.apps.workflow.editor.node")
 
 -- Add a connection between ports
 function M.add(editor, from_node_id, from_port, to_node_id, to_port)

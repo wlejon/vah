@@ -1,10 +1,10 @@
 <rml>
 <head>
     <title>Workflow Application</title>
-    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="workflow_app.rcss"/>
     <script>
-    require "workflow_editor"
+    require "ui.apps.workflow.workflow_editor"
 
     -- View navigation functions - accept document parameter from inline event handlers
     function switch_to_workflow_view(doc)

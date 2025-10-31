@@ -327,7 +327,7 @@ function startup()
     datamodel.bind_table("editor_info", {editor_data})
 
     -- Load UI
-    ui.load_document("ui/file_editor.rml", true, "file_editor")
+    ui.load_document("ui/apps/file_editor/file_editor.rml", true, "file_editor")
 end
 
 function update(dt)

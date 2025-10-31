@@ -750,7 +750,7 @@ function startup()
     event.register("reset_session", on_reset_session)
 
     -- Load UI
-    ui.load_document("ui/manufold.rml", true, "manufold")
+    ui.load_document("ui/apps/manufold/manufold.rml", true, "manufold")
 
     print("Manufold Agent ready")
     print("Tools loaded: " .. #manufold_tools .. " enhanced tools with view-oriented responses")

@@ -1,7 +1,7 @@
 <rml>
 <head>
     <title>File Editor</title>
-    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="file_editor.rcss"/>
 </head>
 <body>

@@ -3,9 +3,9 @@
 
 local M = {}
 
-local node_module = require("workflow_editor.node")
-local connection = require("workflow_editor.connection")
-local transform = require("workflow_editor.transform")
+local node_module = require("ui.apps.workflow.editor.node")
+local connection = require("ui.apps.workflow.editor.connection")
+local transform = require("ui.apps.workflow.editor.transform")
 
 -- Mouse click handler (called on button down/up events only)
 -- Button: 0=left, 1=right, 2=middle

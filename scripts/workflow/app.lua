@@ -658,7 +658,7 @@ local function show_approval_dialog(payload)
 
     -- Load and show approval dialog if not already loaded
     if not approval_dialog_doc then
-        approval_dialog_doc = ui.load_document("ui/workflow_approval_dialog.rml", false, "workflow_approval")
+        approval_dialog_doc = ui.load_document("ui/apps/workflow/workflow_approval_dialog.rml", false, "workflow_approval")
         print("Approval dialog loaded")
     else
         ui.show_document("workflow_approval")
@@ -1608,7 +1608,7 @@ Version: 1.0.0</pre>
     end
 
     -- Load the unified UI
-    ui.load_document("ui/workflow_app.rml", true, "workflow_app")
+    ui.load_document("ui/apps/workflow/workflow_app.rml", true, "workflow_app")
 
     -- Register workflow menu
     register_workflow_menu()

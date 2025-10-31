@@ -1,7 +1,7 @@
 <rml>
 <head>
     <title>Chat</title>
-    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="chat.rcss"/>
     <script>
         function send_chat_message(document)

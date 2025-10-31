@@ -201,7 +201,7 @@ function startup()
     register_global_events()
 
     -- Load menu UI
-    ui.load_document("ui/internal/menu.rml", true, MENU_DOC_ID)
+    ui.load_document("ui/core/menu/menu.rml", true, MENU_DOC_ID)
 
     print("Menu system started")
 

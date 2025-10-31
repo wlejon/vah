@@ -1,7 +1,7 @@
 <rml>
 <head>
     <title>Vah Launcher</title>
-    <link type="text/rcss" href="reset.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="launcher.rcss" />
     <script>
         function launch_app(app_id)

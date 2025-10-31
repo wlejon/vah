@@ -172,7 +172,7 @@ function startup()
     event.register("clear_chat", on_clear_chat)
 
     -- Load the UI
-    ui.load_document("ui/chat.rml", true, "chat")
+    ui.load_document("ui/apps/chat/chat.rml", true, "chat")
 
     print("Chat ready")
 end

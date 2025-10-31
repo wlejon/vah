@@ -3,8 +3,8 @@
 
 local M = {}
 
-local node_module = require("workflow_editor.node")
-local transform = require("workflow_editor.transform")
+local node_module = require("ui.apps.workflow.editor.node")
+local transform = require("ui.apps.workflow.editor.transform")
 
 -- Draw grid background
 function M.draw_grid(nvg_ctx, editor, colors, canvas_x, canvas_y, canvas_w, canvas_h)

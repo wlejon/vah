@@ -410,7 +410,7 @@ function startup()
     register_events()
 
     -- Load UI
-    ui.load_document("ui/mcp_client.rml", true, "mcp_client")
+    ui.load_document("ui/apps/mcp_client/mcp_client.rml", true, "mcp_client")
 
     -- Initialize texteditors
     ui.set_texteditor_content("tool_input_editor", client_data.tool_input)

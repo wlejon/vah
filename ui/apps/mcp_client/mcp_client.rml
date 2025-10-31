@@ -2,7 +2,7 @@
 <head>
     <title>MCP Client</title>
     <link type="text/rcss" href="/ui/reset.rcss"/>
-    <link type="text/rcss" href="/ui/mcp_client.rcss"/>
+    <link type="text/rcss" href="mcp_client.rcss"/>
 </head>
 <body>
     <div class="container" data-model="mcp_client_data">

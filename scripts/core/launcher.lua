@@ -157,7 +157,7 @@ function startup()
     end)
 
     -- Load launcher UI
-    ui.load_document("ui/launcher.rml", true, "launcher")
+    ui.load_document("ui/core/launcher/launcher.rml", true, "launcher")
 
     print("Launcher ready")
 end

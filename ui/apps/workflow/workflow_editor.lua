@@ -2,7 +2,7 @@
 -- This is now a thin wrapper around the modular workflow editor
 -- All actual logic has been split into workflow_editor/ modules
 
-local editor_module = require("workflow_editor.init")
+local editor_module = require("ui.apps.workflow.editor.init")
 
 -- Export all functions that RmlUI expects as global functions
 render_workflow = editor_module.render_workflow

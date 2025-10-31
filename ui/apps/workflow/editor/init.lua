@@ -1,11 +1,11 @@
 -- Workflow Editor Initialization
 -- Main entry point that ties all modules together
 
-local state_module = require("workflow_editor.state")
-local colors = require("workflow_editor.colors")
-local node_module = require("workflow_editor.node")
-local render = require("workflow_editor.render")
-local input = require("workflow_editor.input")
+local state_module = require("ui.apps.workflow.editor.state")
+local colors = require("ui.apps.workflow.editor.colors")
+local node_module = require("ui.apps.workflow.editor.node")
+local render = require("ui.apps.workflow.editor.render")
+local input = require("ui.apps.workflow.editor.input")
 
 -- Module state
 local editor = nil
