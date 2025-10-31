@@ -115,24 +115,29 @@ function M.handle_click(editor, node_types, button, button_down, mouse_x, mouse_
             -- Clear potential drag node
             editor.potential_drag_node = nil
 
-            -- If we were dragging a node, update DataStore immediately and trigger server event
+            -- If we were dragging a node, update DataStore optimistically and notify server
             if editor.dragging_node then
-                -- Find the row in workflow_nodes that matches this node_id
+                -- Update the DataStore immediately to avoid flicker while waiting for server
                 local workflow_nodes = data.get("workflow_nodes")
                 if workflow_nodes then
                     for i, node in ipairs(workflow_nodes) do
                         if node.id == editor.dragging_node.id then
-                            -- Update this row in the DataStore immediately
+                            -- Update this row with ALL fields to avoid losing custom config
                             data.update_row("workflow_nodes", i, {
+                                id = node.id,
+                                type_index = node.type_index,
                                 x = editor.dragging_node.x,
-                                y = editor.dragging_node.y
+                                y = editor.dragging_node.y,
+                                label = node.label,
+                                inputs = node.inputs,
+                                outputs = node.outputs,
                             })
                             break
                         end
                     end
                 end
 
-                -- Trigger server event to persist to database
+                -- Notify server to persist the change
                 emit('workflow_node_moved', {
                     node_id = editor.dragging_node.id,
                     x = editor.dragging_node.x,

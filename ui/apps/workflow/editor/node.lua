@@ -128,6 +128,8 @@ function M.find_by_id(editor, node_id)
 end
 
 -- Update existing nodes to match new type definitions
+-- NOTE: This should ONLY update name and color, NOT inputs/outputs
+-- Custom per-node inputs/outputs are managed by node configs, not type definitions
 function M.update_from_types(editor, node_types)
     if not node_types or type(node_types) ~= "table" then
         print("[Workflow] Invalid node_types provided to update_from_types")
@@ -147,43 +149,10 @@ function M.update_from_types(editor, node_types)
             goto continue
         end
 
-            -- Update node name and color
-            node.name = node_type.name
-            node.color = M.create_color(node_type)
-
-            -- Update inputs
-            local old_input_count = #node.inputs
-            node.inputs = {}
-            for i, port_name in ipairs(node_type.inputs or {}) do
-                table.insert(node.inputs, port_name)
-            end
-
-            -- If inputs were removed, remove affected connections
-            if #node.inputs < old_input_count then
-                for i = #editor.connections, 1, -1 do
-                    local conn = editor.connections[i]
-                    if conn.to_node == node.id and conn.to_port > #node.inputs then
-                        table.remove(editor.connections, i)
-                    end
-                end
-            end
-
-            -- Update outputs
-            local old_output_count = #node.outputs
-            node.outputs = {}
-            for i, port_name in ipairs(node_type.outputs or {}) do
-                table.insert(node.outputs, port_name)
-            end
-
-            -- If outputs were removed, remove affected connections
-            if #node.outputs < old_output_count then
-                for i = #editor.connections, 1, -1 do
-                    local conn = editor.connections[i]
-                    if conn.from_node == node.id and conn.from_port > #node.outputs then
-                        table.remove(editor.connections, i)
-                    end
-                end
-            end
+        -- Only update node name and color from type definition
+        -- Do NOT overwrite inputs/outputs - those come from node config or initial creation
+        node.name = node_type.name
+        node.color = M.create_color(node_type)
 
         ::continue::
     end
