@@ -549,9 +549,6 @@ local function handle_execute_workflow(payload)
         return
     end
 
-    -- Create execution tables
-    workflow_db.create_execution_tables(execution_id)
-
     -- Initialize execution control
     workflow_db.set_execution_control(execution_id, "run")
 

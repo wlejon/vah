@@ -37,7 +37,7 @@ function M.create_execution_api(execution_id)
     end
 
     -- Set a value in execution state
-    -- Stores value as JSON in the exec_X_state table
+    -- Stores value as JSON in the execution_state table
     function api.set(key, value)
         if not key or key == "" then
             return nil, "Key cannot be empty"
@@ -52,16 +52,13 @@ function M.create_execution_api(execution_id)
             return nil, "Failed to open database: " .. err
         end
 
-        -- Build table name
-        local table_name = "exec_" .. exec_id .. "_state"
+        -- Execute INSERT OR REPLACE using fixed schema table
+        local sql = [[
+            INSERT OR REPLACE INTO execution_state (execution_id, key, value, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ]]
 
-        -- Execute INSERT OR REPLACE
-        local sql = string.format(
-            "INSERT OR REPLACE INTO %s (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-            table_name
-        )
-
-        local success, exec_err = db_handle:execute(sql, key, json_value)
+        local success, exec_err = db_handle:execute(sql, exec_id, key, json_value)
         db_handle:close()
 
         if not success then
@@ -84,12 +81,9 @@ function M.create_execution_api(execution_id)
             return nil
         end
 
-        -- Build table name
-        local table_name = "exec_" .. exec_id .. "_state"
-
-        -- Query for the value
-        local sql = string.format("SELECT value FROM %s WHERE key = ?", table_name)
-        local row, query_err = db_handle:query_single(sql, key)
+        -- Query for the value using fixed schema table
+        local sql = "SELECT value FROM execution_state WHERE execution_id = ? AND key = ?"
+        local row, query_err = db_handle:query_single(sql, exec_id, key)
         db_handle:close()
 
         if query_err ~= "" or not row or not row.value then
@@ -113,16 +107,13 @@ function M.create_execution_api(execution_id)
             return nil, "Failed to open database: " .. err
         end
 
-        -- Build table name
-        local table_name = "exec_" .. exec_id .. "_log"
+        -- Insert log entry using fixed schema table
+        local sql = [[
+            INSERT INTO execution_logs (execution_id, timestamp, level, message, node_id)
+            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+        ]]
 
-        -- Insert log entry
-        local sql = string.format(
-            "INSERT INTO %s (timestamp, level, message, node_id) VALUES (CURRENT_TIMESTAMP, ?, ?, ?)",
-            table_name
-        )
-
-        local success, exec_err = db_handle:execute(sql, level, message, node_id or nil)
+        local success, exec_err = db_handle:execute(sql, exec_id, level, message, node_id or nil)
         db_handle:close()
 
         if not success then

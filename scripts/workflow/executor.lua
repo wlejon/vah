@@ -281,37 +281,6 @@ local function add_trace_entry(execution_id, node_id)
     db_handle:close()
 end
 
--- Helper: Create execution tables
-local function create_execution_tables(execution_id)
-    local db_handle, err = db.open("data/workflow.db")
-    if err ~= "" then
-        execution.log("ERROR", "Failed to create execution tables - cannot open database")
-        return
-    end
-
-    local state_sql = string.format([[
-        CREATE TABLE IF NOT EXISTS exec_%d_state (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ]], execution_id)
-
-    local log_sql = string.format([[
-        CREATE TABLE IF NOT EXISTS exec_%d_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            level TEXT,
-            node_id INTEGER,
-            message TEXT
-        )
-    ]], execution_id)
-
-    db_handle:execute(state_sql)
-    db_handle:execute(log_sql)
-    db_handle:close()
-end
-
 -- Main execution function
 function M.execute_workflow(execution_id)
     execution.log("INFO", "Starting execution " .. execution_id)
@@ -386,9 +355,6 @@ function M.execute_workflow(execution_id)
     db_handle:close()
 
     execution.log("INFO", "Loaded workflow " .. workflow_id .. ": " .. #nodes .. " nodes, " .. #connections .. " connections, " .. #callback_nodes .. " callbacks")
-
-    -- Create execution tables
-    create_execution_tables(execution_id)
 
     -- Execute on_start callbacks
     execute_callback_nodes(callback_nodes, "on_start", {
