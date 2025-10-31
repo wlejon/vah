@@ -97,22 +97,6 @@ h1 {
     color: #7f849c;
 }
 
-.btn-test {
-    background: #313244;
-    color: #89b4fa;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-family: Roboto;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.btn-test:hover {
-    background: #45475a;
-    border-color: #89b4fa;
-}
-
 .notification-list {
     display: flex;
     flex-direction: column;

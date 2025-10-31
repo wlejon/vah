@@ -23,9 +23,6 @@
                 <div data-if="notifications.size == 0">
                     <div class="empty-state">
                         <p>No notifications</p>
-                        <button class="btn-test" onclick="emit('add_test_notifications')">
-                            Add Test Notifications
-                        </button>
                     </div>
                 </div>
 

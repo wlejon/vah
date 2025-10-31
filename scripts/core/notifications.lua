@@ -328,44 +328,6 @@ local function warning(title, message)
     })
 end
 
--- Add test notifications (for demonstration)
-function add_test_notifications()
-    add_notification({
-        type = "info",
-        title = "System Started",
-        message = "Vah notification system is now running",
-        source = "system",
-        ttl = 0  -- Persist until dismissed
-    })
-
-    add_notification({
-        type = "success",
-        title = "Task Complete",
-        message = "File processing finished successfully",
-        source = "file_processor",
-        ttl = 0  -- Persist until dismissed
-    })
-
-    add_notification({
-        type = "warning",
-        title = "Low Memory",
-        message = "Available memory is below 20%",
-        source = "system_monitor",
-        ttl = 0  -- Persist until dismissed
-    })
-
-    add_notification({
-        type = "error",
-        title = "Build Failed",
-        message = "Compilation error in main.cpp line 42",
-        source = "build_system",
-        expandable = 1,
-        content_format = "text",
-        ttl = 0,  -- Persist until dismissed
-        expanded_content = "Error details:\n  File: main.cpp\n  Line: 42\n  Error: undefined reference to 'calculateSum'\n\nStack trace:\n  1. main() at main.cpp:42\n  2. calculateTotal() at utils.cpp:15\n\nSuggested fix:\nEnsure calculateSum() is declared in the header file."
-    })
-end
-
 -- Startup
 function startup()
     print("Notifications system started")
@@ -419,10 +381,6 @@ function startup()
         if payload.id and payload.action_event then
             handle_action(payload.id, payload.action_event)
         end
-    end)
-
-    event.register("add_test_notifications", function(payload)
-        add_test_notifications()
     end)
 
     event.register("toggle_notification_expand", function(payload)
