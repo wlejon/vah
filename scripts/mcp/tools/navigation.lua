@@ -7,7 +7,7 @@ local M = {}
 local DEFAULT_PAGE_LIMIT = 10  -- Default number of items per page for list queries
 
 -- Template renderer
-local renderer = require("template_renderer")
+local renderer = require("templates.renderer")
 
 -- Type registry reference (set during registration)
 local type_registry = nil

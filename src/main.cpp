@@ -306,7 +306,7 @@ public:
         rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_, data_store_.get());
 
         // Spawn main Lua thread which will load UI
-        thread_manager_->SpawnThread("scripts/main.lua");
+        thread_manager_->SpawnThread("scripts/core/main.lua");
 
         // Setup file watcher for RML/RCSS hot reload
         ui_file_watcher_ = std::make_unique<efsw::FileWatcher>();

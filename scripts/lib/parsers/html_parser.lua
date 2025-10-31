@@ -2,7 +2,7 @@
 -- Builds a DOM tree from tokens produced by html_lexer
 -- Handles malformed HTML by auto-closing tags
 
-local lexer = require("scripts.html_lexer")
+local lexer = require("lib.parsers.html_lexer")
 
 local M = {}
 

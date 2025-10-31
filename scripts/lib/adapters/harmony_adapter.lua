@@ -2,7 +2,7 @@
 -- Implements the model adapter interface for OpenAI's gpt-oss-20b Harmony format
 -- Reference: docs/harmony-format-specification.md
 
-local ModelAdapter = require("model_adapter")
+local ModelAdapter = require("lib.adapters.model_adapter")
 
 local HarmonyAdapter = setmetatable({}, {__index = ModelAdapter})
 HarmonyAdapter.__index = HarmonyAdapter

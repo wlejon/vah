@@ -2,7 +2,7 @@
 -- Manages both the workflow editor and node type editor views
 
 -- Load workflow database module
-local workflow_db = require("workflow_db")
+local workflow_db = require("workflow.db")
 
 local database_initialized = false
 local node_types_data = {}

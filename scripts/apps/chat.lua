@@ -2,8 +2,8 @@
 -- A basic chat UI that uses the LM Studio client
 -- Each message will eventually be represented as a node in the workflow
 
-local LMStudioClient = require("lm_studio_client")
-local markdown_parser = require("markdown_parser")
+local LMStudioClient = require("lib.adapters.lm_studio_client")
+local markdown_parser = require("lib.parsers.markdown_parser")
 
 -- Create LM Studio client
 local client = LMStudioClient.new("http://127.0.0.1:1234", "openai/gpt-oss-20b")

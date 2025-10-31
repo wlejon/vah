@@ -2,16 +2,16 @@
 -- Agent-assisted workflow for transforming unstructured data into structured knowledge environments
 -- Enhanced with view-oriented tools
 
-local LMStudioClient = require("lm_studio_client")
-local HarmonyAdapter = require("harmony_adapter")
-local manufold_tools = require("manufold_tools")
+local LMStudioClient = require("lib.adapters.lm_studio_client")
+local HarmonyAdapter = require("lib.adapters.harmony_adapter")
+local manufold_tools = require("manufold.tools")
 
 -- Import tool modules
-local FileInspector = require("file_inspector")
-local SchemaExecutor = require("schema_executor")
-local DbInspector = require("db_inspector")
-local ParserExecutor = require("parser_executor")
-local ViewGenerator = require("view_generator")
+local FileInspector = require("tools.file_inspector")
+local SchemaExecutor = require("schema.executor")
+local DbInspector = require("tools.db_inspector")
+local ParserExecutor = require("schema.parser_executor")
+local ViewGenerator = require("templates.view_generator")
 
 -- Create LM Studio client and model adapter
 local client = LMStudioClient.new("http://127.0.0.1:1234", "openai/gpt-oss-20b")

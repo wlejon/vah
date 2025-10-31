@@ -2,11 +2,11 @@
 -- Integrated file browser and text editor
 
 -- Load highlighter configuration
-local highlighter_config = require("highlighters.config")
+local highlighter_config = require("lib.highlighters.config")
 local loaded_highlighters = {}
 
 -- Load MIME type detection
-local mime = require("mime_types")
+local mime = require("lib.mime_types")
 
 local current_path = fs.get_cwd()
 local current_file = nil

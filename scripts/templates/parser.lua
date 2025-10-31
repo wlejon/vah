@@ -1,7 +1,7 @@
 -- Template Parser
 -- Builds AST from token stream
 
-local lexer = require("template_lexer")
+local lexer = require("templates.lexer")
 local M = {}
 
 -- AST Node types

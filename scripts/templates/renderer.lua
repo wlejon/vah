@@ -1,7 +1,7 @@
 -- Template Renderer
 -- Walks AST and renders output with data binding
 
-local parser = require("template_parser")
+local parser = require("templates.parser")
 local M = {}
 
 -- HTML escape function for XSS protection
@@ -278,7 +278,7 @@ function M.render(template, data, options)
     options = options or {}
 
     -- Lex
-    local lexer = require("template_lexer")
+    local lexer = require("templates.lexer")
     local tokens = lexer.tokenize(template)
 
     -- Parse

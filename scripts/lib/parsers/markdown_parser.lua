@@ -2,7 +2,7 @@
 -- Converts markdown tokens to RML markup
 -- Designed for incremental/streaming parsing
 
-local lexer = require("markdown_lexer")
+local lexer = require("lib.parsers.markdown_lexer")
 local M = {}
 
 -- Verify lexer loaded correctly

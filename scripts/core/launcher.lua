@@ -11,27 +11,27 @@ local active_app = {
 local apps = {
     manufold = {
         name = "Manufold",
-        script = "scripts/manufold_agent.lua",
+        script = "scripts/manufold/agent.lua",
         document_id = "manufold"
     },
     file_editor = {
         name = "File Editor",
-        script = "scripts/file_editor.lua",
+        script = "scripts/apps/file_editor.lua",
         document_id = "file_editor"
     },
     chat = {
         name = "Chat",
-        script = "scripts/chat.lua",
+        script = "scripts/apps/chat.lua",
         document_id = "chat"
     },
     workflow_app = {
         name = "Workflow Editor",
-        script = "scripts/workflow_app.lua",
+        script = "scripts/workflow/app.lua",
         document_id = "workflow_app"
     },
     mcp_client = {
         name = "MCP Client",
-        script = "scripts/mcp_client.lua",
+        script = "scripts/mcp/client.lua",
         document_id = "mcp_client"
     }
 }
