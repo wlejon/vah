@@ -10,10 +10,6 @@ local input = require("ui.apps.workflow.editor.input")
 -- Module state
 local editor = nil
 local node_types = {}
-local last_reload_check = 0
-local reload_check_interval = 0.5
-local last_workflow_sync = 0
-local workflow_sync_interval = 0.1
 
 -- Build renderable nodes from server data
 local function build_nodes_from_server()
@@ -77,22 +73,6 @@ local function get_connections_from_server()
     return workflow_connections or {}
 end
 
--- Reload node types from data store
-local function reload_node_types()
-    if not data or not data.get then
-        print("[Workflow Editor] data.get() not available")
-        return
-    end
-
-    local new_node_types = data.get("node_types") or {}
-
-    -- Update existing nodes in the scene to match their new type definitions
-    node_module.update_from_types(editor, new_node_types)
-
-    -- Update the node_types table
-    node_types = new_node_types
-end
-
 -- Initialize the workflow editor
 local function initialize()
     -- Create editor state
@@ -113,13 +93,8 @@ local function render_workflow(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, 
         initialize()
     end
 
-    -- Periodically check if node types were updated
-    if time - last_reload_check > reload_check_interval then
-        reload_node_types()
-        last_reload_check = time
-    end
-
-    -- Refresh from server when not dragging
+    -- Refresh node types and workflow data from server when not dragging
+    node_types = data.get("node_types") or {}
     build_nodes_from_server()
     editor.connections = get_connections_from_server()
 
