@@ -33,6 +33,11 @@ local apps = {
         name = "MCP Client",
         script = "scripts/mcp/client.lua",
         document_id = "mcp_client"
+    },
+    file_indexer = {
+        name = "File Indexer",
+        script = "scripts/apps/file_indexer.lua",
+        document_id = "file_indexer"
     }
 }
 

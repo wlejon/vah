@@ -3,8 +3,8 @@ body {
     font-size: 14px;
     color: #cdd6f4;
     background-color: transparent;
-    width: 60px;
-    height: 60px;
+    width: 30px;
+    height: 30px;
     padding: 0;
     margin: 0;
     right: 0;
@@ -21,12 +21,12 @@ body {
 
 .notification-badge {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 42px;
-    height: 42px;
+    top: 5px;
+    right: 5px;
+    width: 30px;
+    height: 30px;
     background: #1e1e2e;
-    border-radius: 21px;
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
