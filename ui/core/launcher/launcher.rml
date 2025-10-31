@@ -29,6 +29,13 @@
                 <p class="app-description">Browse and edit files with syntax highlighting support</p>
             </div>
 
+            <!-- File Indexer -->
+            <div class="app-card" onclick="launch_app('file_indexer')">
+                <div class="app-icon">[I]</div>
+                <div class="app-name">File Indexer</div>
+                <p class="app-description">Project-oriented filesystem indexer for text files</p>
+            </div>
+
             <!-- Chat -->
             <div class="app-card" onclick="launch_app('chat')">
                 <div class="app-icon">[C]</div>

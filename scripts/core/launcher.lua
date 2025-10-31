@@ -19,6 +19,11 @@ local apps = {
         script = "scripts/apps/file_editor.lua",
         document_id = "file_editor"
     },
+    file_indexer = {
+        name = "File Indexer",
+        script = "scripts/apps/file_indexer.lua",
+        document_id = "file_indexer"
+    },
     chat = {
         name = "Chat",
         script = "scripts/apps/chat.lua",

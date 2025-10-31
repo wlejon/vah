@@ -477,6 +477,25 @@ public:
         return {true, ""};
     }
 
+    // Execute multi-statement SQL script (like from a schema file)
+    std::tuple<bool, std::string> ExecuteFile(const std::string& sql) {
+        if (!db_) {
+            return {false, "Database not open"};
+        }
+
+        // Use sqlite3_exec which can handle multiple statements
+        char* error_msg = nullptr;
+        int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error_msg);
+
+        if (rc != SQLITE_OK) {
+            std::string error = error_msg ? error_msg : "Unknown error";
+            sqlite3_free(error_msg);
+            return {false, "Failed to execute SQL: " + error};
+        }
+
+        return {true, ""};
+    }
+
     // Batch insert for performance
     std::tuple<int, std::string> BatchInsert(const std::string& table, sol::table columns, sol::table rows) {
         if (!db_) {
@@ -728,6 +747,9 @@ void SetupBindings(sol::state& lua) {
         "begin_transaction", &Database::BeginTransaction,
         "commit", &Database::Commit,
         "rollback", &Database::Rollback,
+
+        // Multi-statement execution
+        "execute_file", &Database::ExecuteFile,
 
         // Batch operations
         "batch_insert", &Database::BatchInsert,

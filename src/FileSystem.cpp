@@ -120,11 +120,9 @@ std::tuple<sol::object, std::string> Stat(sol::this_state s, const std::string& 
         // Get last write time (as seconds since epoch)
         try {
             auto ftime = fs::last_write_time(path);
-            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
-            );
-            auto time_since_epoch = sctp.time_since_epoch().count() / 1000000000.0;
-            result["modified_time"] = time_since_epoch;
+            auto system_time = std::chrono::clock_cast<std::chrono::system_clock>(ftime);
+            auto time_t_value = std::chrono::system_clock::to_time_t(system_time);
+            result["modified_time"] = static_cast<double>(time_t_value);
         } catch (const std::exception& e) {
             LOG_WARN("FileSystem: Failed to get modified time for '{}': {}", path, e.what());
             result["modified_time"] = 0.0;

@@ -96,10 +96,4 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-please build an app that shows files and line count information for the project. i want the app to hold a database mirror of the project file structure for meta-data for the files in the project. i want information about the files easily searchable/sortable/etc without needing to hit filesystem reads each request. it's more than a "cache" as we're adding information as well. for example, we'll have a model create semantic explanations we can place into a vector db when we have that implemented. 
-
-the app should use the fs library we have exposed. if it's missing functionality, we should add it to the c++ implementation and expose it for lua through the binding. i think we already have file system watching capabilities, please use it and enhance it as needed. 
-
-we will use this app to explore and create information about folders other than _this_ codebase. this codebase is just the perfect test bed as well and in development, it'll be nice to have live information about the state of the code for agents to query when they're exploring the project.
-
-before building anything, please explain what i'm asking for so that i know i conveyed the information correctly. 
+please build a filesystem indexer. it's currently only for text. it won't index "hidden" files or "dot files". it'll be intelligent and not index "build" and such. this is a project oriented indexer, not a general file system indexer. it should use a list of types of files it knows what to do with and index those. we should build specific tools to provide additional information about the files in the index. like syntax errors, parser errors type things. we're not building any of the extra information now but the design should support more complex interactions with files.

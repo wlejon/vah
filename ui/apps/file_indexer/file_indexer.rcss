@@ -1,0 +1,324 @@
+body {
+    font-family: Roboto;
+    font-size: 14px;
+    color: #cdd6f4;
+    background: #1e1e2e;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    top: 40px;
+}
+
+.header {
+    padding: 16px 20px;
+    background: #181825;
+    border-bottom: 1px #313244;
+}
+
+h1 {
+    font-size: 24px;
+    color: #89b4fa;
+    margin: 0 0 4px 0;
+}
+
+.subtitle {
+    font-size: 13px;
+    color: #a6adc8;
+    margin: 0;
+}
+
+h2 {
+    font-size: 18px;
+    color: #89b4fa;
+    margin: 0 0 12px 0;
+}
+
+h3 {
+    font-size: 14px;
+    color: #89b4fa;
+    margin: 16px 0 8px 0;
+}
+
+.main-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    gap: 1px;
+    background: #181825;
+}
+
+/* Status Panel */
+.status-panel {
+    width: 350px;
+    background: #1e1e2e;
+    padding: 16px;
+    overflow-y: auto;
+    border-right: 1px #313244;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px #313244;
+}
+
+.status-row .label {
+    color: #a6adc8;
+    font-size: 13px;
+}
+
+.status-row .value {
+    color: #cdd6f4;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.current-file {
+    margin-top: 12px;
+    padding: 8px;
+    background: #313244;
+    border-radius: 4px;
+}
+
+.current-file .label {
+    color: #a6adc8;
+    font-size: 11px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.current-file .file-path {
+    color: #89b4fa;
+    font-size: 11px;
+    white-space: normal;
+}
+
+.button-row {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+button {
+    padding: 10px 16px;
+    background: #89b4fa;
+    color: #1e1e2e;
+    border-width: 0px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+button:hover {
+    background: #74c7ec;
+}
+
+button:active {
+    background: #89dceb;
+}
+
+.index-button {
+    background: #a6e3a1;
+}
+
+.index-button:hover {
+    background: #94e2d5;
+}
+
+.refresh-button {
+    background: #313244;
+    color: #cdd6f4;
+}
+
+.refresh-button:hover {
+    background: #45475a;
+}
+
+.indexing-indicator {
+    padding: 10px 16px;
+    background: #313244;
+    color: #f9e2af;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 13px;
+}
+
+/* Statistics Panel */
+.stats-panel {
+    width: 350px;
+    background: #1e1e2e;
+    padding: 16px;
+    overflow-y: auto;
+    border-right: 1px #313244;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px #313244;
+}
+
+.stat-row .label {
+    color: #a6adc8;
+    font-size: 13px;
+}
+
+.stat-row .value {
+    color: #a6e3a1;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.file-types-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.file-type-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 2px;
+    background: #313244;
+    border-radius: 4px;
+}
+
+.file-type-row .extension {
+    color: #89b4fa;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.file-type-row .count {
+    color: #a6adc8;
+    font-size: 12px;
+    flex: 1;
+    text-align: center;
+}
+
+.file-type-row .size {
+    color: #6c7086;
+    font-size: 11px;
+    text-align: right;
+    min-width: 60px;
+}
+
+/* File List Panel */
+.files-panel {
+    flex: 1;
+    background: #1e1e2e;
+    padding: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.file-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 8px;
+}
+
+.file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: 2px;
+    background: #313244;
+    border-radius: 4px;
+}
+
+.file-row:hover {
+    background: #45475a;
+}
+
+.file-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: hidden;
+}
+
+.file-info .file-name {
+    color: #cdd6f4;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.file-info .file-path {
+    color: #6c7086;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.file-meta .file-extension {
+    color: #89b4fa;
+    font-size: 11px;
+    background: #1e1e2e;
+    padding: 2px 6px;
+    border-radius: 3px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.file-meta .file-lines {
+    color: #f9e2af;
+    font-size: 11px;
+    min-width: 70px;
+    text-align: right;
+}
+
+.file-meta .file-size {
+    color: #a6adc8;
+    font-size: 11px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.file-meta .file-modified {
+    color: #6c7086;
+    font-size: 11px;
+    min-width: 120px;
+    text-align: right;
+}
+
+/* Scrollbar styling */
+scrollbarvertical {
+    width: 8px;
+}
+
+scrollbarvertical slidertrack {
+    width: 8px;
+    background: transparent;
+}
+
+scrollbarvertical sliderbar {
+    width: 6px;
+    margin-left: 1px;
+    background: #6c7086;
+    border-radius: 3px;
+    min-height: 30px;
+}
+
+scrollbarvertical sliderarrowdec,
+scrollbarvertical sliderarrowinc {
+    width: 0px;
+    height: 0px;
+}

@@ -1,0 +1,104 @@
+<rml>
+<head>
+    <title>File Indexer</title>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
+    <link type="text/rcss" href="file_indexer.rcss"/>
+</head>
+<body>
+    <div class="header">
+        <h1>File Indexer</h1>
+        <p class="subtitle">Project-oriented filesystem indexer for text files</p>
+    </div>
+
+    <div class="main-container">
+        <!-- Status Panel -->
+        <div class="status-panel">
+            <h2>Indexing Status</h2>
+            <div data-model="indexer_status">
+                <div data-for="status : indexer_status">
+                    <div class="status-row">
+                        <span class="label">Status:</span>
+                        <span class="value">{{status.status}}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Files Indexed:</span>
+                        <span class="value">{{status.files_indexed}}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Files Skipped:</span>
+                        <span class="value">{{status.files_skipped}}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Total Size:</span>
+                        <span class="value">{{status.total_size}}</span>
+                    </div>
+                    <div data-if="status.is_indexing" class="current-file">
+                        <span class="label">Current:</span>
+                        <span class="file-path">{{status.current_file}}</span>
+                    </div>
+                    <div class="button-row">
+                        <button data-if="!status.is_indexing" class="index-button" onclick="emit('start_indexing', {})">
+                            Start Indexing
+                        </button>
+                        <button data-if="!status.is_indexing" class="refresh-button" onclick="emit('refresh_stats', {})">
+                            Refresh Stats
+                        </button>
+                        <div data-if="status.is_indexing" class="indexing-indicator">
+                            Indexing in progress...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div class="stats-panel">
+            <h2>Statistics</h2>
+            <div data-model="stats">
+                <div data-for="stat : stats">
+                    <div class="stat-row">
+                        <span class="label">Total Files:</span>
+                        <span class="value">{{stat.total_files}}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Total Size:</span>
+                        <span class="value">{{stat.total_size}}</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3>File Types</h3>
+            <div class="file-types-list" data-model="file_types">
+                <div data-for="type, i : file_types">
+                    <div class="file-type-row">
+                        <span class="extension">{{type.extension}}</span>
+                        <span class="count">{{type.count}} files</span>
+                        <span class="size">{{type.size}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- File List Panel -->
+        <div class="files-panel">
+            <h2>Recent Files</h2>
+            <div class="file-list" data-model="indexed_files">
+                <div data-for="file, i : indexed_files">
+                    <div class="file-row">
+                        <div class="file-info">
+                            <span class="file-name">{{file.file_name}}</span>
+                            <span class="file-path">{{file.relative_path}}</span>
+                        </div>
+                        <div class="file-meta">
+                            <span class="file-extension">{{file.extension}}</span>
+                            <span class="file-lines">{{file.lines}} lines</span>
+                            <span class="file-size">{{file.size}}</span>
+                            <span class="file-modified">{{file.modified}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
