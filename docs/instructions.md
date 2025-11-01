@@ -96,4 +96,8 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-please build a filesystem indexer. it's currently only for text. it won't index "hidden" files or "dot files". it'll be intelligent and not index "build" and such. this is a project oriented indexer, not a general file system indexer. it should use a list of types of files it knows what to do with and index those. we should build specific tools to provide additional information about the files in the index. like syntax errors, parser errors type things. we're not building any of the extra information now but the design should support more complex interactions with files.
+you've built a file system indexer that is project oriented and it's working great. i'd like to expand it.
+
+we'll start with lua file types. i want to check for code smell and write that to the (or a different) db. we'll do syntax errors and we'll pass the file to a local llm using the chat example for reference. we'll ask the model to do general analysis on the file and grade the file, as a unit, on various code quality metrics. 
+
+the file indexer should run through the loop of the basic information then start a second pass (that you'll be building) to create additional information for files. the first type will be lua files, as described above. 

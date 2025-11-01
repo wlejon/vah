@@ -3,6 +3,14 @@
     <title>File Indexer</title>
     <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="file_indexer.rcss"/>
+    <script>
+        function view_file_analysis(document, event)
+            local file_id = event.current_element:GetAttribute('data-file-id')
+            if file_id then
+                emit('view_file_analysis', {file_id = tonumber(file_id)})
+            end
+        end
+    </script>
 </head>
 <body>
     <div class="header">
@@ -49,6 +57,28 @@
                     </div>
                 </div>
             </div>
+
+            <h2 style="margin-top: 20dp;">Lua Analysis</h2>
+            <div data-model="lua_analyzer_status">
+                <div data-for="analyzer : lua_analyzer_status">
+                    <div class="status-row">
+                        <span class="label">Status:</span>
+                        <span class="value">{{analyzer.status}}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Progress:</span>
+                        <span class="value">{{analyzer.files_analyzed}} / {{analyzer.files_total}}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">Syntax Errors:</span>
+                        <span class="value">{{analyzer.syntax_errors}}</span>
+                    </div>
+                    <div data-if="analyzer.is_analyzing" class="current-file">
+                        <span class="label">Analyzing:</span>
+                        <span class="file-path">{{analyzer.current_file}}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Statistics Panel -->
@@ -84,7 +114,7 @@
             <h2>Recent Files</h2>
             <div class="file-list" data-model="indexed_files">
                 <div data-for="file, i : indexed_files">
-                    <div class="file-row">
+                    <div class="file-row" data-attr-data-file-id="file.id" onclick="view_file_analysis(document, event)">
                         <div class="file-info">
                             <span class="file-name">{{file.file_name}}</span>
                             <span class="file-path">{{file.relative_path}}</span>
@@ -94,6 +124,94 @@
                             <span class="file-lines">{{file.lines}} lines</span>
                             <span class="file-size">{{file.size}}</span>
                             <span class="file-modified">{{file.modified}}</span>
+                            <span data-if="file.has_analysis" class="analysis-grade {{file.grade_class}}">{{file.quality_grade}}</span>
+                            <span data-if="file.syntax_error" class="syntax-error">SYNTAX ERROR</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Detail Panel -->
+        <div class="analysis-detail-panel" data-model="selected_file">
+            <div data-for="file : selected_file">
+                <div class="detail-header">
+                    <h2>{{file.file_name}}</h2>
+                    <button class="close-button" onclick="emit('close_detail_panel', {})">Close</button>
+                </div>
+
+                <div class="detail-content">
+                    <div class="detail-section">
+                        <h3>File Information</h3>
+                        <div class="info-row">
+                            <span class="label">Path:</span>
+                            <span class="value">{{file.relative_path}}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Size:</span>
+                            <span class="value">{{file.size}}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Lines:</span>
+                            <span class="value">{{file.lines}}</span>
+                        </div>
+                    </div>
+
+                    <div data-if="file.has_syntax_analysis" class="detail-section">
+                        <h3>Syntax Check</h3>
+                        <div data-if="file.syntax_has_errors" class="error-box">
+                            <div class="error-title">Syntax Error</div>
+                            <div class="error-message">{{file.syntax_error_message}}</div>
+                            <div data-if="file.syntax_error_line" class="error-line">Line: {{file.syntax_error_line}}</div>
+                        </div>
+                        <div data-if="!file.syntax_has_errors" class="success-box">
+                            No syntax errors found
+                        </div>
+                    </div>
+
+                    <div data-if="file.has_quality_analysis" class="detail-section">
+                        <h3>Code Quality Analysis</h3>
+
+                        <div class="quality-summary">
+                            <div class="grade-display {{file.grade_class}}">{{file.quality_grade}}</div>
+                            <div class="quality-text">{{file.quality_summary}}</div>
+                        </div>
+
+                        <div class="scores-grid">
+                            <div class="score-item">
+                                <span class="score-label">Maintainability</span>
+                                <span class="score-value">{{file.maintainability_score}}/10</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">Readability</span>
+                                <span class="score-value">{{file.readability_score}}/10</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">Complexity</span>
+                                <span class="score-value">{{file.complexity_score}}/10</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">Best Practices</span>
+                                <span class="score-value">{{file.best_practices_score}}/10</span>
+                            </div>
+                        </div>
+
+                        <div data-if="file.has_code_smells" class="issues-section">
+                            <h4>Code Smells</h4>
+                            <div data-model="code_smells">
+                                <div data-for="smell, i : code_smells">
+                                    <div class="issue-item">- {{smell.text}}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div data-if="file.has_recommendations" class="recommendations-section">
+                            <h4>Recommendations</h4>
+                            <div data-model="recommendations">
+                                <div data-for="rec, i : recommendations">
+                                    <div class="recommendation-item">- {{rec.text}}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

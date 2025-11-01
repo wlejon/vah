@@ -177,6 +177,7 @@ button:active {
 .file-types-list {
     max-height: 400px;
     overflow-y: auto;
+    width:100%;
 }
 
 .file-type-row {
@@ -215,15 +216,16 @@ button:active {
     flex: 1;
     background: #1e1e2e;
     padding: 16px;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    width: 100%;
 }
 
 .file-list {
     flex: 1;
     overflow-y: auto;
     margin-top: 8px;
+    width: 50%;
 }
 
 .file-row {
@@ -234,10 +236,12 @@ button:active {
     margin-bottom: 2px;
     background: #313244;
     border-radius: 4px;
+    width: 100%;
 }
 
 .file-row:hover {
     background: #45475a;
+    cursor: pointer;
 }
 
 .file-info {
@@ -297,6 +301,243 @@ button:active {
     font-size: 11px;
     min-width: 120px;
     text-align: right;
+}
+
+/* Analysis badges */
+.file-meta .analysis-grade {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 3px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.file-meta .grade-A {
+    background: #a6e3a1;
+    color: #1e1e2e;
+}
+
+.file-meta .grade-B {
+    background: #94e2d5;
+    color: #1e1e2e;
+}
+
+.file-meta .grade-C {
+    background: #f9e2af;
+    color: #1e1e2e;
+}
+
+.file-meta .grade-D {
+    background: #fab387;
+    color: #1e1e2e;
+}
+
+.file-meta .grade-F {
+    background: #f38ba8;
+    color: #1e1e2e;
+}
+
+.file-meta .syntax-error {
+    background: #f38ba8;
+    color: #1e1e2e;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 6px;
+    border-radius: 3px;
+}
+
+/* Analysis Detail Panel */
+.analysis-detail-panel {
+    position: fixed;
+    right: 0;
+    top: 40px;
+    bottom: 0;
+    width: 30%;
+    background: #1e1e2e;
+    border-left: 2px #89b4fa;
+    padding: 20px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.analysis-detail-panel[data-model="selected_file"]:not(:empty) {
+    display: block;
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px #313244;
+}
+
+.detail-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.close-button {
+    padding: 6px 12px;
+    background: #313244;
+    font-size: 12px;
+}
+
+.close-button:hover {
+    background: #f38ba8;
+}
+
+.detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.detail-section {
+    background: #313244;
+    padding: 16px;
+    border-radius: 6px;
+}
+
+.detail-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: #89b4fa;
+}
+
+.detail-section h4 {
+    margin: 12px 0 8px 0;
+    font-size: 14px;
+    color: #a6adc8;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px #45475a;
+}
+
+.info-row .label {
+    color: #a6adc8;
+    font-size: 13px;
+}
+
+.info-row .value {
+    color: #cdd6f4;
+    font-size: 13px;
+}
+
+.error-box {
+    background: #3e2428;
+    border: 1px #f38ba8;
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.error-title {
+    color: #f38ba8;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.error-message {
+    color: #cdd6f4;
+    font-size: 12px;
+    margin-bottom: 4px;
+    font-family: JetBrains Mono;
+}
+
+.error-line {
+    color: #a6adc8;
+    font-size: 11px;
+}
+
+.success-box {
+    background: #2a3428;
+    border: 1px #a6e3a1;
+    border-radius: 4px;
+    padding: 12px;
+    color: #a6e3a1;
+    font-size: 13px;
+}
+
+.quality-summary {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #1e1e2e;
+    border-radius: 4px;
+}
+
+.grade-display {
+    font-size: 32px;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 6px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.quality-text {
+    flex: 1;
+    color: #cdd6f4;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.scores-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.score-item {
+    background: #1e1e2e;
+    padding: 12px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1 1 45%;
+    min-width: 150px;
+}
+
+.score-label {
+    color: #a6adc8;
+    font-size: 12px;
+}
+
+.score-value {
+    color: #89b4fa;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.issues-section,
+.recommendations-section {
+    margin-top: 12px;
+}
+
+.issue-item {
+    color: #fab387;
+    font-size: 12px;
+    padding: 4px 0;
+    line-height: 1.4;
+}
+
+.recommendation-item {
+    color: #94e2d5;
+    font-size: 12px;
+    padding: 4px 0;
+    line-height: 1.4;
 }
 
 /* Scrollbar styling */

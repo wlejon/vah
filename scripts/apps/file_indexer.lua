@@ -67,6 +67,15 @@ local stats_data = {
     file_types = {}
 }
 
+local analyzer_status = {
+    status = "Idle",
+    files_total = 0,
+    files_analyzed = 0,
+    syntax_errors = 0,
+    current_file = "",
+    is_analyzing = false
+}
+
 -- Utility: Format size
 function format_size(size)
     if size < 1024 then
@@ -378,7 +387,6 @@ function start_indexing()
     -- Update UI
     indexer_data.status = "Indexing complete: " .. files_indexed .. " files indexed"
     indexer_data.current_file = ""
-    indexer_data.is_indexing = false
     datamodel.bind_table("indexer_status", {indexer_data})
 
     print("Indexing complete: " .. files_indexed .. " files indexed, " .. files_skipped .. " files skipped")
@@ -387,6 +395,17 @@ function start_indexing()
     -- Refresh stats and file list
     refresh_stats()
     refresh_file_list()
+
+    indexer_data.is_indexing = false
+    datamodel.bind_table("indexer_status", {indexer_data})
+
+    -- Trigger file analyzers if indexing succeeded
+    if walk_success then
+        print("Triggering file analyzers...")
+        event.trigger_global("file_analysis_needed", {
+            run_id = current_run_id
+        })
+    end
 
     database:close()
     database = nil
@@ -445,18 +464,23 @@ function refresh_file_list()
         return
     end
 
-    -- Get recent files with line counts
+    -- Get recent files with line counts and analysis data
     local query = [[
         SELECT
+            f.id,
             f.path,
             f.relative_path,
             f.file_name,
             f.file_extension,
             f.file_size,
             f.modified_time,
-            c.line_count
+            c.line_count,
+            syntax.analysis_data as syntax_data,
+            quality.analysis_data as quality_data
         FROM indexed_files f
         LEFT JOIN file_content c ON f.id = c.file_id
+        LEFT JOIN file_analysis syntax ON f.id = syntax.file_id AND syntax.analysis_type = 'lua_syntax'
+        LEFT JOIN file_analysis quality ON f.id = quality.file_id AND quality.analysis_type = 'lua_quality'
         ORDER BY f.modified_time DESC
         LIMIT 100
     ]]
@@ -474,19 +498,164 @@ function refresh_file_list()
                 end
             end
 
-            table.insert(file_list_data.files, {
+            local file_entry = {
+                id = row.id,
                 path = row.path,
                 relative_path = row.relative_path,
                 file_name = row.file_name,
                 extension = row.file_extension or "",
                 size = format_size(row.file_size),
                 modified = date_str,
-                lines = row.line_count or 0
-            })
+                lines = row.line_count or 0,
+                has_analysis = false,
+                syntax_error = false,
+                quality_grade = ""
+            }
+
+            -- Parse syntax analysis
+            if row.syntax_data then
+                local success, syntax_info = pcall(json.decode, row.syntax_data)
+                if success and syntax_info.has_errors then
+                    file_entry.syntax_error = true
+                end
+            end
+
+            -- Parse quality analysis
+            if row.quality_data then
+                local success, quality_info = pcall(json.decode, row.quality_data)
+                if success and quality_info.overall_grade then
+                    file_entry.has_analysis = true
+                    file_entry.quality_grade = quality_info.overall_grade
+                    file_entry.grade_class = "grade-" .. quality_info.overall_grade
+                end
+            end
+
+            table.insert(file_list_data.files, file_entry)
         end
     end
 
     datamodel.bind_table("indexed_files", file_list_data.files)
+
+    db:close()
+end
+
+-- Load detailed file analysis
+function load_file_analysis(file_id)
+    local db, error = db.open("data/file_index.db")
+    if error ~= "" then
+        print("ERROR: Failed to open database: " .. error)
+        return
+    end
+
+    -- Get file with analysis data
+    local query = [[
+        SELECT
+            f.id,
+            f.path,
+            f.relative_path,
+            f.file_name,
+            f.file_extension,
+            f.file_size,
+            f.modified_time,
+            c.line_count,
+            syntax.analysis_data as syntax_data,
+            quality.analysis_data as quality_data
+        FROM indexed_files f
+        LEFT JOIN file_content c ON f.id = c.file_id
+        LEFT JOIN file_analysis syntax ON f.id = syntax.file_id AND syntax.analysis_type = 'lua_syntax'
+        LEFT JOIN file_analysis quality ON f.id = quality.file_id AND quality.analysis_type = 'lua_quality'
+        WHERE f.id = ?
+    ]]
+
+    local result, query_error = db:query(query, file_id)
+    if query_error ~= "" or not result or #result == 0 then
+        print("ERROR: Failed to load file analysis: " .. query_error)
+        db:close()
+        return
+    end
+
+    local row = result[1]
+
+    -- Convert modified_time to readable date
+    local date_str = "Unknown"
+    if row.modified_time and row.modified_time > 0 then
+        local timestamp = math.floor(row.modified_time)
+        if timestamp > 946684800 and timestamp < 2147483647 then
+            date_str = os.date("%Y-%m-%d %H:%M", timestamp)
+        end
+    end
+
+    local file_detail = {
+        id = row.id,
+        file_name = row.file_name,
+        relative_path = row.relative_path,
+        size = format_size(row.file_size),
+        lines = row.line_count or 0,
+        modified = date_str,
+        has_syntax_analysis = false,
+        syntax_has_errors = false,
+        syntax_error_message = "",
+        syntax_error_line = 0,
+        has_quality_analysis = false,
+        quality_grade = "",
+        grade_class = "",
+        quality_summary = "",
+        maintainability_score = 0,
+        readability_score = 0,
+        complexity_score = 0,
+        best_practices_score = 0,
+        has_code_smells = false,
+        has_recommendations = false
+    }
+
+    -- Parse syntax analysis
+    if row.syntax_data then
+        local success, syntax_info = pcall(json.decode, row.syntax_data)
+        if success then
+            file_detail.has_syntax_analysis = true
+            file_detail.syntax_has_errors = syntax_info.has_errors or false
+            file_detail.syntax_error_message = syntax_info.error_message or ""
+            file_detail.syntax_error_line = syntax_info.error_line or 0
+        end
+    end
+
+    -- Parse quality analysis
+    local code_smells_list = {}
+    local recommendations_list = {}
+
+    if row.quality_data then
+        local success, quality_info = pcall(json.decode, row.quality_data)
+        if success then
+            file_detail.has_quality_analysis = true
+            file_detail.quality_grade = quality_info.overall_grade or ""
+            file_detail.grade_class = "grade-" .. (quality_info.overall_grade or "")
+            file_detail.quality_summary = quality_info.summary or ""
+            file_detail.maintainability_score = quality_info.maintainability_score or 0
+            file_detail.readability_score = quality_info.readability_score or 0
+            file_detail.complexity_score = quality_info.complexity_score or 0
+            file_detail.best_practices_score = quality_info.best_practices_score or 0
+
+            -- Convert arrays to tables for databinding
+            if quality_info.code_smells and #quality_info.code_smells > 0 then
+                file_detail.has_code_smells = true
+                for _, smell in ipairs(quality_info.code_smells) do
+                    table.insert(code_smells_list, {text = smell})
+                end
+            end
+
+            if quality_info.recommendations and #quality_info.recommendations > 0 then
+                file_detail.has_recommendations = true
+                for _, rec in ipairs(quality_info.recommendations) do
+                    table.insert(recommendations_list, {text = rec})
+                end
+            end
+        end
+    end
+
+    -- Bind data
+    datamodel.bind_table("selected_file", {file_detail})
+    datamodel.bind_table("code_smells", code_smells_list)
+    datamodel.bind_table("recommendations", recommendations_list)
 
     db:close()
 end
@@ -504,11 +673,43 @@ function startup()
         refresh_file_list()
     end)
 
+    event.register("view_file_analysis", function(payload)
+        print("Loading analysis for file ID: " .. payload.file_id)
+        load_file_analysis(payload.file_id)
+    end)
+
+    event.register("close_detail_panel", function(payload)
+        datamodel.bind_table("selected_file", {})
+        datamodel.bind_table("code_smells", {})
+        datamodel.bind_table("recommendations", {})
+    end)
+
+    -- Register global event for analyzer status updates
+    event.register_global("lua_analyzer_status_update", function(payload)
+        analyzer_status.status = payload.status or analyzer_status.status
+        analyzer_status.files_total = payload.files_total or analyzer_status.files_total
+        analyzer_status.files_analyzed = payload.files_analyzed or analyzer_status.files_analyzed
+        analyzer_status.syntax_errors = payload.syntax_errors or analyzer_status.syntax_errors
+        analyzer_status.current_file = payload.current_file or analyzer_status.current_file
+        analyzer_status.is_analyzing = payload.is_analyzing or false
+        datamodel.bind_table("lua_analyzer_status", {analyzer_status})
+    end)
+
+    -- Register global event to refresh when analysis completes
+    event.register_global("lua_analysis_complete", function(payload)
+        print("Lua analysis complete, refreshing file list...")
+        refresh_file_list()
+    end)
+
     -- Initialize data models
     datamodel.bind_table("indexer_status", {indexer_data})
     datamodel.bind_table("stats", {stats_data})
     datamodel.bind_table("file_types", stats_data.file_types)
     datamodel.bind_table("indexed_files", file_list_data.files)
+    datamodel.bind_table("lua_analyzer_status", {analyzer_status})
+    datamodel.bind_table("selected_file", {})  -- Initialize empty, populated on click
+    datamodel.bind_table("code_smells", {})
+    datamodel.bind_table("recommendations", {})
 
     -- Load initial stats if database exists
     if fs.exists("data/file_index.db") then

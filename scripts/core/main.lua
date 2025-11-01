@@ -9,6 +9,9 @@ function startup()
     command.spawn_thread("scripts/core/menu.lua")
     command.spawn_thread("scripts/mcp/server.lua")
 
+    -- Start file analyzers (background services)
+    command.spawn_thread("scripts/analyzers/lua_analyzer.lua")
+
     -- Start the launcher (app selection menu)
     command.spawn_thread("scripts/core/launcher.lua")
 end
