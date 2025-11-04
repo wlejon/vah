@@ -173,6 +173,9 @@ function startup()
         apply_motor_torque()
     end)
 
+    -- Initialize data bindings
+    update_bindings()
+
     print("Vehicle Builder ready! Build your vehicle in the start zone (left side).")
 end
 
