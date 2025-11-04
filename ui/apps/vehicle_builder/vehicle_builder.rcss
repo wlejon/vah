@@ -1,5 +1,5 @@
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: Roboto;
     background-color: #1a1a2e;
     color: #eee;
     margin: 0;

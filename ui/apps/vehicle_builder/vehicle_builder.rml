@@ -1,7 +1,8 @@
 <rml>
 <head>
     <title>Vehicle Builder</title>
-    <link type="text/rcss" href="ui/apps/vehicle_builder/vehicle_builder.rcss"/>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
+    <link type="text/rcss" href="vehicle_builder.rcss"/>
     <script>
         function render_game_world(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
             -- Get game state
