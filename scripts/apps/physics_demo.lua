@@ -58,16 +58,8 @@ function startup()
     -- Bind initial body data BEFORE loading UI
     update()
 
-    -- Load UI
+    -- Load UI - update(dt) will be called automatically by the engine
     ui.load_document("ui/apps/physics_demo/physics_demo.rml", true, "physics_demo")
-
-    -- Start update loop to refresh data model at 60Hz
-    thread.spawn(function()
-        while true do
-            update()
-            thread.sleep(0.016)  -- ~60 FPS
-        end
-    end)
 end
 
 function create_ball(x, y)
