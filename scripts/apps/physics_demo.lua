@@ -55,11 +55,19 @@ function startup()
     -- Initialize status display
     update_status()
 
-    -- Bind body views BEFORE loading UI so render has data immediately
+    -- Bind initial body data BEFORE loading UI
     update()
 
-    -- Load UI - physics thread will push render state directly at 60Hz
+    -- Load UI
     ui.load_document("ui/apps/physics_demo/physics_demo.rml", true, "physics_demo")
+
+    -- Start update loop to refresh data model at 60Hz
+    thread.spawn(function()
+        while true do
+            update()
+            thread.sleep(0.016)  -- ~60 FPS
+        end
+    end)
 end
 
 function create_ball(x, y)
@@ -88,18 +96,29 @@ function create_ball(x, y)
 end
 
 function update(dt)
-    -- Create lightweight views for rendering (can cross lua_State boundaries)
-    local body_views = {}
+    -- Extract physics properties into plain tables for data model
+    -- (DynamicValue can't hold userdata, so we need to convert to primitives)
+    local body_data = {}
     for i, ball_data in ipairs(balls) do
-        -- Create view - lightweight userdata with just IDs
-        table.insert(body_views, ball_data.body:create_view())
+        -- Create view to access current physics state
+        local view = ball_data.body:create_view()
+
+        -- Extract all properties into a plain table
+        table.insert(body_data, {
+            id = view.id,
+            pos_x = view.pos_x,
+            pos_y = view.pos_y,
+            angle = view.angle,
+            vel_x = view.vel_x,
+            vel_y = view.vel_y,
+            mass = view.mass,
+            awake = view.awake
+        })
     end
 
-    -- Bind views to data model - render function will read live properties at 60fps
-    datamodel.bind_table("physics_bodies", {{bodies = body_views}})
-
-    -- Also bind for UI list
-    datamodel.bind_table("physics_state", {{bodies = body_views}})
+    -- Bind plain tables to data model - these can cross thread boundaries
+    datamodel.bind_table("physics_bodies", {{bodies = body_data}})
+    datamodel.bind_table("physics_state", {{bodies = body_data}})
 end
 
 function shutdown()
