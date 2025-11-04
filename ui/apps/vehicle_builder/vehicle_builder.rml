@@ -183,19 +183,11 @@
             end
         end
 
-        function on_canvas_click(event)
-            -- Get click position
-            local mouse_x = event.mouse_x
-            local mouse_y = event.mouse_y
-
-            -- Get canvas bounds
-            local canvas = event.current_element
-            local bounds = canvas:GetBoundingClientRect()
-
-            local canvas_x = bounds.x
-            local canvas_y = bounds.y
-            local canvas_w = bounds.width
-            local canvas_h = bounds.height
+        function on_canvas_click(button, button_down, mouse_x, mouse_y, canvas_x, canvas_y)
+            -- Only handle left button press
+            if button ~= 0 or not button_down then
+                return
+            end
 
             -- Get camera state
             local state_data = data.get("vehicle_builder_state")
@@ -208,9 +200,17 @@
             local cam_y = state.camera_y or 0
             local zoom = state.camera_zoom or 20
 
+            -- Get canvas element to get dimensions
+            local canvas = document:GetElementById("vehicle_canvas")
+            if not canvas then return end
+
+            local bounds = canvas:GetBoundingClientRect()
+            local canvas_w = bounds.width
+            local canvas_h = bounds.height
+
             -- Convert screen to world coordinates
-            local rel_x = mouse_x - (canvas_x + canvas_w / 2)
-            local rel_y = mouse_y - (canvas_y + canvas_h / 2)
+            local rel_x = (mouse_x - canvas_x) - (canvas_w / 2)
+            local rel_y = (mouse_y - canvas_y) - (canvas_h / 2)
 
             local world_x = cam_x + rel_x / zoom
             local world_y = cam_y - rel_y / zoom
@@ -222,8 +222,12 @@
             })
         end
 
-        function select_component(comp_id)
-            emit("vb_select_component", {component_id = comp_id})
+        function select_component(document, event)
+            local element = event.current_element
+            local comp_id = element:GetAttribute("data-comp-id")
+            if comp_id then
+                emit("vb_select_component", {component_id = comp_id})
+            end
         end
 
         function start_test()
@@ -256,7 +260,7 @@
 
                 <div class="component-list" data-for="comp : toolbox">
                     <div class="component-item" data-class-selected="comp.selected">
-                        <button onclick="select_component('{{comp.id}}')">
+                        <button data-attr-data-comp-id="comp.id" onclick="select_component(document, event)">
                             <div class="component-name">{{comp.name}}</div>
                             <div class="component-desc">{{comp.description}}</div>
                         </button>
@@ -266,7 +270,7 @@
 
             <!-- Right Panel: Game Canvas -->
             <div class="game-area" data-model="vehicle_builder_state">
-                <canvas width="1000" height="700" onclick="on_canvas_click" data-render="render_game_world"/>
+                <canvas id="vehicle_canvas" width="1000" height="700" mouseclickhandler="on_canvas_click" renderfunction="render_game_world"/>
 
                 <div class="controls">
                     <button class="btn-primary" onclick="start_test()">
