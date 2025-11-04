@@ -184,7 +184,7 @@ function create_terrain()
             local center_x = (segment.x1 + segment.x2) / 2
             local center_y = (segment.y1 + segment.y2) / 2
             local length = math.sqrt((segment.x2 - segment.x1)^2 + (segment.y2 - segment.y1)^2)
-            local angle = math.atan2(segment.y2 - segment.y1, segment.x2 - segment.x1)
+            local angle = math.atan(segment.y2 - segment.y1, segment.x2 - segment.x1)
 
             local terrain = world:create_body(physics.STATIC, center_x, center_y, angle)
             terrain:add_box_fixture(length / 2, 0.2, 0, 0.6, 0)
