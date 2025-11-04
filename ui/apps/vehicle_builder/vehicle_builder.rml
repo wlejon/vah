@@ -223,9 +223,9 @@
         end
     </script>
 </head>
-<body data-model="vehicle_builder_state,toolbox">
+<body>
     <div class="container">
-        <div class="header">
+        <div class="header" data-model="vehicle_builder_state">
             <h1>Vehicle Builder</h1>
             <div data-for="state : vehicle_builder_state">
                 <span class="game-status">Status: {{state.game_state}}</span>
@@ -234,7 +234,7 @@
 
         <div class="main-content">
             <!-- Left Panel: Toolbox -->
-            <div class="toolbox">
+            <div class="toolbox" data-model="toolbox">
                 <h2>Component Toolbox</h2>
                 <p class="instruction">Click a component, then click in the green zone to place it.</p>
 
@@ -249,7 +249,7 @@
             </div>
 
             <!-- Right Panel: Game Canvas -->
-            <div class="game-area">
+            <div class="game-area" data-model="vehicle_builder_state">
                 <canvas width="1000" height="700" data-event-click="on_canvas_click" data-render="render_game_world"/>
 
                 <div class="controls">
