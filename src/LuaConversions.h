@@ -6,7 +6,7 @@
 
 namespace LuaConversions {
     // Convert DynamicValue to Lua object (recursive for nested objects)
-    sol::object DynamicValueToLua(sol::state& lua, const DynamicValue& value);
+    sol::object DynamicValueToLua(sol::state_view lua, const DynamicValue& value);
 
     // Convert Lua object to DynamicValue
     DynamicValue ObjectToDynamicValue(const sol::object& obj);
@@ -19,4 +19,7 @@ namespace LuaConversions {
 
     // Convert Lua table to PayloadMap (for configs, params, etc.)
     PayloadMap TableToPayloadMap(const sol::table& table);
+
+    // Convert PayloadMap to Lua table
+    sol::table PayloadMapToTable(sol::state_view lua, const PayloadMap& payload);
 }

@@ -3,6 +3,7 @@
 #include "DocumentManager.h"
 #include "DataModelManager.h"
 #include "EventDispatcher.h"
+#include "AudioManager.h"
 #include "Logger.h"
 
 CommandProcessor::CommandProcessor(
@@ -10,12 +11,14 @@ CommandProcessor::CommandProcessor(
     DocumentManager* document_manager,
     DataModelManager* data_model_manager,
     EventDispatcher* event_dispatcher,
+    AudioManager* audio_manager,
     std::function<void()> on_close_application
 )
     : thread_manager_(thread_manager)
     , document_manager_(document_manager)
     , data_model_manager_(data_model_manager)
     , event_dispatcher_(event_dispatcher)
+    , audio_manager_(audio_manager)
     , on_close_application_(on_close_application)
 {
 }
@@ -283,6 +286,83 @@ void CommandProcessor::ProcessCommand(Command&& cmd) {
                 } else {
                     command.promise->set_value(std::move(response_data));
                 }
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::LoadSound>) {
+            LOG_INFO("Processing LoadSound command: {}", command.file_path);
+
+            std::string error;
+            int sound_id = audio_manager_->LoadSound(command.file_path, error);
+
+            PayloadMap response_data;
+            if (sound_id >= 0) {
+                response_data["sound_id"] = static_cast<int64_t>(sound_id);
+                response_data["error"] = std::string("");
+            } else {
+                response_data["sound_id"] = static_cast<int64_t>(-1);
+                response_data["error"] = error;
+            }
+
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value(std::move(response_data));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::UnloadSound>) {
+            audio_manager_->UnloadSound(command.sound_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::PlaySound>) {
+            audio_manager_->PlaySound(command.sound_id, command.volume, command.pan, command.loop, command.restart);
+        }
+        else if constexpr (std::is_same_v<T, Commands::StopSound>) {
+            audio_manager_->StopSound(command.sound_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::PauseSound>) {
+            audio_manager_->PauseSound(command.sound_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetSoundVolume>) {
+            audio_manager_->SetVolume(command.sound_id, command.volume);
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetSoundPan>) {
+            audio_manager_->SetPan(command.sound_id, command.pan);
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetSoundLooping>) {
+            audio_manager_->SetLooping(command.sound_id, command.loop);
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetSoundPosition>) {
+            audio_manager_->SetPosition(command.sound_id, command.seconds);
+        }
+        else if constexpr (std::is_same_v<T, Commands::RewindSound>) {
+            audio_manager_->Rewind(command.sound_id);
+        }
+        else if constexpr (std::is_same_v<T, Commands::QuerySoundInfo>) {
+            LOG_INFO("Processing QuerySoundInfo command for sound {}", command.sound_id);
+
+            PayloadMap response_data;
+            response_data["is_playing"] = audio_manager_->IsPlaying(command.sound_id);
+            response_data["position"] = static_cast<double>(audio_manager_->GetPosition(command.sound_id));
+            response_data["volume"] = static_cast<double>(audio_manager_->GetVolume(command.sound_id));
+            response_data["pan"] = static_cast<double>(audio_manager_->GetPan(command.sound_id));
+            response_data["looping"] = audio_manager_->IsLooping(command.sound_id);
+            response_data["length"] = static_cast<double>(audio_manager_->GetLength(command.sound_id));
+
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value(std::move(response_data));
+            }
+        }
+        else if constexpr (std::is_same_v<T, Commands::SetMasterVolume>) {
+            audio_manager_->SetMasterVolume(command.volume);
+        }
+        else if constexpr (std::is_same_v<T, Commands::QueryMasterVolume>) {
+            LOG_INFO("Processing QueryMasterVolume command");
+
+            PayloadMap response_data;
+            response_data["volume"] = static_cast<double>(audio_manager_->GetMasterVolume());
+
+            // Set promise to wake blocked Lua thread
+            if (command.promise) {
+                command.promise->set_value(std::move(response_data));
             }
         }
         // Note: Notification commands (AddNotification, ClearNotifications, DismissNotification)

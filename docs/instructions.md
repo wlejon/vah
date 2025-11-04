@@ -96,8 +96,30 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-you've built a file system indexer that is project oriented and it's working great. i'd like to expand it.
+we've created AudioBindings for lua threads to use. please perform a code review on the new code.
 
-we'll start with lua file types. i want to check for code smell and write that to the (or a different) db. we'll do syntax errors and we'll pass the file to a local llm using the chat example for reference. we'll ask the model to do general analysis on the file and grade the file, as a unit, on various code quality metrics. 
+PS D:\projects\vah> git status
+On branch main
+Your branch is up to date with 'origin/main'.
 
-the file indexer should run through the loop of the basic information then start a second pass (that you'll be building) to create additional information for files. the first type will be lua files, as described above. 
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   CMakeLists.txt
+        modified:   src/CommandProcessor.cpp
+        modified:   src/CommandProcessor.h
+        modified:   src/Commands.h
+        modified:   src/LuaConversions.cpp
+        modified:   src/LuaConversions.h
+        modified:   src/LuaThread.cpp
+        modified:   src/main.cpp
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        boop.wav
+        src/AudioBindings.cpp
+        src/AudioBindings.h
+        src/AudioManager.cpp
+        src/AudioManager.h
+        src/miniaudio_impl.cpp
+

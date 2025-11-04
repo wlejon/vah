@@ -21,6 +21,7 @@
 #include "DataBindings.h"
 #include "DocumentManager.h"
 #include "DataModelManager.h"
+#include "AudioManager.h"
 #include "CommandProcessor.h"
 #include "ElementCanvas.h"
 #include "ElementTextEditor.h"
@@ -270,6 +271,7 @@ public:
         // Initialize managers
         document_manager_ = std::make_unique<DocumentManager>(rml_context_, rmlui_bridge_.get(), event_dispatcher_.get());
         data_model_manager_ = std::make_unique<DataModelManager>(rml_context_, data_store_.get(), event_dispatcher_.get());
+        audio_manager_ = std::make_unique<AudioManager>();
 
         // Initialize command processor (needs all managers)
         command_processor_ = std::make_unique<CommandProcessor>(
@@ -277,6 +279,7 @@ public:
             document_manager_.get(),
             data_model_manager_.get(),
             event_dispatcher_.get(),
+            audio_manager_.get(),
             [this]() { running_ = false; }  // Callback to close application
         );
 
@@ -713,6 +716,7 @@ private:
     // Managers
     std::unique_ptr<DocumentManager> document_manager_;
     std::unique_ptr<DataModelManager> data_model_manager_;
+    std::unique_ptr<AudioManager> audio_manager_;
     std::unique_ptr<CommandProcessor> command_processor_;
 
     // File watcher for RML/RCSS hot reload

@@ -9,6 +9,7 @@
 #include "FileWatcherBindings.h"
 #include "FileIngestionBindings.h"
 #include "ClipboardBindings.h"
+#include "AudioBindings.h"
 #include "DataStore.h"
 #include "WorkflowThread.h"
 #include <httplib.h>
@@ -345,6 +346,9 @@ void LuaThread::SetupLuaBindings() {
 
     // Setup file ingestion bindings
     FileIngestionBindings::SetupBindings(*lua_);
+
+    // Setup audio bindings
+    AudioBindings::SetupBindings(*lua_);
 
     // Note: Notification system is now managed by Lua (scripts/notifications.lua)
     // Threads can use: local notif = require('notifications'); notif.add({...})

@@ -3,10 +3,10 @@
 namespace LuaConversions {
 
 // Forward declaration for recursion
-sol::object DynamicValueToLua(sol::state& lua, const DynamicValue& value);
+sol::object DynamicValueToLua(sol::state_view lua, const DynamicValue& value);
 
 // Helper to recursively convert DynamicValue to Lua object
-sol::object DynamicValueToLua(sol::state& lua, const DynamicValue& value) {
+sol::object DynamicValueToLua(sol::state_view lua, const DynamicValue& value) {
     return std::visit([&](auto&& val) -> sol::object {
         using T = std::decay_t<decltype(val)>;
 
@@ -157,6 +157,15 @@ PayloadMap TableToPayloadMap(const sol::table& table) {
         }
     }
     return result;
+}
+
+// Helper to convert PayloadMap to Lua table
+sol::table PayloadMapToTable(sol::state_view lua, const PayloadMap& payload) {
+    auto table = lua.create_table();
+    for (const auto& [key, value] : payload) {
+        table[key] = DynamicValueToLua(lua, value);
+    }
+    return table;
 }
 
 } // namespace LuaConversions

@@ -251,6 +251,75 @@ namespace Commands {
         std::shared_ptr<std::promise<PayloadMap>> promise;
     };
 
+    // Audio commands
+    struct LoadSound {
+        int requesting_thread_id;
+        uint64_t request_id;
+        std::string file_path;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {sound_id=int, error=string}
+    };
+
+    struct UnloadSound {
+        int sound_id;
+    };
+
+    struct PlaySound {
+        int sound_id;
+        float volume;      // 0.0 to 1.0
+        float pan;         // -1.0 to 1.0
+        bool loop;
+        bool restart;      // Rewind to beginning before playing
+    };
+
+    struct StopSound {
+        int sound_id;
+    };
+
+    struct PauseSound {
+        int sound_id;
+    };
+
+    struct SetSoundVolume {
+        int sound_id;
+        float volume;
+    };
+
+    struct SetSoundPan {
+        int sound_id;
+        float pan;
+    };
+
+    struct SetSoundLooping {
+        int sound_id;
+        bool loop;
+    };
+
+    struct SetSoundPosition {
+        int sound_id;
+        float seconds;
+    };
+
+    struct RewindSound {
+        int sound_id;
+    };
+
+    struct QuerySoundInfo {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int sound_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {is_playing, position, volume, pan, looping, length}
+    };
+
+    struct SetMasterVolume {
+        float volume;
+    };
+
+    struct QueryMasterVolume {
+        int requesting_thread_id;
+        uint64_t request_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {volume=float}
+    };
+
 }
 
 // Variant holding all possible command types
@@ -298,7 +367,20 @@ using Command = std::variant<
     Commands::QueryThreadList,
     Commands::QueryThreadInfo,
     Commands::QueryDocumentList,
-    Commands::QueryDocumentInfo
+    Commands::QueryDocumentInfo,
+    Commands::LoadSound,
+    Commands::UnloadSound,
+    Commands::PlaySound,
+    Commands::StopSound,
+    Commands::PauseSound,
+    Commands::SetSoundVolume,
+    Commands::SetSoundPan,
+    Commands::SetSoundLooping,
+    Commands::SetSoundPosition,
+    Commands::RewindSound,
+    Commands::QuerySoundInfo,
+    Commands::SetMasterVolume,
+    Commands::QueryMasterVolume
 >;
 
 // Response sent from main thread to lua thread

@@ -7,6 +7,10 @@
         function launch_app(app_id)
             emit('launch_app', {app_id = app_id})
         end
+
+        function play_hover_sound()
+            emit('play_hover_sound', {})
+        end
     </script>
 </head>
 <body>
@@ -16,42 +20,42 @@
 
         <div class="app-grid">
             <!-- Manufold -->
-            <div class="app-card primary" onclick="launch_app('manufold')">
+            <div class="app-card primary" onclick="launch_app('manufold')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[M]</div>
                 <div class="app-name">Manufold</div>
                 <p class="app-description">Transform unstructured data into structured knowledge environments</p>
             </div>
 
             <!-- File Editor -->
-            <div class="app-card" onclick="launch_app('file_editor')">
+            <div class="app-card" onclick="launch_app('file_editor')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[F]</div>
                 <div class="app-name">File Editor</div>
                 <p class="app-description">Browse and edit files with syntax highlighting support</p>
             </div>
 
             <!-- File Indexer -->
-            <div class="app-card" onclick="launch_app('file_indexer')">
+            <div class="app-card" onclick="launch_app('file_indexer')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[I]</div>
                 <div class="app-name">File Indexer</div>
                 <p class="app-description">Project-oriented filesystem indexer for text files</p>
             </div>
 
             <!-- Chat -->
-            <div class="app-card" onclick="launch_app('chat')">
+            <div class="app-card" onclick="launch_app('chat')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[C]</div>
                 <div class="app-name">Chat</div>
                 <p class="app-description">AI chat interface with LM Studio integration</p>
             </div>
 
             <!-- Workflow Editor -->
-            <div class="app-card" onclick="launch_app('workflow_app')">
+            <div class="app-card" onclick="launch_app('workflow_app')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[W]</div>
                 <div class="app-name">Workflow Editor</div>
                 <p class="app-description">Visual node-based workflow and node type editor</p>
             </div>
 
             <!-- MCP Client -->
-            <div class="app-card" onclick="launch_app('mcp_client')">
+            <div class="app-card" onclick="launch_app('mcp_client')" onmouseover="play_hover_sound()">
                 <div class="app-icon">[P]</div>
                 <div class="app-name">MCP Client</div>
                 <p class="app-description">Model Context Protocol client - connect to MCP servers and call tools</p>

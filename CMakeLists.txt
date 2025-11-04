@@ -54,6 +54,9 @@ add_executable(vah
     src/HttpBindings.cpp
     src/SseParser.cpp
     src/ClipboardBindings.cpp
+    src/miniaudio_impl.cpp
+    src/AudioManager.cpp
+    src/AudioBindings.cpp
     src/KeybindingRegistry.cpp
     src/UndoStack.cpp
     src/DataBindings.cpp

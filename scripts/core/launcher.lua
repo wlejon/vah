@@ -7,6 +7,9 @@ local active_app = {
     script_path = nil
 }
 
+-- Audio
+local boop_sound = nil
+
 -- App registry with metadata
 local apps = {
     manufold = {
@@ -146,13 +149,30 @@ local function on_thread_spawned(payload)
     end
 end
 
+-- Play hover sound
+local function play_hover_sound(payload)
+    if boop_sound then
+        boop_sound:play({volume = 0.3, restart = true})
+    end
+end
+
 function startup()
     print("Launcher started (thread_id: " .. thread_id .. ")")
+
+    -- Load audio
+    local sound, err = audio.load("data/boop.wav")
+    if sound then
+        boop_sound = sound
+        print("Loaded hover sound")
+    else
+        print("Failed to load hover sound: " .. err)
+    end
 
     -- Register event handlers
     event.register("launch_app", launch_app)
     event.register("close_app", close_current_app)
     event.register("thread_spawned", on_thread_spawned)
+    event.register("play_hover_sound", play_hover_sound)
 
     -- Register global event handlers (for menu system)
     event.register_global("return_to_launcher", close_current_app)
@@ -173,6 +193,12 @@ end
 
 function shutdown()
     print("Launcher shutting down")
+
+    -- Cleanup audio
+    if boop_sound then
+        boop_sound:unload()
+        boop_sound = nil
+    end
 end
 
 -- Called when menu system is ready
