@@ -1,0 +1,282 @@
+<rml>
+<head>
+    <title>Vehicle Builder</title>
+    <link type="text/rcss" href="ui/apps/vehicle_builder/vehicle_builder.rcss"/>
+    <script>
+        function render_game_world(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
+            -- Get game state
+            local state_data = data.get("vehicle_builder_state")
+            if not state_data or #state_data == 0 then
+                return
+            end
+
+            local state = state_data[1]
+            local cam_x = state.camera_x or 0
+            local cam_y = state.camera_y or 0
+            local zoom = state.camera_zoom or 20
+
+            -- Helper to convert world coords to screen coords
+            local function to_screen(world_x, world_y)
+                local screen_x = canvas_x + canvas_w / 2 + (world_x - cam_x) * zoom
+                local screen_y = canvas_y + canvas_h / 2 - (world_y - cam_y) * zoom
+                return screen_x, screen_y
+            end
+
+            -- Draw background
+            nvg.beginPath(nvg_ctx)
+            nvg.rect(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h)
+            nvg.fillColor(nvg_ctx, nvg.rgba(135, 206, 235, 255)) -- Sky blue
+            nvg.fill(nvg_ctx)
+
+            -- Draw start zone (build area)
+            if state.start_zone then
+                local zone = state.start_zone
+                local sx1, sy1 = to_screen(zone.x, zone.y)
+                local sx2, sy2 = to_screen(zone.x + zone.width, zone.y - zone.height)
+
+                nvg.beginPath(nvg_ctx)
+                nvg.rect(nvg_ctx, sx1, sy2, sx2 - sx1, sy1 - sy2)
+                nvg.fillColor(nvg_ctx, nvg.rgba(200, 255, 200, 100)) -- Light green with alpha
+                nvg.fill(nvg_ctx)
+                nvg.strokeColor(nvg_ctx, nvg.rgba(100, 200, 100, 255))
+                nvg.strokeWidth(nvg_ctx, 2)
+                nvg.stroke(nvg_ctx)
+            end
+
+            -- Draw terrain
+            if state.terrain then
+                nvg.strokeWidth(nvg_ctx, 4)
+                nvg.strokeColor(nvg_ctx, nvg.rgba(139, 69, 19, 255)) -- Brown
+
+                for _, terrain in ipairs(state.terrain) do
+                    if terrain.type == "segment" then
+                        local sx1, sy1 = to_screen(terrain.x1, terrain.y1)
+                        local sx2, sy2 = to_screen(terrain.x2, terrain.y2)
+
+                        nvg.beginPath(nvg_ctx)
+                        nvg.moveTo(nvg_ctx, sx1, sy1)
+                        nvg.lineTo(nvg_ctx, sx2, sy2)
+                        nvg.stroke(nvg_ctx)
+                    elseif terrain.type == "goal" then
+                        -- Draw goal flag
+                        local gx, gy = to_screen(terrain.x, terrain.y)
+
+                        nvg.beginPath(nvg_ctx)
+                        nvg.moveTo(nvg_ctx, gx, gy)
+                        nvg.lineTo(nvg_ctx, gx, gy - 60)
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(0, 0, 0, 255))
+                        nvg.strokeWidth(nvg_ctx, 3)
+                        nvg.stroke(nvg_ctx)
+
+                        -- Flag
+                        nvg.beginPath(nvg_ctx)
+                        nvg.moveTo(nvg_ctx, gx, gy - 60)
+                        nvg.lineTo(nvg_ctx, gx + 40, gy - 45)
+                        nvg.lineTo(nvg_ctx, gx, gy - 30)
+                        nvg.closePath(nvg_ctx)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(255, 215, 0, 255)) -- Gold
+                        nvg.fill(nvg_ctx)
+                    end
+                end
+            end
+
+            -- Draw joints (connections between components)
+            if state.joints then
+                nvg.strokeWidth(nvg_ctx, 2)
+
+                for _, joint in ipairs(state.joints) do
+                    local jx, jy = to_screen(joint.x, joint.y)
+
+                    nvg.beginPath(nvg_ctx)
+                    nvg.circle(nvg_ctx, jx, jy, 5)
+
+                    if joint.is_motor then
+                        nvg.fillColor(nvg_ctx, nvg.rgba(255, 165, 0, 255)) -- Orange for motors
+                    else
+                        nvg.fillColor(nvg_ctx, nvg.rgba(100, 100, 100, 255)) -- Gray for joints
+                    end
+                    nvg.fill(nvg_ctx)
+                    nvg.strokeColor(nvg_ctx, nvg.rgba(50, 50, 50, 255))
+                    nvg.stroke(nvg_ctx)
+                end
+            end
+
+            -- Draw components
+            if state.components then
+                for _, comp in ipairs(state.components) do
+                    local pos_x = comp.view.pos_x
+                    local pos_y = comp.view.pos_y
+                    local angle = comp.view.angle
+
+                    local sx, sy = to_screen(pos_x, pos_y)
+
+                    nvg.save(nvg_ctx)
+                    nvg.translate(nvg_ctx, sx, sy)
+                    nvg.rotate(nvg_ctx, -angle) -- Negative because screen Y is flipped
+
+                    if comp.render_type == "circle" then
+                        local radius = comp.radius * zoom
+
+                        nvg.beginPath(nvg_ctx)
+                        nvg.circle(nvg_ctx, 0, 0, radius)
+
+                        -- Color based on type
+                        if comp.is_motor then
+                            nvg.fillColor(nvg_ctx, nvg.rgba(255, 140, 0, 255)) -- Dark orange
+                        else
+                            nvg.fillColor(nvg_ctx, nvg.rgba(64, 64, 64, 255)) -- Dark gray (wheel)
+                        end
+                        nvg.fill(nvg_ctx)
+
+                        -- Wheel spokes
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(200, 200, 200, 255))
+                        nvg.strokeWidth(nvg_ctx, 2)
+                        for i = 0, 5 do
+                            local spoke_angle = (i / 6) * math.pi * 2
+                            nvg.beginPath(nvg_ctx)
+                            nvg.moveTo(nvg_ctx, 0, 0)
+                            nvg.lineTo(nvg_ctx, math.cos(spoke_angle) * radius, math.sin(spoke_angle) * radius)
+                            nvg.stroke(nvg_ctx)
+                        end
+
+                    elseif comp.render_type == "box" then
+                        local half_w = comp.half_width * zoom
+                        local half_h = comp.half_height * zoom
+
+                        nvg.beginPath(nvg_ctx)
+                        nvg.rect(nvg_ctx, -half_w, -half_h, half_w * 2, half_h * 2)
+
+                        -- Color based on type
+                        if comp.type == "plank" then
+                            nvg.fillColor(nvg_ctx, nvg.rgba(160, 82, 45, 255)) -- Brown
+                        else
+                            nvg.fillColor(nvg_ctx, nvg.rgba(70, 130, 180, 255)) -- Steel blue
+                        end
+                        nvg.fill(nvg_ctx)
+
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(0, 0, 0, 255))
+                        nvg.strokeWidth(nvg_ctx, 2)
+                        nvg.stroke(nvg_ctx)
+                    end
+
+                    nvg.restore(nvg_ctx)
+                end
+            end
+
+            -- Draw grid for reference
+            nvg.strokeColor(nvg_ctx, nvg.rgba(200, 200, 200, 50))
+            nvg.strokeWidth(nvg_ctx, 1)
+            for i = -50, 50 do
+                local grid_x, grid_y = to_screen(i, 0)
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, grid_x, canvas_y)
+                nvg.lineTo(nvg_ctx, grid_x, canvas_y + canvas_h)
+                nvg.stroke(nvg_ctx)
+            end
+            for i = -20, 20 do
+                local grid_x, grid_y = to_screen(0, i)
+                nvg.beginPath(nvg_ctx)
+                nvg.moveTo(nvg_ctx, canvas_x, grid_y)
+                nvg.lineTo(nvg_ctx, canvas_x + canvas_w, grid_y)
+                nvg.stroke(nvg_ctx)
+            end
+        end
+
+        function on_canvas_click(event)
+            -- Get click position
+            local mouse_x = event.mouse_x
+            local mouse_y = event.mouse_y
+
+            -- Get canvas bounds
+            local canvas = event.current_element
+            local bounds = canvas:GetBoundingClientRect()
+
+            local canvas_x = bounds.x
+            local canvas_y = bounds.y
+            local canvas_w = bounds.width
+            local canvas_h = bounds.height
+
+            -- Get camera state
+            local state_data = data.get("vehicle_builder_state")
+            if not state_data or #state_data == 0 then
+                return
+            end
+
+            local state = state_data[1]
+            local cam_x = state.camera_x or 0
+            local cam_y = state.camera_y or 0
+            local zoom = state.camera_zoom or 20
+
+            -- Convert screen to world coordinates
+            local rel_x = mouse_x - (canvas_x + canvas_w / 2)
+            local rel_y = mouse_y - (canvas_y + canvas_h / 2)
+
+            local world_x = cam_x + rel_x / zoom
+            local world_y = cam_y - rel_y / zoom
+
+            -- Trigger place component event
+            event.trigger_global("vb_place_component", {
+                world_x = world_x,
+                world_y = world_y
+            })
+        end
+    </script>
+</head>
+<body data-model="vehicle_builder_state,toolbox">
+    <div class="container">
+        <div class="header">
+            <h1>Vehicle Builder</h1>
+            <div data-for="state : vehicle_builder_state">
+                <span class="game-status">Status: {{state.game_state}}</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Panel: Toolbox -->
+            <div class="toolbox">
+                <h2>Component Toolbox</h2>
+                <p class="instruction">Click a component, then click in the green zone to place it.</p>
+
+                <div class="component-list" data-for="comp : toolbox">
+                    <div class="component-item" data-class-selected="comp.selected">
+                        <button data-event-click="event.trigger_global('vb_select_component', {component_id = comp.id})">
+                            <div class="component-name">{{comp.name}}</div>
+                            <div class="component-desc">{{comp.description}}</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Game Canvas -->
+            <div class="game-area">
+                <canvas width="1000" height="700" data-event-click="on_canvas_click" data-render="render_game_world"/>
+
+                <div class="controls">
+                    <button class="btn-primary" data-event-click="event.trigger_global('vb_start_test', {})">
+                        Start Test
+                    </button>
+                    <button class="btn-secondary" data-event-click="event.trigger_global('vb_apply_motor', {})">
+                        Apply Motor
+                    </button>
+                    <button class="btn-danger" data-event-click="event.trigger_global('vb_reset', {})">
+                        Reset Vehicle
+                    </button>
+                </div>
+
+                <div class="instructions">
+                    <h3>How to Play:</h3>
+                    <ol>
+                        <li>Select components from the toolbox on the left</li>
+                        <li>Click in the <strong>green zone</strong> to place components</li>
+                        <li>Components auto-connect when placed nearby</li>
+                        <li>Press "Start Test" to begin physics simulation</li>
+                        <li>Use "Apply Motor" to drive motorized wheels</li>
+                        <li>Reach the <strong>golden flag</strong> on the right to win!</li>
+                        <li>Joints break on high impact - build carefully!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>
