@@ -21,42 +21,34 @@ class Body;
 class PhysicsBodyView;
 
 // PhysicsBodyView - Lightweight view for rendering (can cross lua_State boundaries)
-// Only stores IDs, reads live from physics thread's double buffer
+// Caches PhysicsThread pointer for lock-free, O(1) access to body state
 class PhysicsBodyView {
 public:
-    PhysicsBodyView(int world_id, int body_id)
+    PhysicsBodyView(int world_id, int body_id, PhysicsThread* physics_thread)
         : world_id_(world_id)
         , body_id_(body_id)
+        , physics_thread_(physics_thread)
     {
     }
 
     int GetBodyId() const { return body_id_; }
     int GetWorldId() const { return world_id_; }
 
-    // Live property getters - read from render state (lock-free)
+    // Live property getters - read from render state (lock-free, O(1) map lookup)
     const PhysicsBodyState* GetRenderState() const {
-        // Look up physics thread
-        std::lock_guard<std::mutex> lock(g_physics_threads_mutex);
-        auto it = g_physics_threads.find(world_id_);
-        if (it == g_physics_threads.end()) {
+        if (!physics_thread_) {
             return nullptr;
         }
 
-        PhysicsThread* physics_thread = it->second.get();
-        if (!physics_thread) {
-            return nullptr;
-        }
-
-        const PhysicsWorldState* world_state = physics_thread->GetRenderState();
+        const PhysicsWorldState* world_state = physics_thread_->GetRenderState();
         if (!world_state) {
             return nullptr;
         }
 
-        // Find this body in the state
-        for (const auto& body : world_state->bodies) {
-            if (body.body_id == body_id_) {
-                return &body;
-            }
+        // O(1) map lookup by body_id (no iteration, no mutex)
+        auto it = world_state->bodies.find(body_id_);
+        if (it != world_state->bodies.end()) {
+            return &it->second;
         }
         return nullptr;
     }
@@ -99,6 +91,7 @@ public:
 private:
     int world_id_;
     int body_id_;
+    PhysicsThread* physics_thread_;  // Cached pointer for lock-free access
 };
 
 // Body handle - stores body_id, world_id, and references to queues
@@ -120,7 +113,7 @@ public:
 
     // Create a lightweight view for rendering (can cross lua_State boundaries)
     PhysicsBodyView CreateView() const {
-        return PhysicsBodyView(world_id_, body_id_);
+        return PhysicsBodyView(world_id_, body_id_, physics_thread_);
     }
 
 private:

@@ -175,7 +175,7 @@ void PhysicsThread::SimulationStep(float dt) {
 void PhysicsThread::UpdateRenderState() {
     // Write to write buffer
     PhysicsWorldState& write_buf = render_buffers_[write_buffer_index_];
-    write_buf.bodies.clear();
+    write_buf.bodies.clear();  // Clear map
     write_buf.world_id = world_id_;
 
     // Get gravity
@@ -185,7 +185,7 @@ void PhysicsThread::UpdateRenderState() {
         write_buf.gravity_y = static_cast<double>(gravity.y);
     }
 
-    // Collect all body states
+    // Collect all body states - now using map for O(1) lookup
     for (const auto& [body_id, b2_body_id] : bodies_) {
         if (B2_IS_NON_NULL(b2_body_id)) {
             PhysicsBodyState state;
@@ -205,7 +205,7 @@ void PhysicsThread::UpdateRenderState() {
             state.mass = static_cast<double>(mass);
             state.awake = awake;
 
-            write_buf.bodies.push_back(state);
+            write_buf.bodies[body_id] = state;  // Insert/update in map by body_id
         }
     }
 

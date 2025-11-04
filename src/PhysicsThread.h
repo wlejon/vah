@@ -26,9 +26,10 @@ struct PhysicsBodyState {
 /**
  * PhysicsWorldState - Complete snapshot of physics world for rendering
  * Lock-free: Physics thread writes, render thread reads
+ * Uses unordered_map for O(1) body lookup by body_id
  */
 struct PhysicsWorldState {
-    std::vector<PhysicsBodyState> bodies;
+    std::unordered_map<int, PhysicsBodyState> bodies;  // Changed from vector for O(1) lookup
     int world_id;
     double gravity_x;
     double gravity_y;
