@@ -4,7 +4,15 @@
     <link type="text/rcss" href="/ui/reset.rcss"/>
     <link type="text/rcss" href="vehicle_builder.rcss"/>
     <script>
+        -- Store canvas dimensions (updated by render function)
+        local canvas_width = 1000
+        local canvas_height = 700
+
         function render_game_world(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
+            -- Store canvas dimensions for click handler
+            canvas_width = canvas_w
+            canvas_height = canvas_h
+
             -- Get game state
             local state_data = data.get("vehicle_builder_state")
             if not state_data or #state_data == 0 then
@@ -200,17 +208,10 @@
             local cam_y = state.camera_y or 0
             local zoom = state.camera_zoom or 20
 
-            -- Get canvas element to get dimensions
-            local canvas = document:GetElementById("vehicle_canvas")
-            if not canvas then return end
-
-            local bounds = canvas:GetBoundingClientRect()
-            local canvas_w = bounds.width
-            local canvas_h = bounds.height
-
-            -- Convert screen to world coordinates
-            local rel_x = (mouse_x - canvas_x) - (canvas_w / 2)
-            local rel_y = (mouse_y - canvas_y) - (canvas_h / 2)
+            -- mouse_x, mouse_y are canvas-relative (already adjusted by RmlUI)
+            -- Convert to world coordinates
+            local rel_x = mouse_x - (canvas_width / 2)
+            local rel_y = mouse_y - (canvas_height / 2)
 
             local world_x = cam_x + rel_x / zoom
             local world_y = cam_y - rel_y / zoom
