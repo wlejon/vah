@@ -216,10 +216,26 @@
             local world_y = cam_y - rel_y / zoom
 
             -- Trigger place component event
-            event.trigger_global("vb_place_component", {
+            emit("vb_place_component", {
                 world_x = world_x,
                 world_y = world_y
             })
+        end
+
+        function select_component(comp_id)
+            emit("vb_select_component", {component_id = comp_id})
+        end
+
+        function start_test()
+            emit("vb_start_test", {})
+        end
+
+        function apply_motor()
+            emit("vb_apply_motor", {})
+        end
+
+        function reset_vehicle()
+            emit("vb_reset", {})
         end
     </script>
 </head>
@@ -240,7 +256,7 @@
 
                 <div class="component-list" data-for="comp : toolbox">
                     <div class="component-item" data-class-selected="comp.selected">
-                        <button data-event-click="event.trigger_global('vb_select_component', {component_id = comp.id})">
+                        <button onclick="select_component('{{comp.id}}')">
                             <div class="component-name">{{comp.name}}</div>
                             <div class="component-desc">{{comp.description}}</div>
                         </button>
@@ -250,16 +266,16 @@
 
             <!-- Right Panel: Game Canvas -->
             <div class="game-area" data-model="vehicle_builder_state">
-                <canvas width="1000" height="700" data-event-click="on_canvas_click" data-render="render_game_world"/>
+                <canvas width="1000" height="700" onclick="on_canvas_click" data-render="render_game_world"/>
 
                 <div class="controls">
-                    <button class="btn-primary" data-event-click="event.trigger_global('vb_start_test', {})">
+                    <button class="btn-primary" onclick="start_test()">
                         Start Test
                     </button>
-                    <button class="btn-secondary" data-event-click="event.trigger_global('vb_apply_motor', {})">
+                    <button class="btn-secondary" onclick="apply_motor()">
                         Apply Motor
                     </button>
-                    <button class="btn-danger" data-event-click="event.trigger_global('vb_reset', {})">
+                    <button class="btn-danger" onclick="reset_vehicle()">
                         Reset Vehicle
                     </button>
                 </div>
