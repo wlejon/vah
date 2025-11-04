@@ -123,7 +123,7 @@ local terrain_segments = {
 }
 
 local goal_x = 48
-local start_zone = {x = 2, y = 0, width = 6, height = 4}
+local start_zone = {x = -2, y = 2, width = 10, height = 6}  -- Larger, easier to click
 
 function startup()
     print("Vehicle Builder starting...")
