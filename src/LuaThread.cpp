@@ -10,6 +10,7 @@
 #include "FileIngestionBindings.h"
 #include "ClipboardBindings.h"
 #include "AudioBindings.h"
+#include "PhysicsBindings.h"
 #include "DataStore.h"
 #include "WorkflowThread.h"
 #include <httplib.h>
@@ -349,6 +350,9 @@ void LuaThread::SetupLuaBindings() {
 
     // Setup audio bindings
     AudioBindings::SetupBindings(*lua_);
+
+    // Setup physics bindings (Box2D)
+    PhysicsBindings::SetupBindings(*lua_);
 
     // Note: Notification system is now managed by Lua (scripts/notifications.lua)
     // Threads can use: local notif = require('notifications'); notif.add({...})

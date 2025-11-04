@@ -320,6 +320,176 @@ namespace Commands {
         std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {volume=float}
     };
 
+    // Physics commands - for Box2D integration
+    struct CreatePhysicsWorld {
+        int requesting_thread_id;
+        uint64_t request_id;
+        double gravity_x;
+        double gravity_y;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {world_id=int, error=string}
+    };
+
+    struct DestroyPhysicsWorld {
+        int world_id;
+    };
+
+    struct StepPhysicsWorld {
+        int world_id;
+        float time_step;
+        int velocity_iterations;
+        int position_iterations;
+    };
+
+    struct CreatePhysicsBody {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_type;  // 0=static, 1=kinematic, 2=dynamic
+        double position_x;
+        double position_y;
+        double angle;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {body_id=int, error=string}
+    };
+
+    struct DestroyPhysicsBody {
+        int world_id;
+        int body_id;
+    };
+
+    struct AddBoxFixture {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_id;
+        double half_width;
+        double half_height;
+        double density;
+        double friction;
+        double restitution;
+        bool is_sensor;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {fixture_id=int, error=string}
+    };
+
+    struct AddCircleFixture {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_id;
+        double radius;
+        double offset_x;
+        double offset_y;
+        double density;
+        double friction;
+        double restitution;
+        bool is_sensor;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {fixture_id=int, error=string}
+    };
+
+    struct AddPolygonFixture {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_id;
+        std::vector<double> vertices;  // Flat array: [x1, y1, x2, y2, ...]
+        double density;
+        double friction;
+        double restitution;
+        bool is_sensor;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {fixture_id=int, error=string}
+    };
+
+    struct SetBodyVelocity {
+        int world_id;
+        int body_id;
+        double velocity_x;
+        double velocity_y;
+    };
+
+    struct SetBodyAngularVelocity {
+        int world_id;
+        int body_id;
+        double angular_velocity;
+    };
+
+    struct SetBodyTransform {
+        int world_id;
+        int body_id;
+        double position_x;
+        double position_y;
+        double angle;
+    };
+
+    struct ApplyForce {
+        int world_id;
+        int body_id;
+        double force_x;
+        double force_y;
+        double point_x;
+        double point_y;
+        bool wake;
+    };
+
+    struct ApplyForceToCenter {
+        int world_id;
+        int body_id;
+        double force_x;
+        double force_y;
+        bool wake;
+    };
+
+    struct ApplyTorque {
+        int world_id;
+        int body_id;
+        double torque;
+        bool wake;
+    };
+
+    struct ApplyLinearImpulse {
+        int world_id;
+        int body_id;
+        double impulse_x;
+        double impulse_y;
+        double point_x;
+        double point_y;
+        bool wake;
+    };
+
+    struct ApplyLinearImpulseToCenter {
+        int world_id;
+        int body_id;
+        double impulse_x;
+        double impulse_y;
+        bool wake;
+    };
+
+    struct ApplyAngularImpulse {
+        int world_id;
+        int body_id;
+        double impulse;
+        bool wake;
+    };
+
+    struct QueryPhysicsBodyInfo {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {pos_x, pos_y, angle, vel_x, vel_y, angular_vel, mass, ...}
+    };
+
+    struct QueryPhysicsWorldInfo {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {body_count, gravity_x, gravity_y, ...}
+    };
+
+    struct SetPhysicsGravity {
+        int world_id;
+        double gravity_x;
+        double gravity_y;
+    };
+
 }
 
 // Variant holding all possible command types
@@ -380,7 +550,27 @@ using Command = std::variant<
     Commands::RewindSound,
     Commands::QuerySoundInfo,
     Commands::SetMasterVolume,
-    Commands::QueryMasterVolume
+    Commands::QueryMasterVolume,
+    Commands::CreatePhysicsWorld,
+    Commands::DestroyPhysicsWorld,
+    Commands::StepPhysicsWorld,
+    Commands::CreatePhysicsBody,
+    Commands::DestroyPhysicsBody,
+    Commands::AddBoxFixture,
+    Commands::AddCircleFixture,
+    Commands::AddPolygonFixture,
+    Commands::SetBodyVelocity,
+    Commands::SetBodyAngularVelocity,
+    Commands::SetBodyTransform,
+    Commands::ApplyForce,
+    Commands::ApplyForceToCenter,
+    Commands::ApplyTorque,
+    Commands::ApplyLinearImpulse,
+    Commands::ApplyLinearImpulseToCenter,
+    Commands::ApplyAngularImpulse,
+    Commands::QueryPhysicsBodyInfo,
+    Commands::QueryPhysicsWorldInfo,
+    Commands::SetPhysicsGravity
 >;
 
 // Response sent from main thread to lua thread

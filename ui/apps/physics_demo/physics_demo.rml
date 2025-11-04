@@ -1,0 +1,123 @@
+<rml>
+<head>
+    <title>Physics Demo</title>
+    <link type="text/rcss" href="/ui/reset.rcss"/>
+    <link type="text/rcss" href="physics_demo.rcss"/>
+    <script>
+    -- Render function for physics canvas
+    -- Bodies array comes from data model (set by Lua thread)
+    function render_physics(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h, time)
+        -- Get bodies from data model
+        local demo_data = data and data.get and data.get("physics_bodies")
+        if not demo_data or #demo_data == 0 then
+            -- Draw "no data" message
+            nvg.fontSize(nvg_ctx, 16.0)
+            nvg.fontFace(nvg_ctx, "roboto")
+            nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_MIDDLE)
+            nvg.fillColor(nvg_ctx, nvg.rgba(255, 255, 255, 255))
+            nvg.text(nvg_ctx, canvas_x + canvas_w / 2, canvas_y + canvas_h / 2, "Waiting for physics data...")
+            return
+        end
+
+        local bodies = demo_data[1].bodies
+        if not bodies or #bodies == 0 then
+            return
+        end
+
+        -- Clear background
+        nvg.beginPath(nvg_ctx)
+        nvg.rect(nvg_ctx, canvas_x, canvas_y, canvas_w, canvas_h)
+        nvg.fillColor(nvg_ctx, nvg.rgba(30, 30, 30, 255))
+        nvg.fill(nvg_ctx)
+
+        -- Set up coordinate transform (physics uses meters, canvas uses pixels)
+        -- Center at middle, scale 20 pixels per meter
+        local scale = 20
+        local offset_x = canvas_x + canvas_w / 2
+        local offset_y = canvas_y + canvas_h - 100  -- 100px from bottom
+
+        -- Draw ground
+        nvg.beginPath(nvg_ctx)
+        nvg.rect(nvg_ctx, canvas_x, offset_y + 10 * scale, canvas_w, 200)
+        nvg.fillColor(nvg_ctx, nvg.rgba(68, 68, 68, 255))
+        nvg.fill(nvg_ctx)
+
+        -- Draw bodies - reading live properties from Body objects
+        for i, body in ipairs(bodies) do
+            -- Live property access - reads from double buffer at render time!
+            local x = offset_x + body.pos_x * scale
+            local y = offset_y - body.pos_y * scale
+
+            nvg.save(nvg_ctx)
+            nvg.translate(nvg_ctx, x, y)
+            nvg.rotate(nvg_ctx, body.angle)
+
+            -- Draw circle (radius 0.5 meters)
+            local radius = 0.5 * scale
+
+            -- Color based on velocity (faster = redder)
+            local speed = math.sqrt(body.vel_x * body.vel_x + body.vel_y * body.vel_y)
+            local r = math.floor(math.min(255, 100 + speed * 20))
+            local g = math.floor(150 - math.min(150, speed * 10))
+            local b = 100
+
+            nvg.beginPath(nvg_ctx)
+            nvg.circle(nvg_ctx, 0, 0, radius)
+            nvg.fillColor(nvg_ctx, nvg.rgba(r, g, b, 255))
+            nvg.fill(nvg_ctx)
+
+            -- Draw direction indicator
+            nvg.beginPath(nvg_ctx)
+            nvg.moveTo(nvg_ctx, 0, 0)
+            nvg.lineTo(nvg_ctx, radius, 0)
+            nvg.strokeWidth(nvg_ctx, 2)
+            nvg.strokeColor(nvg_ctx, nvg.rgba(255, 255, 255, 255))
+            nvg.stroke(nvg_ctx)
+
+            nvg.restore(nvg_ctx)
+        end
+
+        -- Draw info text
+        nvg.fontSize(nvg_ctx, 14.0)
+        nvg.fontFace(nvg_ctx, "roboto")
+        nvg.textAlign(nvg_ctx, nvg.ALIGN_LEFT + nvg.ALIGN_TOP)
+        nvg.fillColor(nvg_ctx, nvg.rgba(255, 255, 255, 255))
+        nvg.text(nvg_ctx, canvas_x + 10, canvas_y + 10, "Bodies: " .. #bodies)
+    end
+    </script>
+</head>
+<body>
+    <div class="header" data-model="demo_status">
+        <div data-for="s : demo_status">
+            <h1>Box2D Physics Demo</h1>
+            <p class="status">{{s.text}}</p>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="physics_canvas" renderfunction="render_physics"/>
+    </div>
+
+    <div class="controls">
+        <button onclick="emit('reset_physics')">Reset</button>
+        <button onclick="emit('add_ball')">Add Ball</button>
+        <button onclick="emit('impulse_all')">Impulse Up</button>
+        <button onclick="emit('toggle_gravity')">Toggle Gravity</button>
+    </div>
+
+    <div class="body-list" data-model="physics_state">
+        <div data-for="ps : physics_state">
+            <h3>Bodies:</h3>
+            <div data-for="body : ps.bodies">
+                <div class="body-info">
+                    <span>Ball {{body.id}}: </span>
+                    <span>Pos ({{body.pos_x}}, {{body.pos_y}})</span>
+                    <span>Vel ({{body.vel_x}}, {{body.vel_y}})</span>
+                    <span data-if="body.awake" class="awake">AWAKE</span>
+                    <span data-if="!body.awake" class="sleeping">SLEEPING</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</rml>

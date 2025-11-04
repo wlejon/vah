@@ -60,6 +60,12 @@
                 <div class="app-name">MCP Client</div>
                 <p class="app-description">Model Context Protocol client - connect to MCP servers and call tools</p>
             </div>
+
+            <div class="app-card" onclick="launch_app('physics_demo')" onmouseover="play_hover_sound()">
+                <div class="app-icon">[PP]</div>
+                <div class="app-name">Physics Demo</div>
+                <p class="app-description">physics demo</p>
+            </div>
         </div>
 
         <div class="footer">

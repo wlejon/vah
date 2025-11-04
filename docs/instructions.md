@@ -96,30 +96,352 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-we've created AudioBindings for lua threads to use. please perform a code review on the new code.
+we need a lua binding for box2d. we're going to be building a physics based puzzle game. please review existing bindings to understand. physics will run on its own thread so you'll need to understand the lock-free philosophy.
+
+you've take a first pass at it. currently it's struggling to render properly. 
 
 PS D:\projects\vah> git status
 On branch main
-Your branch is up to date with 'origin/main'.
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
 
 Changes not staged for commit:
   (use "git add <file>..." to update what will be committed)
   (use "git restore <file>..." to discard changes in working directory)
         modified:   CMakeLists.txt
-        modified:   src/CommandProcessor.cpp
-        modified:   src/CommandProcessor.h
+        modified:   docs/instructions.md
+        modified:   scripts/core/launcher.lua
         modified:   src/Commands.h
-        modified:   src/LuaConversions.cpp
-        modified:   src/LuaConversions.h
         modified:   src/LuaThread.cpp
-        modified:   src/main.cpp
+        modified:   ui/core/launcher/launcher.rml
 
 Untracked files:
   (use "git add <file>..." to include in what will be committed)
-        boop.wav
-        src/AudioBindings.cpp
-        src/AudioBindings.h
-        src/AudioManager.cpp
-        src/AudioManager.h
-        src/miniaudio_impl.cpp
+        scripts/apps/physics_demo.lua
+        src/PhysicsBindings.cpp
+        src/PhysicsBindings.h
+        src/PhysicsThread.cpp
+        src/PhysicsThread.h
+        ui/apps/physics_demo/
 
+no changes added to commit (use "git add" and/or "git commit -a")
+
+## current log
+[2025-11-04 02:06:22.152] [info] Initializing Vah Engine...
+[2025-11-04 02:06:22.352] [info] RmlGL3: 
+[2025-11-04 02:06:22.358] [info] [RmlUi] Loaded font face 'Roboto' [regular] from 'ui/fonts/roboto-static/Roboto-Regular.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loaded font face 'Roboto' [bold] from 'ui/fonts/roboto-static/Roboto-Bold.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loaded font face 'Roboto' [italic] from 'ui/fonts/roboto-static/Roboto-Italic.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loaded font face 'Roboto' [weight=300] from 'ui/fonts/roboto-static/Roboto-Light.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loaded font face 'Roboto' [weight=500] from 'ui/fonts/roboto-static/Roboto-Medium.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loaded font face 'JetBrains Mono' [regular] from 'ui/fonts/jetbrains-mono-static/JetBrainsMono-Regular.ttf'.
+[2025-11-04 02:06:22.359] [info] [RmlUi] Loading Lua plugin using a new Lua state.
+[2025-11-04 02:06:22.360] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [regular] from 'memory'.
+[2025-11-04 02:06:22.360] [info] [RmlUi] Loaded font face 'rmlui-debugger-font' [italic] from 'memory'.
+[2025-11-04 02:06:22.366] [info] Registered custom element: canvas
+[2025-11-04 02:06:22.366] [info] Registered custom element: texteditor
+[2025-11-04 02:06:22.366] [info] Registered Lua bindings for ElementTextEditor
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: math (Math Operations)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: string (String Operations)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: table (Table Operations)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: json (JSON Encoding/Decoding)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: db (Database Access)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: fs (File System Access)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: http (Network Access)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: ui (User Interface)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: thread (Threading Utilities)
+[2025-11-04 02:06:22.366] [debug] Registered workflow library: event (Event System)
+[2025-11-04 02:06:22.366] [info] Registered 10 built-in workflow libraries
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=14 ctrl=true shift=false alt=false -> command='command_copy'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=33 ctrl=true shift=false alt=false -> command='command_paste'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=35 ctrl=true shift=false alt=false -> command='command_cut'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=12 ctrl=true shift=false alt=false -> command='command_select_all'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=37 ctrl=true shift=false alt=false -> command='command_undo'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=36 ctrl=true shift=false alt=false -> command='command_redo'
+[2025-11-04 02:06:22.366] [info] Mapped keybinding: key=30 ctrl=true shift=false alt=false -> command='command_save'
+[2025-11-04 02:06:22.366] [info] NanoVG bindings registered in Lua state
+[2025-11-04 02:06:22.366] [info] RmlUiBridge: Registered emit(), data, and DOM introspection functions in RmlUI lua state
+[2025-11-04 02:06:22.366] [info] EventDispatcher: Registered thread 0
+[2025-11-04 02:06:22.366] [info] ThreadManager: Spawned thread 0 for script 'scripts/core/main.lua'
+[2025-11-04 02:06:22.366] [info] Watching ui/ directory for RML/RCSS changes
+[2025-11-04 02:06:22.366] [info] Vah Engine initialized successfully
+[2025-11-04 02:06:22.368] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.368] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.369] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.369] [info] Lua thread 0 running
+[2025-11-04 02:06:22.391] [info] [Lua Thread 0] Main Lua thread started
+[2025-11-04 02:06:22.391] [info] Processing SpawnThread command: scripts/core/notifications.lua (parent: 0)
+[2025-11-04 02:06:22.391] [info] EventDispatcher: Registered thread 1
+[2025-11-04 02:06:22.391] [info] ThreadManager: Spawned thread 1 for script 'scripts/core/notifications.lua'
+[2025-11-04 02:06:22.391] [info] Processing SpawnThread command: scripts/core/menu.lua (parent: 0)
+[2025-11-04 02:06:22.391] [info] EventDispatcher: Registered thread 2
+[2025-11-04 02:06:22.391] [info] ThreadManager: Spawned thread 2 for script 'scripts/core/menu.lua'
+[2025-11-04 02:06:22.392] [info] Processing SpawnThread command: scripts/mcp/server.lua (parent: 0)
+[2025-11-04 02:06:22.392] [info] EventDispatcher: Registered thread 3
+[2025-11-04 02:06:22.392] [info] ThreadManager: Spawned thread 3 for script 'scripts/mcp/server.lua'
+[2025-11-04 02:06:22.392] [info] Processing SpawnThread command: scripts/analyzers/lua_analyzer.lua (parent: 0)
+[2025-11-04 02:06:22.392] [info] EventDispatcher: Registered thread 4
+[2025-11-04 02:06:22.392] [info] ThreadManager: Spawned thread 4 for script 'scripts/analyzers/lua_analyzer.lua'
+[2025-11-04 02:06:22.392] [info] Processing SpawnThread command: scripts/core/launcher.lua (parent: 0)
+[2025-11-04 02:06:22.392] [info] EventDispatcher: Registered thread 5
+[2025-11-04 02:06:22.392] [info] ThreadManager: Spawned thread 5 for script 'scripts/core/launcher.lua'
+[2025-11-04 02:06:22.396] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.396] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.396] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.396] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.396] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:22.396] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.396] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.396] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.397] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.397] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.397] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.397] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.397] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:22.397] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.397] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:22.404] [info] Lua thread 3 running
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] MCP server system starting...
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Initializing type registry...
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Types directory: mcp_views/types
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Templates directory: mcp_views/templates
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: application
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: database
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: directory
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: document
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: file
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: row
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3]   Loaded type: table
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Type registry initialized with 7 types
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Type registry initialized
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: list
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: detail
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: summary
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: search
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: diff
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: status
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Navigation tools registered: list, detail, summary, search, diff, status
+[2025-11-04 02:06:22.529] [info] [Lua Thread 1] Notifications system started
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Navigation tools registered
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'add_notification' registered to thread 1
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'mcp_start_server' registered to thread 3
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'notification_success' registered to thread 1
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'mcp_stop_server' registered to thread 3
+[2025-11-04 02:06:22.529] [info] [Lua Thread 4] Lua analyzer started (thread_id: 4)
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'notification_error' registered to thread 1
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: echo
+[2025-11-04 02:06:22.529] [info] [Lua Thread 4] LM Studio is available for code quality analysis
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'notification_info' registered to thread 1
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] Registered MCP tool: get_time
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'file_analysis_needed' registered to thread 4
+[2025-11-04 02:06:22.529] [info] EventDispatcher: Global event 'notification_warning' registered to thread 1
+[2025-11-04 02:06:22.529] [info] [Lua Thread 3] MCP server system ready (use start command to launch server)
+[2025-11-04 02:06:22.529] [info] [Lua Thread 5] Launcher started (thread_id: 5)
+[2025-11-04 02:06:22.529] [info] [Lua Thread 2] Menu system starting...
+[2025-11-04 02:06:22.529] [info] Processing LoadSound command: data/boop.wav
+[2025-11-04 02:06:22.530] [info] Lua thread 4 running
+[2025-11-04 02:06:22.559] [info] Audio engine initialized successfully
+[2025-11-04 02:06:22.560] [info] Sound loaded: data/boop.wav (id=1)
+[2025-11-04 02:06:22.560] [info] Lua thread 5 running
+[2025-11-04 02:06:22.560] [info] Lua thread 2 running
+[2025-11-04 02:06:22.561] [info] [Lua Thread 5] Loaded hover sound
+[2025-11-04 02:06:22.562] [info] EventDispatcher: Global event 'return_to_launcher' registered to thread 5
+[2025-11-04 02:06:22.562] [info] EventDispatcher: Global event 'close_application' registered to thread 5
+[2025-11-04 02:06:22.562] [warning] EventDispatcher: No thread registered for global event 'lua_analyzer_status_update'
+[2025-11-04 02:06:22.562] [info] Processing LoadUIDocument command: ui/core/launcher/launcher.rml
+[2025-11-04 02:06:22.580] [info] Stored document with ID: launcher
+[2025-11-04 02:06:22.583] [info] Loaded UI document: ui/core/launcher/launcher.rml
+[2025-11-04 02:06:22.583] [info] [Lua Thread 4] Lua analyzer ready
+[2025-11-04 02:06:22.583] [info] EventDispatcher: Global event 'menu_register' registered to thread 2
+[2025-11-04 02:06:22.583] [info] EventDispatcher: Global event 'menu_unregister' registered to thread 2
+[2025-11-04 02:06:22.583] [info] EventDispatcher: Global event 'menu_update_status' registered to thread 2
+[2025-11-04 02:06:22.583] [info] EventDispatcher: Global event 'close_all_menus' registered to thread 2
+[2025-11-04 02:06:22.583] [info] Processing LoadUIDocument command: ui/core/menu/menu.rml
+[2025-11-04 02:06:22.585] [info] Stored document with ID: app_menu
+[2025-11-04 02:06:22.586] [info] Loaded UI document: ui/core/menu/menu.rml
+[2025-11-04 02:06:22.586] [info] [Lua Thread 2] Menu system started
+[2025-11-04 02:06:22.586] [info] [Lua Thread 5] Launcher ready
+[2025-11-04 02:06:22.586] [info] Lua thread 1 running
+[2025-11-04 02:06:22.586] [info] EventDispatcher: Broadcast event 'system_ready' to 6 thread(s)
+[2025-11-04 02:06:22.586] [info] EventDispatcher: System 'menu' marked ready
+[2025-11-04 02:06:22.587] [info] Processing LoadUIDocument command: ui/core/notifications/notifications_badge.rml
+[2025-11-04 02:06:22.590] [info] Stored document with ID: notifications_badge
+[2025-11-04 02:06:22.591] [info] Loaded UI document: ui/core/notifications/notifications_badge.rml
+[2025-11-04 02:06:22.591] [info] Processing LoadUIDocument command: ui/core/notifications/notifications_panel.rml
+[2025-11-04 02:06:22.594] [info] Lua thread 5 called menu_ready()
+[2025-11-04 02:06:22.601] [info] Stored document with ID: notifications_panel
+[2025-11-04 02:06:22.601] [info] Loaded UI document: ui/core/notifications/notifications_panel.rml
+[2025-11-04 02:06:22.601] [info] [Lua Thread 1] Notifications system ready
+[2025-11-04 02:06:22.602] [info] Lua thread 3 called menu_ready()
+[2025-11-04 02:06:23.387] [info] [Lua Thread 5] Launching app: Physics Demo
+[2025-11-04 02:06:23.388] [info] Hiding document: launcher
+[2025-11-04 02:06:23.388] [info] Processing SpawnThread command: scripts/apps/physics_demo.lua (parent: 5)
+[2025-11-04 02:06:23.388] [info] EventDispatcher: Registered thread 6
+[2025-11-04 02:06:23.389] [info] ThreadManager: Spawned thread 6 for script 'scripts/apps/physics_demo.lua' (parent: 5)
+[2025-11-04 02:06:23.390] [info] Audio bindings registered (command-based)
+[2025-11-04 02:06:23.390] [info] Physics bindings registered (Box2D with lock-free threads)
+[2025-11-04 02:06:23.390] [debug] Registered workflow thread bindings
+[2025-11-04 02:06:23.391] [info] PhysicsThread 1 created with gravity (0, -10)
+[2025-11-04 02:06:23.391] [info] Created physics world 1 with gravity (0, -10)
+[2025-11-04 02:06:23.391] [info] PhysicsThread 1 running
+[2025-11-04 02:06:23.391] [debug] PhysicsThread 1: Created body 1 at (0, -10)
+[2025-11-04 02:06:23.392] [info] [Lua Thread 6] Physics Demo starting...
+[2025-11-04 02:06:23.392] [info] [Lua Thread 6] Created physics world with gravity (0, -10)
+[2025-11-04 02:06:23.409] [info] [Lua Thread 6] Created ground at y=-10 with box fixture
+[2025-11-04 02:06:23.420] [info] [Lua Thread 5] Thread spawned: 6 for script: scripts/apps/physics_demo.lua
+[2025-11-04 02:06:23.420] [info] [Lua Thread 5] Tracking thread ID: 6
+[2025-11-04 02:06:23.425] [debug] PhysicsThread 1: Created body 2 at (-5, 12)
+[2025-11-04 02:06:23.442] [info] [Lua Thread 6] Created ball 1 at (-5.0, 12.0)
+[2025-11-04 02:06:23.458] [debug] PhysicsThread 1: Created body 3 at (0, 14)
+[2025-11-04 02:06:23.476] [info] [Lua Thread 6] Created ball 2 at (0.0, 14.0)
+[2025-11-04 02:06:23.492] [debug] PhysicsThread 1: Created body 4 at (5, 16)
+[2025-11-04 02:06:23.509] [info] [Lua Thread 6] Created ball 3 at (5.0, 16.0)
+[2025-11-04 02:06:23.525] [debug] PhysicsThread 1: Created body 5 at (10, 18)
+[2025-11-04 02:06:23.545] [info] [Lua Thread 6] Created ball 4 at (10.0, 18.0)
+[2025-11-04 02:06:23.558] [debug] PhysicsThread 1: Created body 6 at (15, 20)
+[2025-11-04 02:06:23.576] [info] [Lua Thread 6] Created ball 5 at (15.0, 20.0)
+[2025-11-04 02:06:23.576] [info] Lua thread 6 running
+[2025-11-04 02:06:23.578] [info] Processing LoadUIDocument command: ui/apps/physics_demo/physics_demo.rml
+[2025-11-04 02:06:23.598] [warning] [RmlUi] Syntax error parsing property declaration 'border: 1px solid #3e3e42;' in ui/apps/physics_demo/physics_demo.rcss: 38.
+[2025-11-04 02:06:23.598] [warning] [RmlUi] Syntax error parsing property declaration 'border: none;' in ui/apps/physics_demo/physics_demo.rcss: 51.
+[2025-11-04 02:06:23.599] [info] ElementCanvas created
+[2025-11-04 02:06:23.600] [info] Loaded default NanoVG font 'roboto'
+[2025-11-04 02:06:23.600] [info] NanoVG context created successfully
+[2025-11-04 02:06:23.600] [info] ElementCanvas added to document tree
+[2025-11-04 02:06:23.603] [info] Canvas resized to 800x600
+[2025-11-04 02:06:23.603] [info] Stored document with ID: physics_demo
+[2025-11-04 02:06:23.606] [info] Loaded UI document: ui/apps/physics_demo/physics_demo.rml
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].x'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].y'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vx'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vy'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].x'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].y'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vx'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vy'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vx'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vy'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].x'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].y'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vx'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vy'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].x'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].y'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].x'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].y'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vx'.
+[2025-11-04 02:06:23.665] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vy'.
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [bold] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span.awake < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.669] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [bold] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span.awake < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [bold] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span.awake < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [bold] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span.awake < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [regular] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.670] [warning] [RmlUi] No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, and (2) that the specified font face 'monospace' [bold] has been successfully loaded. Please see previous log messages for all successfully loaded fonts. On element span.awake < div.body-info < div < div < div.body-list < body#physics_demo < #root#main
+[2025-11-04 02:06:23.671] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.681] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.683] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.684] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.687] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.689] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.692] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.695] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.698] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.701] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.703] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.706] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.709] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.712] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.714] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.717] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.720] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.723] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.726] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.728] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.731] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.734] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.737] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.739] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.742] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].x'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].y'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vx'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vy'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].x'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].y'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vx'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vy'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vx'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vy'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].x'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].y'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vx'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vy'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].x'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].y'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].x'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].y'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vx'.
+[2025-11-04 02:06:23.744] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vy'.
+[2025-11-04 02:06:23.755] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.756] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.757] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.759] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.762] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.764] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.767] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.770] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.773] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.776] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.778] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.781] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.784] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.787] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.789] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.792] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.795] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.798] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.801] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.803] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.806] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.809] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.812] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.814] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.817] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.820] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.823] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.826] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.828] [error] ElementCanvas: Error calling Lua render function 'render_physics': [string "--ui/apps/physics_demo/physics_demo.rml:6..."]:58: bad argument #1 to 'rgba' (number has no integer representation)
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].x'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].y'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vx'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[2].vy'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].x'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].y'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vx'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].vy'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vx'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[0].vy'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].x'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[1].y'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vx'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].vy'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].x'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].y'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].x'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[3].y'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vx'.
+[2025-11-04 02:06:23.830] [warning] [RmlUi] Could not get value from data variable 'physics_state[0].bodies[4].vy'.

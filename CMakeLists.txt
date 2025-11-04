@@ -26,6 +26,7 @@ find_package(httplib CONFIG REQUIRED)
 find_package(efsw CONFIG REQUIRED)
 find_package(concurrentqueue CONFIG REQUIRED)
 find_package(nanovg CONFIG REQUIRED)
+find_package(box2d CONFIG REQUIRED)
 
 # Fetch RmlUi from forked repository
 include(FetchContent)
@@ -85,6 +86,8 @@ add_executable(vah
     src/ElementTextEditor.cpp
     src/WorkflowLibrary.cpp
     src/WorkflowThread.cpp
+    src/PhysicsThread.cpp
+    src/PhysicsBindings.cpp
 )
 
 target_include_directories(vah PRIVATE
@@ -110,6 +113,7 @@ target_link_libraries(vah PRIVATE
     efsw::efsw
     concurrentqueue::concurrentqueue
     nanovg::nanovg
+    box2d::box2d
 )
 
 

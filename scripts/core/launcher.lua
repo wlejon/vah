@@ -41,6 +41,11 @@ local apps = {
         name = "MCP Client",
         script = "scripts/mcp/client.lua",
         document_id = "mcp_client"
+    },
+    physics_demo = {
+        name = "Physics Demo",
+        script = "scripts/apps/physics_demo.lua",
+        document_id = "physics_demo"
     }
 }
 

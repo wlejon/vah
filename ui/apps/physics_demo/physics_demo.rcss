@@ -1,0 +1,95 @@
+body {
+    font-family: Roboto;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    margin: 0;
+    padding: 20px;
+}
+
+.header {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #2d2d30;
+    border-radius: 4px;
+}
+
+.header h1 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
+    color: #ffffff;
+}
+
+.header .status {
+    margin: 0;
+    font-size: 14px;
+    color: #858585;
+}
+
+.canvas-container {
+    background-color: #252526;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: block;
+}
+
+canvas {
+    display: block;
+    width: 800px;
+    height: 600px;
+}
+
+.controls {
+    margin-bottom: 20px;
+    display: block;
+}
+
+.controls button {
+    background-color: #0e639c;
+    color: #ffffff;
+    padding: 8px 16px;
+    margin-right: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.controls button:hover {
+    background-color: #1177bb;
+}
+
+.body-list {
+    background-color: #2d2d30;
+    padding: 15px;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.body-list h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #ffffff;
+}
+
+.body-info {
+    padding: 8px;
+    margin-bottom: 5px;
+    background-color: #3e3e42;
+    border-radius: 2px;
+    font-size: 12px;
+    font-family: JetBrains Mono;
+}
+
+.body-info span {
+    margin-right: 15px;
+}
+
+.body-info .awake {
+    color: #4ec9b0;
+    font-weight: bold;
+}
+
+.body-info .sleeping {
+    color: #858585;
+}
