@@ -146,6 +146,9 @@ function startup()
     -- Select first component by default
     selected_component_type = component_types[1].id
 
+    -- Initialize data bindings BEFORE loading UI
+    update_bindings()
+
     -- Load UI
     ui.load_document("ui/apps/vehicle_builder/vehicle_builder.rml", true, "vehicle_builder")
 
@@ -172,9 +175,6 @@ function startup()
     event.register("vb_apply_motor", function(payload)
         apply_motor_torque()
     end)
-
-    -- Initialize data bindings
-    update_bindings()
 
     print("Vehicle Builder ready! Build your vehicle in the start zone (left side).")
 end
