@@ -128,6 +128,8 @@ private:
     void HandleCreateDistanceJoint(Commands::CreateDistanceJoint& cmd);
     void HandleDestroyJoint(Commands::DestroyJoint& cmd);
     void HandleSetJointMotorSpeed(Commands::SetJointMotorSpeed& cmd);
+    void HandleEnableJointLimit(Commands::EnableJointLimit& cmd);
+    void HandleSetJointLimits(Commands::SetJointLimits& cmd);
 
     int world_id_;
     std::unique_ptr<b2WorldId> world_;

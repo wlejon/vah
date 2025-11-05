@@ -139,6 +139,140 @@
             end
         end
 
+        -- Draw joint demonstrations
+        local joint_data = data and data.get and data.get("joint_demos")
+        if joint_data and #joint_data > 0 then
+            local world_id = joint_data[1].world_id
+            local joints = joint_data[1].joints
+            if joints and #joints > 0 then
+                for i, joint in ipairs(joints) do
+                    if joint.type == "chain" then
+                        -- Draw chain segments and connections
+                        for j = 1, #joint.body_ids - 1 do
+                            local view1, err1 = physics.create_body_view(world_id, joint.body_ids[j])
+                            local view2, err2 = physics.create_body_view(world_id, joint.body_ids[j+1])
+                            if view1 and view2 then
+                                -- Draw line between chain segments (cyan)
+                                nvg.beginPath(nvg_ctx)
+                                nvg.moveTo(nvg_ctx, view1.pos_x, view1.pos_y)
+                                nvg.lineTo(nvg_ctx, view2.pos_x, view2.pos_y)
+                                nvg.strokeWidth(nvg_ctx, 0.1)
+                                nvg.strokeColor(nvg_ctx, nvg.rgba(0, 200, 200, 255))
+                                nvg.stroke(nvg_ctx)
+                            end
+                        end
+                        -- Draw chain bodies
+                        for j, body_id in ipairs(joint.body_ids) do
+                            local view, err = physics.create_body_view(world_id, body_id)
+                            if view then
+                                nvg.save(nvg_ctx)
+                                nvg.translate(nvg_ctx, view.pos_x, view.pos_y)
+                                nvg.rotate(nvg_ctx, view.angle)
+
+                                if j == 1 then
+                                    -- Anchor point (small red circle)
+                                    nvg.beginPath(nvg_ctx)
+                                    nvg.circle(nvg_ctx, 0, 0, 0.2)
+                                    nvg.fillColor(nvg_ctx, nvg.rgba(255, 50, 50, 255))
+                                    nvg.fill(nvg_ctx)
+                                else
+                                    -- Chain segment (gray box)
+                                    nvg.beginPath(nvg_ctx)
+                                    nvg.rect(nvg_ctx, -0.2, -0.4, 0.4, 0.8)
+                                    nvg.fillColor(nvg_ctx, nvg.rgba(150, 150, 150, 255))
+                                    nvg.fill(nvg_ctx)
+                                end
+
+                                nvg.restore(nvg_ctx)
+                            end
+                        end
+                    else
+                        -- Single joint (pendulum, motor, gate, springs)
+                        local anchor_view, err1 = physics.create_body_view(world_id, joint.anchor_id)
+                        local body_view, err2 = physics.create_body_view(world_id, joint.body_id)
+
+                        if anchor_view and body_view then
+                            -- Choose color based on joint type
+                            local r, g, b = 255, 255, 255
+                            if joint.type == "pendulum" then
+                                r, g, b = 200, 100, 255  -- Purple
+                            elseif joint.type == "motor" then
+                                r, g, b = 255, 150, 0  -- Orange
+                            elseif joint.type == "gate" then
+                                r, g, b = 255, 255, 0  -- Yellow
+                            elseif joint.type == "soft_spring" then
+                                r, g, b = 0, 255, 100  -- Green
+                            elseif joint.type == "stiff_spring" then
+                                r, g, b = 255, 0, 100  -- Pink
+                            end
+
+                            -- Draw connection line
+                            nvg.beginPath(nvg_ctx)
+                            nvg.moveTo(nvg_ctx, anchor_view.pos_x, anchor_view.pos_y)
+                            nvg.lineTo(nvg_ctx, body_view.pos_x, body_view.pos_y)
+                            nvg.strokeWidth(nvg_ctx, 0.1)
+                            nvg.strokeColor(nvg_ctx, nvg.rgba(r, g, b, 200))
+                            nvg.stroke(nvg_ctx)
+
+                            -- Draw anchor point (small red circle)
+                            nvg.beginPath(nvg_ctx)
+                            nvg.circle(nvg_ctx, anchor_view.pos_x, anchor_view.pos_y, 0.2)
+                            nvg.fillColor(nvg_ctx, nvg.rgba(255, 50, 50, 255))
+                            nvg.fill(nvg_ctx)
+
+                            -- Draw attached body
+                            nvg.save(nvg_ctx)
+                            nvg.translate(nvg_ctx, body_view.pos_x, body_view.pos_y)
+                            nvg.rotate(nvg_ctx, body_view.angle)
+
+                            if joint.type == "pendulum" then
+                                -- Pendulum bob (box 0.5 x 2.0)
+                                nvg.beginPath(nvg_ctx)
+                                nvg.rect(nvg_ctx, -0.25, -1.0, 0.5, 2.0)
+                                nvg.fillColor(nvg_ctx, nvg.rgba(r, g, b, 255))
+                                nvg.fill(nvg_ctx)
+                            elseif joint.type == "motor" or joint.type == "gate" then
+                                -- Platform/Gate (box 3.0 x 0.5)
+                                nvg.beginPath(nvg_ctx)
+                                nvg.rect(nvg_ctx, -1.5, -0.25, 3.0, 0.5)
+                                nvg.fillColor(nvg_ctx, nvg.rgba(r, g, b, 255))
+                                nvg.fill(nvg_ctx)
+                            else
+                                -- Spring bob (circle 0.5)
+                                nvg.beginPath(nvg_ctx)
+                                nvg.circle(nvg_ctx, 0, 0, 0.5)
+                                nvg.fillColor(nvg_ctx, nvg.rgba(r, g, b, 255))
+                                nvg.fill(nvg_ctx)
+                            end
+
+                            nvg.restore(nvg_ctx)
+                        end
+                    end
+                end
+
+                -- Draw joint labels in screen coordinates
+                nvg.restore(nvg_ctx)  -- Exit physics space
+                for i, joint in ipairs(joints) do
+                    if joint.type ~= "chain" then
+                        local anchor_view, err1 = physics.create_body_view(world_id, joint.anchor_id)
+                        if anchor_view then
+                            local screen_x = origin_x + anchor_view.pos_x * scale
+                            local screen_y = origin_y + anchor_view.pos_y * scale - 30
+
+                            nvg.fontSize(nvg_ctx, 12.0)
+                            nvg.fontFace(nvg_ctx, "roboto")
+                            nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_BOTTOM)
+                            nvg.fillColor(nvg_ctx, nvg.rgba(255, 255, 255, 255))
+                            nvg.text(nvg_ctx, screen_x, screen_y, joint.label)
+                        end
+                    end
+                end
+                nvg.save(nvg_ctx)  -- Re-enter physics space for bodies
+                nvg.translate(nvg_ctx, origin_x, origin_y)
+                nvg.scale(nvg_ctx, scale, scale)
+            end
+        end
+
         -- Draw bodies - reading live properties from Body objects
         for i, body in ipairs(bodies) do
             nvg.save(nvg_ctx)

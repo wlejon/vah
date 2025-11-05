@@ -787,6 +787,31 @@ void SetJointMotorSpeed(std::shared_ptr<Joint> joint, double motor_speed) {
     joint->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
 }
 
+// Enable/disable joint angle limits (fire and forget)
+void EnableJointLimit(std::shared_ptr<Joint> joint, bool enable) {
+    if (!joint) return;
+
+    Commands::EnableJointLimit cmd;
+    cmd.world_id = joint->GetWorldId();
+    cmd.joint_id = joint->GetJointId();
+    cmd.enable = enable;
+
+    joint->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+}
+
+// Set joint angle limits (fire and forget)
+void SetJointLimits(std::shared_ptr<Joint> joint, double lower_angle, double upper_angle) {
+    if (!joint) return;
+
+    Commands::SetJointLimits cmd;
+    cmd.world_id = joint->GetWorldId();
+    cmd.joint_id = joint->GetJointId();
+    cmd.lower_angle = lower_angle;
+    cmd.upper_angle = upper_angle;
+
+    joint->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+}
+
 // No longer needed - Body objects now have live property bindings
 
 void SetupBindings(sol::state& lua) {
@@ -828,6 +853,8 @@ void SetupBindings(sol::state& lua) {
     lua.new_usertype<Joint>("PhysicsJoint",
         sol::no_constructor,
         "set_motor_speed", &SetJointMotorSpeed,
+        "enable_limit", &EnableJointLimit,
+        "set_limits", &SetJointLimits,
         "destroy", &DestroyJoint
     );
 

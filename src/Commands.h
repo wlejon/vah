@@ -534,6 +534,19 @@ namespace Commands {
         double motor_speed;
     };
 
+    struct EnableJointLimit {
+        int world_id;
+        int joint_id;
+        bool enable;
+    };
+
+    struct SetJointLimits {
+        int world_id;
+        int joint_id;
+        double lower_angle;
+        double upper_angle;
+    };
+
 }
 
 // Variant holding all possible command types
@@ -618,7 +631,9 @@ using Command = std::variant<
     Commands::CreateRevoluteJoint,
     Commands::CreateDistanceJoint,
     Commands::DestroyJoint,
-    Commands::SetJointMotorSpeed
+    Commands::SetJointMotorSpeed,
+    Commands::EnableJointLimit,
+    Commands::SetJointLimits
 >;
 
 // Response sent from main thread to lua thread

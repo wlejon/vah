@@ -172,6 +172,12 @@ void PhysicsThread::ProcessCommands() {
             else if constexpr (std::is_same_v<T, Commands::SetJointMotorSpeed>) {
                 HandleSetJointMotorSpeed(command);
             }
+            else if constexpr (std::is_same_v<T, Commands::EnableJointLimit>) {
+                HandleEnableJointLimit(command);
+            }
+            else if constexpr (std::is_same_v<T, Commands::SetJointLimits>) {
+                HandleSetJointLimits(command);
+            }
         }, cmd);
     }
 }
@@ -762,5 +768,21 @@ void PhysicsThread::HandleSetJointMotorSpeed(Commands::SetJointMotorSpeed& cmd) 
     if (it != joints_.end()) {
         // Set motor speed for revolute joint
         b2RevoluteJoint_SetMotorSpeed(it->second, static_cast<float>(cmd.motor_speed));
+    }
+}
+
+void PhysicsThread::HandleEnableJointLimit(Commands::EnableJointLimit& cmd) {
+    auto it = joints_.find(cmd.joint_id);
+    if (it != joints_.end()) {
+        // Enable/disable angle limits for revolute joint
+        b2RevoluteJoint_EnableLimit(it->second, cmd.enable);
+    }
+}
+
+void PhysicsThread::HandleSetJointLimits(Commands::SetJointLimits& cmd) {
+    auto it = joints_.find(cmd.joint_id);
+    if (it != joints_.end()) {
+        // Set angle limits for revolute joint
+        b2RevoluteJoint_SetLimits(it->second, static_cast<float>(cmd.lower_angle), static_cast<float>(cmd.upper_angle));
     }
 }

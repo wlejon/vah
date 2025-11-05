@@ -96,6 +96,4 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-in the physics demo, please add shapes that help demonstrate the coordinate system such that we can verify it is oriented correctly. 
-
-include directional rotation examples (like spinning wheels with a line on them), movement examples (left, right, up, down), etc. these should be cyclical in scene so it can be easily understood over time and confirmed. 
+in the physics demo, please add joint mechanisms that demonstrate each of the types. 
