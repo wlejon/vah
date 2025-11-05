@@ -270,9 +270,6 @@ void PhysicsThread::HandleCreateBody(Commands::CreatePhysicsBody& cmd) {
         response["body_id"] = static_cast<int64_t>(body_id);
         response["error"] = std::string("");
         cmd.promise->set_value(std::move(response));
-
-        LOG_DEBUG("PhysicsThread {}: Created body {} at ({}, {})", world_id_, body_id, cmd.position_x, cmd.position_y);
-
     } catch (const std::exception& e) {
         PayloadMap response;
         response["body_id"] = static_cast<int64_t>(-1);
@@ -290,7 +287,6 @@ void PhysicsThread::HandleDestroyBody(Commands::DestroyPhysicsBody& cmd) {
             b2DestroyBody(it->second);
         }
         bodies_.erase(it);
-        LOG_DEBUG("PhysicsThread {}: Destroyed body {}", world_id_, cmd.body_id);
     }
 }
 
@@ -651,7 +647,6 @@ void PhysicsThread::HandleSetGravity(Commands::SetPhysicsGravity& cmd) {
     if (world_) {
         b2Vec2 gravity = {static_cast<float>(cmd.gravity_x), static_cast<float>(cmd.gravity_y)};
         b2World_SetGravity(*world_, gravity);
-        LOG_DEBUG("PhysicsThread {}: Set gravity to ({}, {})", world_id_, cmd.gravity_x, cmd.gravity_y);
     }
 }
 
@@ -689,9 +684,6 @@ void PhysicsThread::HandleCreateRevoluteJoint(Commands::CreateRevoluteJoint& cmd
             // Store joint
             joint_id = next_joint_id_++;
             joints_[joint_id] = joint;
-
-            LOG_DEBUG("PhysicsThread {}: Created revolute joint {} between bodies {} and {}",
-                     world_id_, joint_id, cmd.body_a_id, cmd.body_b_id);
         }
     } catch (const std::exception& e) {
         error = std::string("Exception creating revolute joint: ") + e.what();
@@ -743,9 +735,6 @@ void PhysicsThread::HandleCreateDistanceJoint(Commands::CreateDistanceJoint& cmd
             // Store joint
             joint_id = next_joint_id_++;
             joints_[joint_id] = joint;
-
-            LOG_DEBUG("PhysicsThread {}: Created distance joint {} between bodies {} and {} with length {}",
-                     world_id_, joint_id, cmd.body_a_id, cmd.body_b_id, jointDef.length);
         }
     } catch (const std::exception& e) {
         error = std::string("Exception creating distance joint: ") + e.what();
@@ -765,7 +754,6 @@ void PhysicsThread::HandleDestroyJoint(Commands::DestroyJoint& cmd) {
     if (it != joints_.end()) {
         b2DestroyJoint(it->second);
         joints_.erase(it);
-        LOG_DEBUG("PhysicsThread {}: Destroyed joint {}", world_id_, cmd.joint_id);
     }
 }
 
@@ -774,6 +762,5 @@ void PhysicsThread::HandleSetJointMotorSpeed(Commands::SetJointMotorSpeed& cmd) 
     if (it != joints_.end()) {
         // Set motor speed for revolute joint
         b2RevoluteJoint_SetMotorSpeed(it->second, static_cast<float>(cmd.motor_speed));
-        LOG_DEBUG("PhysicsThread {}: Set joint {} motor speed to {}", world_id_, cmd.joint_id, cmd.motor_speed);
     }
 }

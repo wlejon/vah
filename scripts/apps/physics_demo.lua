@@ -92,8 +92,6 @@ function create_ball(x, y)
         body = ball,
         id = #balls + 1
     })
-
-    print(string.format("Created ball %d at (%.1f, %.1f)", #balls, x, y))
 end
 
 function create_coord_demos()
