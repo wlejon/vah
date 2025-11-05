@@ -490,6 +490,50 @@ namespace Commands {
         double gravity_y;
     };
 
+    // Joint commands
+    struct CreateRevoluteJoint {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_a_id;
+        int body_b_id;
+        double anchor_x;  // World coordinates
+        double anchor_y;  // World coordinates
+        bool enable_motor;
+        double motor_speed;
+        double max_motor_torque;
+        bool enable_limit;
+        double lower_angle;
+        double upper_angle;
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {joint_id=int, error=string}
+    };
+
+    struct CreateDistanceJoint {
+        int requesting_thread_id;
+        uint64_t request_id;
+        int world_id;
+        int body_a_id;
+        int body_b_id;
+        double anchor_a_x;  // World coordinates
+        double anchor_a_y;
+        double anchor_b_x;
+        double anchor_b_y;
+        double frequency;    // Hz (0 = rigid constraint)
+        double damping_ratio; // 0-1
+        std::shared_ptr<std::promise<PayloadMap>> promise;  // Returns {joint_id=int, error=string}
+    };
+
+    struct DestroyJoint {
+        int world_id;
+        int joint_id;
+    };
+
+    struct SetJointMotorSpeed {
+        int world_id;
+        int joint_id;
+        double motor_speed;
+    };
+
 }
 
 // Variant holding all possible command types
@@ -570,7 +614,11 @@ using Command = std::variant<
     Commands::ApplyAngularImpulse,
     Commands::QueryPhysicsBodyInfo,
     Commands::QueryPhysicsWorldInfo,
-    Commands::SetPhysicsGravity
+    Commands::SetPhysicsGravity,
+    Commands::CreateRevoluteJoint,
+    Commands::CreateDistanceJoint,
+    Commands::DestroyJoint,
+    Commands::SetJointMotorSpeed
 >;
 
 // Response sent from main thread to lua thread

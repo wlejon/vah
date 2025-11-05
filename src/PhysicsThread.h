@@ -124,6 +124,10 @@ private:
     void HandleQueryBodyInfo(Commands::QueryPhysicsBodyInfo& cmd);
     void HandleQueryWorldInfo(Commands::QueryPhysicsWorldInfo& cmd);
     void HandleSetGravity(Commands::SetPhysicsGravity& cmd);
+    void HandleCreateRevoluteJoint(Commands::CreateRevoluteJoint& cmd);
+    void HandleCreateDistanceJoint(Commands::CreateDistanceJoint& cmd);
+    void HandleDestroyJoint(Commands::DestroyJoint& cmd);
+    void HandleSetJointMotorSpeed(Commands::SetJointMotorSpeed& cmd);
 
     int world_id_;
     std::unique_ptr<b2WorldId> world_;
@@ -139,11 +143,13 @@ private:
     // Local command queue for physics-specific commands
     moodycamel::ConcurrentQueue<Command> physics_command_queue_;
 
-    // Body/fixture tracking (Box2D v3 uses IDs instead of pointers)
+    // Body/fixture/joint tracking (Box2D v3 uses IDs instead of pointers)
     int next_body_id_;
     int next_fixture_id_;
+    int next_joint_id_;
     std::unordered_map<int, b2BodyId> bodies_;
     std::unordered_map<int, b2ShapeId> fixtures_;
+    std::unordered_map<int, b2JointId> joints_;
 
     // Simulation settings
     float time_step_;

@@ -31,29 +31,122 @@
         nvg.fill(nvg_ctx)
 
         -- Set up coordinate transform (physics uses meters, canvas uses pixels)
-        -- Center at middle, scale 20 pixels per meter
+        -- Scale: 20 pixels per meter
+        -- Origin: horizontally centered, 100px from bottom
+        -- Y-down coordinate system (matches screen coordinates)
         local scale = 20
-        local offset_x = canvas_x + canvas_w / 2
-        local offset_y = canvas_y + canvas_h - 100  -- 100px from bottom
+        local origin_x = canvas_x + canvas_w / 2
+        local origin_y = canvas_y + canvas_h - 100
 
-        -- Draw ground
+        -- Set up physics coordinate system transform
+        -- This makes all subsequent drawing use physics coordinates directly
+        nvg.save(nvg_ctx)
+        nvg.translate(nvg_ctx, origin_x, origin_y)
+        nvg.scale(nvg_ctx, scale, scale)  -- Same scale both axes (Y-down)
+
+        -- Draw ground (in physics coordinates: at y=10, 50 meters wide, 1 meter tall)
         nvg.beginPath(nvg_ctx)
-        nvg.rect(nvg_ctx, canvas_x, offset_y + 10 * scale, canvas_w, 200)
+        nvg.rect(nvg_ctx, -25, 10, 50, 1)
         nvg.fillColor(nvg_ctx, nvg.rgba(68, 68, 68, 255))
         nvg.fill(nvg_ctx)
 
+        -- Draw coordinate demo shapes first (behind balls)
+        local demo_data = data and data.get and data.get("coord_demos")
+        if demo_data and #demo_data > 0 then
+            local world_id = demo_data[1].world_id
+            local demos = demo_data[1].demos
+            if demos and #demos > 0 then
+                for i, demo in ipairs(demos) do
+                    -- Create fresh view at 60Hz from body_id
+                    local view, err = physics.create_body_view(world_id, demo.body_id)
+                    if not view then
+                        -- Skip this body if view creation failed
+                        goto continue
+                    end
+
+                    nvg.save(nvg_ctx)
+                    nvg.translate(nvg_ctx, view.pos_x, view.pos_y)  -- 60Hz position!
+                    nvg.rotate(nvg_ctx, view.angle)  -- 60Hz angle!
+
+                    if demo.type == "wheel_cw" or demo.type == "wheel_ccw" then
+                        -- Draw spinning wheel (radius 1.0 meters in physics units)
+                        local radius = 1.0
+
+                        -- Wheel body - yellow
+                        nvg.beginPath(nvg_ctx)
+                        nvg.circle(nvg_ctx, 0, 0, radius)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(255, 200, 50, 200))
+                        nvg.fill(nvg_ctx)
+
+                        -- Draw radial lines to show rotation
+                        nvg.strokeWidth(nvg_ctx, 0.15)  -- In physics units (scaled to pixels)
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(40, 40, 40, 255))
+                        -- Main line at 0 degrees
+                        nvg.beginPath(nvg_ctx)
+                        nvg.moveTo(nvg_ctx, 0, 0)
+                        nvg.lineTo(nvg_ctx, radius, 0)
+                        nvg.stroke(nvg_ctx)
+                        -- Perpendicular line
+                        nvg.beginPath(nvg_ctx)
+                        nvg.moveTo(nvg_ctx, 0, 0)
+                        nvg.lineTo(nvg_ctx, 0, radius)
+                        nvg.stroke(nvg_ctx)
+
+                    elseif demo.type == "h_mover" or demo.type == "v_mover" or demo.type == "d_mover" then
+                        -- Draw box mover (0.75 x 0.75 meters in physics units)
+                        local half_size = 0.75
+
+                        -- Choose color based on type
+                        local r, g, b = 100, 255, 100  -- Default green for h_mover
+                        if demo.type == "v_mover" then
+                            r, g, b = 100, 150, 255  -- Blue for v_mover
+                        elseif demo.type == "d_mover" then
+                            r, g, b = 255, 100, 255  -- Purple for d_mover
+                        end
+
+                        nvg.beginPath(nvg_ctx)
+                        nvg.rect(nvg_ctx, -half_size, -half_size, half_size * 2, half_size * 2)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(r, g, b, 200))
+                        nvg.fill(nvg_ctx)
+                    end
+
+                    nvg.restore(nvg_ctx)
+
+                    ::continue::  -- Label for skipping failed view creation
+                end
+
+                -- Draw text labels in screen coordinates (after all shapes)
+                nvg.restore(nvg_ctx)  -- Exit physics space
+                for i, demo in ipairs(demos) do
+                    if demo.type == "h_mover" or demo.type == "v_mover" or demo.type == "d_mover" then
+                        -- Create fresh view for text positioning
+                        local view, err = physics.create_body_view(world_id, demo.body_id)
+                        if view then
+                            local screen_x = origin_x + view.pos_x * scale
+                            local screen_y = origin_y + view.pos_y * scale
+
+                            nvg.fontSize(nvg_ctx, 20.0)  -- Screen pixels
+                            nvg.fontFace(nvg_ctx, "roboto")
+                            nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_MIDDLE)
+                            nvg.fillColor(nvg_ctx, nvg.rgba(0, 0, 0, 255))
+                            nvg.text(nvg_ctx, screen_x, screen_y, demo.label)
+                        end
+                    end
+                end
+                nvg.save(nvg_ctx)  -- Re-enter physics space for bodies
+                nvg.translate(nvg_ctx, origin_x, origin_y)
+                nvg.scale(nvg_ctx, scale, scale)
+            end
+        end
+
         -- Draw bodies - reading live properties from Body objects
         for i, body in ipairs(bodies) do
-            -- Live property access - reads from double buffer at render time!
-            local x = offset_x + body.pos_x * scale
-            local y = offset_y - body.pos_y * scale
-
             nvg.save(nvg_ctx)
-            nvg.translate(nvg_ctx, x, y)
-            nvg.rotate(nvg_ctx, body.angle)
+            nvg.translate(nvg_ctx, body.pos_x, body.pos_y)  -- Physics coordinates directly
+            nvg.rotate(nvg_ctx, body.angle)  -- No negation needed!
 
-            -- Draw circle (radius 0.5 meters)
-            local radius = 0.5 * scale
+            -- Draw circle (radius 0.5 meters in physics units)
+            local radius = 0.5
 
             -- Color based on velocity (faster = redder)
             local speed = math.sqrt(body.vel_x * body.vel_x + body.vel_y * body.vel_y)
@@ -70,14 +163,27 @@
             nvg.beginPath(nvg_ctx)
             nvg.moveTo(nvg_ctx, 0, 0)
             nvg.lineTo(nvg_ctx, radius, 0)
-            nvg.strokeWidth(nvg_ctx, 2)
+            nvg.strokeWidth(nvg_ctx, 0.1)  -- In physics units
             nvg.strokeColor(nvg_ctx, nvg.rgba(255, 255, 255, 255))
             nvg.stroke(nvg_ctx)
 
             nvg.restore(nvg_ctx)
         end
 
-        -- Draw info text
+        -- Restore to screen coordinates for UI elements
+        nvg.restore(nvg_ctx)
+
+        -- Draw coordinate axes labels (in screen coordinates)
+        nvg.fontSize(nvg_ctx, 16.0)
+        nvg.fontFace(nvg_ctx, "roboto")
+        nvg.textAlign(nvg_ctx, nvg.ALIGN_CENTER + nvg.ALIGN_MIDDLE)
+        nvg.fillColor(nvg_ctx, nvg.rgba(200, 200, 200, 255))
+        -- X axis label (right side)
+        nvg.text(nvg_ctx, canvas_x + canvas_w - 30, origin_y, "+X")
+        -- Y axis label (bottom - Y-down means positive Y goes down)
+        nvg.text(nvg_ctx, origin_x, canvas_y + canvas_h - 20, "+Y")
+
+        -- Draw info text (in screen coordinates)
         nvg.fontSize(nvg_ctx, 14.0)
         nvg.fontFace(nvg_ctx, "roboto")
         nvg.textAlign(nvg_ctx, nvg.ALIGN_LEFT + nvg.ALIGN_TOP)

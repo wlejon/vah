@@ -18,6 +18,7 @@ static std::mutex g_physics_threads_mutex;  // ONLY for managing thread lifecycl
 // Forward declarations
 class World;
 class Body;
+class Joint;
 class PhysicsBodyView;
 
 // PhysicsBodyView - Lightweight view for rendering (can cross lua_State boundaries)
@@ -138,6 +139,29 @@ public:
     LuaThread* GetLuaThread() const { return lua_thread_; }
 
 private:
+    int world_id_;
+    PhysicsThread* physics_thread_;
+    LuaThread* lua_thread_;
+};
+
+// Joint handle - stores joint_id, world_id, and references to queues
+class Joint {
+public:
+    Joint(int joint_id, int world_id, PhysicsThread* physics_thread, LuaThread* lua_thread)
+        : joint_id_(joint_id)
+        , world_id_(world_id)
+        , physics_thread_(physics_thread)
+        , lua_thread_(lua_thread)
+    {
+    }
+
+    int GetJointId() const { return joint_id_; }
+    int GetWorldId() const { return world_id_; }
+    PhysicsThread* GetPhysicsThread() const { return physics_thread_; }
+    LuaThread* GetLuaThread() const { return lua_thread_; }
+
+private:
+    int joint_id_;
     int world_id_;
     PhysicsThread* physics_thread_;
     LuaThread* lua_thread_;
@@ -619,6 +643,150 @@ void SetGravity(std::shared_ptr<World> world, double gx, double gy) {
     world->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
 }
 
+// Create revolute joint (blocking - returns joint handle)
+std::tuple<sol::object, std::string> CreateRevoluteJoint(sol::this_state s,
+                                                           std::shared_ptr<World> world,
+                                                           std::shared_ptr<Body> body_a,
+                                                           std::shared_ptr<Body> body_b,
+                                                           double anchor_x,
+                                                           double anchor_y,
+                                                           sol::optional<bool> enable_motor,
+                                                           sol::optional<double> motor_speed,
+                                                           sol::optional<double> max_motor_torque) {
+    sol::state_view lua(s);
+
+    if (!world || !body_a || !body_b) {
+        return {sol::nil, "Invalid world or bodies"};
+    }
+
+    try {
+        auto promise = std::make_shared<std::promise<PayloadMap>>();
+        auto future = promise->get_future();
+
+        Commands::CreateRevoluteJoint cmd;
+        cmd.requesting_thread_id = world->GetLuaThread()->GetId();
+        cmd.request_id = world->GetLuaThread()->AllocateRequestId();
+        cmd.world_id = world->GetWorldId();
+        cmd.body_a_id = body_a->GetBodyId();
+        cmd.body_b_id = body_b->GetBodyId();
+        cmd.anchor_x = anchor_x;
+        cmd.anchor_y = anchor_y;
+        cmd.enable_motor = enable_motor.value_or(false);
+        cmd.motor_speed = motor_speed.value_or(0.0);
+        cmd.max_motor_torque = max_motor_torque.value_or(0.0);
+        cmd.enable_limit = false;
+        cmd.lower_angle = 0.0;
+        cmd.upper_angle = 0.0;
+        cmd.promise = promise;
+
+        world->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+
+        PayloadMap response = future.get();
+
+        int64_t joint_id_int = std::get<int64_t>(response.at("joint_id"));
+        std::string error = std::get<std::string>(response.at("error"));
+
+        if (joint_id_int < 0) {
+            return {sol::nil, error};
+        }
+
+        auto joint = std::make_shared<Joint>(
+            static_cast<int>(joint_id_int),
+            world->GetWorldId(),
+            world->GetPhysicsThread(),
+            world->GetLuaThread()
+        );
+
+        return {sol::make_object(lua, joint), ""};
+
+    } catch (const std::exception& e) {
+        return {sol::nil, std::string("Error creating revolute joint: ") + e.what()};
+    }
+}
+
+// Create distance joint (blocking - returns joint handle)
+std::tuple<sol::object, std::string> CreateDistanceJoint(sol::this_state s,
+                                                           std::shared_ptr<World> world,
+                                                           std::shared_ptr<Body> body_a,
+                                                           std::shared_ptr<Body> body_b,
+                                                           double anchor_a_x,
+                                                           double anchor_a_y,
+                                                           double anchor_b_x,
+                                                           double anchor_b_y,
+                                                           sol::optional<double> frequency,
+                                                           sol::optional<double> damping) {
+    sol::state_view lua(s);
+
+    if (!world || !body_a || !body_b) {
+        return {sol::nil, "Invalid world or bodies"};
+    }
+
+    try {
+        auto promise = std::make_shared<std::promise<PayloadMap>>();
+        auto future = promise->get_future();
+
+        Commands::CreateDistanceJoint cmd;
+        cmd.requesting_thread_id = world->GetLuaThread()->GetId();
+        cmd.request_id = world->GetLuaThread()->AllocateRequestId();
+        cmd.world_id = world->GetWorldId();
+        cmd.body_a_id = body_a->GetBodyId();
+        cmd.body_b_id = body_b->GetBodyId();
+        cmd.anchor_a_x = anchor_a_x;
+        cmd.anchor_a_y = anchor_a_y;
+        cmd.anchor_b_x = anchor_b_x;
+        cmd.anchor_b_y = anchor_b_y;
+        cmd.frequency = frequency.value_or(0.0);  // 0 = rigid
+        cmd.damping_ratio = damping.value_or(0.0);
+        cmd.promise = promise;
+
+        world->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+
+        PayloadMap response = future.get();
+
+        int64_t joint_id_int = std::get<int64_t>(response.at("joint_id"));
+        std::string error = std::get<std::string>(response.at("error"));
+
+        if (joint_id_int < 0) {
+            return {sol::nil, error};
+        }
+
+        auto joint = std::make_shared<Joint>(
+            static_cast<int>(joint_id_int),
+            world->GetWorldId(),
+            world->GetPhysicsThread(),
+            world->GetLuaThread()
+        );
+
+        return {sol::make_object(lua, joint), ""};
+
+    } catch (const std::exception& e) {
+        return {sol::nil, std::string("Error creating distance joint: ") + e.what()};
+    }
+}
+
+// Destroy a joint
+void DestroyJoint(std::shared_ptr<Joint> joint) {
+    if (!joint) return;
+
+    Commands::DestroyJoint cmd;
+    cmd.world_id = joint->GetWorldId();
+    cmd.joint_id = joint->GetJointId();
+
+    joint->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+}
+
+// Set joint motor speed (fire and forget)
+void SetJointMotorSpeed(std::shared_ptr<Joint> joint, double motor_speed) {
+    if (!joint) return;
+
+    Commands::SetJointMotorSpeed cmd;
+    cmd.world_id = joint->GetWorldId();
+    cmd.joint_id = joint->GetJointId();
+    cmd.motor_speed = motor_speed;
+
+    joint->GetPhysicsThread()->GetCommandQueue()->enqueue(std::move(cmd));
+}
+
 // No longer needed - Body objects now have live property bindings
 
 void SetupBindings(sol::state& lua) {
@@ -656,13 +824,23 @@ void SetupBindings(sol::state& lua) {
         "create_view", &Body::CreateView  // Create view for rendering
     );
 
+    // Register Joint usertype
+    lua.new_usertype<Joint>("PhysicsJoint",
+        sol::no_constructor,
+        "set_motor_speed", &SetJointMotorSpeed,
+        "destroy", &DestroyJoint
+    );
+
     // Register World usertype
     lua.new_usertype<World>("PhysicsWorld",
         sol::no_constructor,
         "create_body", &CreateBody,
+        "create_revolute_joint", &CreateRevoluteJoint,
+        "create_distance_joint", &CreateDistanceJoint,
         "get_info", &GetWorldInfo,
         "set_gravity", &SetGravity,
-        "destroy", &DestroyWorld
+        "destroy", &DestroyWorld,
+        "id", sol::property(&World::GetWorldId)
     );
 
     // Register physics table with functions
@@ -678,6 +856,54 @@ void SetupBindings(sol::state& lua) {
     lua["physics"] = physics_table;
 
     LOG_INFO("Physics bindings registered (Box2D with lock-free threads)");
+}
+
+// Create a PhysicsBodyView from world_id and body_id (for render context)
+std::tuple<sol::object, std::string> CreateBodyView(sol::this_state s, int world_id, int body_id) {
+    sol::state_view lua(s);
+
+    // Look up physics thread from global registry
+    PhysicsThread* physics_thread = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_physics_threads_mutex);
+        auto it = g_physics_threads.find(world_id);
+        if (it != g_physics_threads.end()) {
+            physics_thread = it->second.get();
+        }
+    }
+
+    if (!physics_thread) {
+        return {sol::nil, "World not found"};
+    }
+
+    // Create view (reads from render buffer at 60Hz)
+    auto view = std::make_shared<PhysicsBodyView>(world_id, body_id, physics_thread);
+    return {sol::make_object(lua, view), ""};
+}
+
+void SetupRenderBindings(lua_State* L) {
+    sol::state_view lua(L);
+
+    // Register PhysicsBodyView usertype (read-only properties)
+    lua.new_usertype<PhysicsBodyView>("PhysicsBodyView",
+        sol::no_constructor,
+        // Live property getters - read from render state (lock-free)
+        "pos_x", sol::property(&PhysicsBodyView::GetPosX),
+        "pos_y", sol::property(&PhysicsBodyView::GetPosY),
+        "angle", sol::property(&PhysicsBodyView::GetAngle),
+        "vel_x", sol::property(&PhysicsBodyView::GetVelX),
+        "vel_y", sol::property(&PhysicsBodyView::GetVelY),
+        "mass", sol::property(&PhysicsBodyView::GetMass),
+        "awake", sol::property(&PhysicsBodyView::GetAwake),
+        "id", sol::property(&PhysicsBodyView::GetBodyId)
+    );
+
+    // Register minimal physics table for render context
+    auto physics_table = lua.create_table();
+    physics_table["create_body_view"] = &CreateBodyView;
+    lua["physics"] = physics_table;
+
+    LOG_INFO("Physics render bindings registered (60Hz view creation)");
 }
 
 } // namespace PhysicsBindings

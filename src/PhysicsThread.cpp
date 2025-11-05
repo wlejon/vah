@@ -14,6 +14,7 @@ PhysicsThread::PhysicsThread(int world_id,
     , main_command_queue_(command_queue)
     , next_body_id_(1)
     , next_fixture_id_(1)
+    , next_joint_id_(1)
     , time_step_(1.0f / 60.0f)  // 60Hz default
     , velocity_iterations_(8)
     , position_iterations_(3)
@@ -158,6 +159,18 @@ void PhysicsThread::ProcessCommands() {
             }
             else if constexpr (std::is_same_v<T, Commands::SetPhysicsGravity>) {
                 HandleSetGravity(command);
+            }
+            else if constexpr (std::is_same_v<T, Commands::CreateRevoluteJoint>) {
+                HandleCreateRevoluteJoint(command);
+            }
+            else if constexpr (std::is_same_v<T, Commands::CreateDistanceJoint>) {
+                HandleCreateDistanceJoint(command);
+            }
+            else if constexpr (std::is_same_v<T, Commands::DestroyJoint>) {
+                HandleDestroyJoint(command);
+            }
+            else if constexpr (std::is_same_v<T, Commands::SetJointMotorSpeed>) {
+                HandleSetJointMotorSpeed(command);
             }
         }, cmd);
     }
@@ -639,5 +652,128 @@ void PhysicsThread::HandleSetGravity(Commands::SetPhysicsGravity& cmd) {
         b2Vec2 gravity = {static_cast<float>(cmd.gravity_x), static_cast<float>(cmd.gravity_y)};
         b2World_SetGravity(*world_, gravity);
         LOG_DEBUG("PhysicsThread {}: Set gravity to ({}, {})", world_id_, cmd.gravity_x, cmd.gravity_y);
+    }
+}
+
+void PhysicsThread::HandleCreateRevoluteJoint(Commands::CreateRevoluteJoint& cmd) {
+    PayloadMap response;
+    int joint_id = -1;
+    std::string error = "";
+
+    try {
+        // Find bodies
+        auto body_a_it = bodies_.find(cmd.body_a_id);
+        auto body_b_it = bodies_.find(cmd.body_b_id);
+
+        if (body_a_it == bodies_.end()) {
+            error = "Body A not found: " + std::to_string(cmd.body_a_id);
+        } else if (body_b_it == bodies_.end()) {
+            error = "Body B not found: " + std::to_string(cmd.body_b_id);
+        } else {
+            // Create revolute joint definition
+            b2RevoluteJointDef jointDef = b2DefaultRevoluteJointDef();
+            jointDef.bodyIdA = body_a_it->second;
+            jointDef.bodyIdB = body_b_it->second;
+            jointDef.localAnchorA = b2Body_GetLocalPoint(body_a_it->second, {static_cast<float>(cmd.anchor_x), static_cast<float>(cmd.anchor_y)});
+            jointDef.localAnchorB = b2Body_GetLocalPoint(body_b_it->second, {static_cast<float>(cmd.anchor_x), static_cast<float>(cmd.anchor_y)});
+            jointDef.enableMotor = cmd.enable_motor;
+            jointDef.motorSpeed = static_cast<float>(cmd.motor_speed);
+            jointDef.maxMotorTorque = static_cast<float>(cmd.max_motor_torque);
+            jointDef.enableLimit = cmd.enable_limit;
+            jointDef.lowerAngle = static_cast<float>(cmd.lower_angle);
+            jointDef.upperAngle = static_cast<float>(cmd.upper_angle);
+
+            // Create joint
+            b2JointId joint = b2CreateRevoluteJoint(*world_, &jointDef);
+
+            // Store joint
+            joint_id = next_joint_id_++;
+            joints_[joint_id] = joint;
+
+            LOG_DEBUG("PhysicsThread {}: Created revolute joint {} between bodies {} and {}",
+                     world_id_, joint_id, cmd.body_a_id, cmd.body_b_id);
+        }
+    } catch (const std::exception& e) {
+        error = std::string("Exception creating revolute joint: ") + e.what();
+        LOG_ERROR("PhysicsThread {}: {}", world_id_, error);
+    }
+
+    response["joint_id"] = static_cast<int64_t>(joint_id);
+    response["error"] = error;
+
+    if (cmd.promise) {
+        cmd.promise->set_value(std::move(response));
+    }
+}
+
+void PhysicsThread::HandleCreateDistanceJoint(Commands::CreateDistanceJoint& cmd) {
+    PayloadMap response;
+    int joint_id = -1;
+    std::string error = "";
+
+    try {
+        // Find bodies
+        auto body_a_it = bodies_.find(cmd.body_a_id);
+        auto body_b_it = bodies_.find(cmd.body_b_id);
+
+        if (body_a_it == bodies_.end()) {
+            error = "Body A not found: " + std::to_string(cmd.body_a_id);
+        } else if (body_b_it == bodies_.end()) {
+            error = "Body B not found: " + std::to_string(cmd.body_b_id);
+        } else {
+            // Create distance joint definition
+            b2DistanceJointDef jointDef = b2DefaultDistanceJointDef();
+            jointDef.bodyIdA = body_a_it->second;
+            jointDef.bodyIdB = body_b_it->second;
+            jointDef.localAnchorA = b2Body_GetLocalPoint(body_a_it->second, {static_cast<float>(cmd.anchor_a_x), static_cast<float>(cmd.anchor_a_y)});
+            jointDef.localAnchorB = b2Body_GetLocalPoint(body_b_it->second, {static_cast<float>(cmd.anchor_b_x), static_cast<float>(cmd.anchor_b_y)});
+
+            // Calculate rest length from anchor positions
+            b2Vec2 pos_a = b2Body_GetWorldPoint(body_a_it->second, jointDef.localAnchorA);
+            b2Vec2 pos_b = b2Body_GetWorldPoint(body_b_it->second, jointDef.localAnchorB);
+            b2Vec2 delta = {pos_b.x - pos_a.x, pos_b.y - pos_a.y};
+            jointDef.length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+
+            jointDef.hertz = static_cast<float>(cmd.frequency);
+            jointDef.dampingRatio = static_cast<float>(cmd.damping_ratio);
+
+            // Create joint
+            b2JointId joint = b2CreateDistanceJoint(*world_, &jointDef);
+
+            // Store joint
+            joint_id = next_joint_id_++;
+            joints_[joint_id] = joint;
+
+            LOG_DEBUG("PhysicsThread {}: Created distance joint {} between bodies {} and {} with length {}",
+                     world_id_, joint_id, cmd.body_a_id, cmd.body_b_id, jointDef.length);
+        }
+    } catch (const std::exception& e) {
+        error = std::string("Exception creating distance joint: ") + e.what();
+        LOG_ERROR("PhysicsThread {}: {}", world_id_, error);
+    }
+
+    response["joint_id"] = static_cast<int64_t>(joint_id);
+    response["error"] = error;
+
+    if (cmd.promise) {
+        cmd.promise->set_value(std::move(response));
+    }
+}
+
+void PhysicsThread::HandleDestroyJoint(Commands::DestroyJoint& cmd) {
+    auto it = joints_.find(cmd.joint_id);
+    if (it != joints_.end()) {
+        b2DestroyJoint(it->second);
+        joints_.erase(it);
+        LOG_DEBUG("PhysicsThread {}: Destroyed joint {}", world_id_, cmd.joint_id);
+    }
+}
+
+void PhysicsThread::HandleSetJointMotorSpeed(Commands::SetJointMotorSpeed& cmd) {
+    auto it = joints_.find(cmd.joint_id);
+    if (it != joints_.end()) {
+        // Set motor speed for revolute joint
+        b2RevoluteJoint_SetMotorSpeed(it->second, static_cast<float>(cmd.motor_speed));
+        LOG_DEBUG("PhysicsThread {}: Set joint {} motor speed to {}", world_id_, cmd.joint_id, cmd.motor_speed);
     }
 }

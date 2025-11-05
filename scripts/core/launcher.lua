@@ -46,11 +46,6 @@ local apps = {
         name = "Physics Demo",
         script = "scripts/apps/physics_demo.lua",
         document_id = "physics_demo"
-    },
-    vehicle_builder = {
-        name = "Vehicle Builder",
-        script = "scripts/apps/vehicle_builder.lua",
-        document_id = "vehicle_builder"
     }
 }
 

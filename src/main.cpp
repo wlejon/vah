@@ -27,6 +27,7 @@
 #include "ElementTextEditor.h"
 #include "ElementTextEditorInstancer.h"
 #include "NanoVGBindings.h"
+#include "PhysicsBindings.h"
 #include "EventDispatcher.h"
 #include "WorkflowLibrary.h"
 #include <efsw/efsw.hpp>
@@ -305,6 +306,9 @@ public:
 
         // Setup NanoVG bindings for canvas elements
         NanoVGBindings::SetupBindings(rml_lua);
+
+        // Setup Physics bindings for 60Hz view creation
+        PhysicsBindings::SetupRenderBindings(rml_lua);
 
         rmlui_bridge_->SetupLuaBindings(rml_lua, rml_context_, data_store_.get());
 

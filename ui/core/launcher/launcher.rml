@@ -66,12 +66,6 @@
                 <div class="app-name">Physics Demo</div>
                 <p class="app-description">physics demo</p>
             </div>
-
-            <div class="app-card" onclick="launch_app('vehicle_builder')" onmouseover="play_hover_sound()">
-                <div class="app-icon">[V]</div>
-                <div class="app-name">Vehicle Builder</div>
-                <p class="app-description">Build vehicles from physics components to traverse challenging terrain</p>
-            </div>
         </div>
 
         <div class="footer">

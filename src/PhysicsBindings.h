@@ -36,4 +36,5 @@
  */
 namespace PhysicsBindings {
     void SetupBindings(sol::state& lua);
+    void SetupRenderBindings(lua_State* L);  // For RmlUI context (60Hz view creation)
 }
