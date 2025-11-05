@@ -9,7 +9,7 @@ local selected_component_type = nil
 local game_state = "building" -- building, testing, success, failure
 local camera_x = 0
 local camera_y = 0
-local camera_zoom = 20 -- pixels per meter
+local camera_zoom = 40 -- pixels per meter (increased for better visibility)
 
 -- Component definitions
 local component_types = {
@@ -123,7 +123,7 @@ local terrain_segments = {
 }
 
 local goal_x = 48
-local start_zone = {x = -2, y = 2, width = 10, height = 6}  -- Larger, easier to click
+local start_zone = {x = -3, y = 0, width = 12, height = 6}  -- Build zone below camera view
 
 function startup()
     print("Vehicle Builder starting...")
