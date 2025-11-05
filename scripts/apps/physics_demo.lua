@@ -15,6 +15,10 @@ local demo_time = 0  -- Track time for cyclical animations
 local joint_demos = {}
 local joints = {}
 
+-- Monster truck with soft body wheels
+local truck = nil
+local walls = {}  -- Enclosing walls (left, right, ceiling)
+
 -- Status for UI display
 local status = "Initializing..."
 
@@ -66,7 +70,13 @@ function startup()
     -- Create joint demonstrations
     create_joint_demos()
 
-    status = "Running - " .. #balls .. " balls, " .. #coord_demos .. " coord demos, " .. #joints .. " joints"
+    -- Create enclosing walls
+    create_walls()
+
+    -- Create motorized wheels
+    create_motorized_wheels()
+
+    status = "Running - " .. #balls .. " balls, " .. #coord_demos .. " coord demos, " .. #joints .. " joints, motorized wheels ready!"
 
     -- Initialize status display
     update_status()
@@ -376,9 +386,85 @@ function create_joint_demos()
     print("Created " .. #joints .. " joints total")
 end
 
+-- Create motorized wheels that can roll around freely
+function create_motorized_wheels()
+    -- Create a few motorized wheels at different positions
+    -- These are free-rolling wheels with motors (applied torque)
+    local wheel_positions = {
+        {x = -15, y = -5, motor_torque = 95.0},
+        {x = -5, y = -8, motor_torque = 90.0},
+        {x = 15, y = -10, motor_torque = 90.0}
+    }
+
+    truck = {wheels = {}}
+
+    for i, pos in ipairs(wheel_positions) do
+        -- Create the wheel (dynamic body, free to move)
+        local wheel = world:create_body(physics.DYNAMIC, pos.x, pos.y, 0)
+        if not wheel then
+            print("Failed to create wheel " .. i)
+            goto continue
+        end
+
+        -- Add circle fixture with high friction and some density
+        local fixture_id = wheel:add_circle_fixture(1.0, 0, 0, 2.0, 0.9, 0.2)  -- radius, offset, density, friction, restitution
+        if fixture_id < 0 then
+            print("Failed to add wheel fixture " .. i)
+            goto continue
+        end
+
+        table.insert(truck.wheels, {
+            wheel = wheel,
+            radius = 1.0,
+            motor_torque = pos.motor_torque
+        })
+        print("Created motorized wheel " .. i .. " at (" .. pos.x .. ", " .. pos.y .. ") with motor torque " .. pos.motor_torque)
+
+        ::continue::
+    end
+
+    print("Created " .. #truck.wheels .. " motorized wheels")
+end
+
+-- Create enclosing walls
+function create_walls()
+    -- Increase friction on ground
+    local ground_fixture_id = ground:add_box_fixture(50, 1, 0, 0.8, 0.1)  -- High friction
+
+    -- Left wall
+    local left_wall = world:create_body(physics.STATIC, -26, -15, 0)
+    if left_wall then
+        left_wall:add_box_fixture(1, 30, 1.0, 0.8, 0.3)  -- High friction
+        table.insert(walls, left_wall)
+    end
+
+    -- Right wall
+    local right_wall = world:create_body(physics.STATIC, 26, -15, 0)
+    if right_wall then
+        right_wall:add_box_fixture(1, 30, 1.0, 0.8, 0.3)  -- High friction
+        table.insert(walls, right_wall)
+    end
+
+    -- Ceiling
+    local ceiling = world:create_body(physics.STATIC, 0, -45, 0)
+    if ceiling then
+        ceiling:add_box_fixture(50, 1, 1.0, 0.8, 0.3)  -- High friction
+        table.insert(walls, ceiling)
+    end
+
+    print("Created enclosing walls (left, right, ceiling)")
+end
+
 function update(dt)
     -- Update time for cyclical animations
     demo_time = demo_time + (dt or 0.033)  -- Default to ~30Hz if dt is nil
+
+    -- Apply motor torque to wheels (continuously powered)
+    if truck and truck.wheels then
+        for i, wheel_info in ipairs(truck.wheels) do
+            wheel_info.wheel:apply_torque(wheel_info.motor_torque, true)
+        end
+    end
 
     -- Update coordinate demo movers with cyclical motion
     -- Only update velocity - physics thread interpolates position smoothly at 60Hz
@@ -466,11 +552,33 @@ function update(dt)
         end
     end
 
+    -- Extract motorized wheels data for rendering
+    local wheels_data = {}
+    if truck and truck.wheels then
+        for i, wheel_info in ipairs(truck.wheels) do
+            local wheel_view = wheel_info.wheel:create_view()
+            table.insert(wheels_data, {
+                body_id = wheel_view.id,
+                radius = wheel_info.radius
+            })
+        end
+    end
+
+    -- Extract wall data for rendering
+    local wall_data = {}
+    for _, wall in ipairs(walls) do
+        local view = wall:create_view()
+        table.insert(wall_data, {
+            body_id = view.id
+        })
+    end
+
     -- Bind plain tables to data model - these can cross thread boundaries
     datamodel.bind_table("physics_bodies", {{bodies = body_data}})
     datamodel.bind_table("physics_state", {{bodies = body_data}})
     datamodel.bind_table("coord_demos", {{world_id = world_id, demos = demo_data}})
     datamodel.bind_table("joint_demos", {{world_id = world_id, joints = joint_data}})
+    datamodel.bind_table("truck_data", {{world_id = world_id, wheels = wheels_data, walls = wall_data}})
 end
 
 function shutdown()
@@ -510,6 +618,20 @@ function shutdown()
         end
     end
     joint_demos = {}
+
+    -- Destroy motorized wheels
+    if truck and truck.wheels then
+        for _, wheel_info in ipairs(truck.wheels) do
+            if wheel_info.wheel then wheel_info.wheel:destroy() end
+        end
+        truck = nil
+    end
+
+    -- Destroy walls
+    for _, wall in ipairs(walls) do
+        wall:destroy()
+    end
+    walls = {}
 
     -- Destroy ground
     if ground then
@@ -576,7 +698,24 @@ function on_reset()
     -- Recreate joint demos
     create_joint_demos()
 
-    status = "Reset - " .. #balls .. " balls, " .. #coord_demos .. " coord demos, " .. #joints .. " joints"
+    -- Destroy and recreate motorized wheels
+    if truck and truck.wheels then
+        for _, wheel_info in ipairs(truck.wheels) do
+            if wheel_info.wheel then wheel_info.wheel:destroy() end
+        end
+    end
+
+    -- Destroy and recreate walls
+    for _, wall in ipairs(walls) do
+        wall:destroy()
+    end
+    walls = {}
+
+    -- Recreate walls and motorized wheels
+    create_walls()
+    create_motorized_wheels()
+
+    status = "Reset - " .. #balls .. " balls, " .. #coord_demos .. " coord demos, " .. #joints .. " joints, motorized wheels ready!"
     update_status()
 end
 

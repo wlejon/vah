@@ -96,4 +96,6 @@ Main thread: dequeue command → process → command.promise->set_value() → wa
 
 this task will fit in your context, there is no need to use subagents.
 
-in the physics demo, please add joint mechanisms that demonstrate each of the types. 
+in the physics demo, please add soft body wheels attached to a motor so that it's like a monster truck. let's enclose the space we're working in as well so that it'll be stopped by walls and hopefully, flip over, and drive back the other way. the soft body wheels should give it friction enough. make sure the floor and walls have some friction as well. 
+
+let me know if box2d can't do soft bodies and we'll think about a different way.

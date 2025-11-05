@@ -273,6 +273,88 @@
             end
         end
 
+        -- Draw walls
+        local truck_info = data and data.get and data.get("truck_data")
+        if truck_info and #truck_info > 0 then
+            local world_id = truck_info[1].world_id
+            local walls = truck_info[1].walls
+
+            if walls then
+                for i, wall in ipairs(walls) do
+                    local view, err = physics.create_body_view(world_id, wall.body_id)
+                    if view then
+                        nvg.save(nvg_ctx)
+                        nvg.translate(nvg_ctx, view.pos_x, view.pos_y)
+                        nvg.rotate(nvg_ctx, view.angle)
+
+                        -- Draw wall as dark gray box
+                        local wall_w, wall_h = 2, 60  -- Approximate sizes
+                        if i == 3 then  -- Ceiling
+                            wall_w, wall_h = 100, 2
+                        end
+                        nvg.beginPath(nvg_ctx)
+                        nvg.rect(nvg_ctx, -wall_w/2, -wall_h/2, wall_w, wall_h)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(80, 80, 80, 255))
+                        nvg.fill(nvg_ctx)
+
+                        nvg.restore(nvg_ctx)
+                    end
+                end
+            end
+        end
+
+        -- Draw motorized wheels
+        if truck_info and #truck_info > 0 then
+            local world_id = truck_info[1].world_id
+            local wheels = truck_info[1].wheels
+
+            if wheels and #wheels > 0 then
+                for i, wheel in ipairs(wheels) do
+                    local wheel_view, err = physics.create_body_view(world_id, wheel.body_id)
+                    if wheel_view then
+                        nvg.save(nvg_ctx)
+                        nvg.translate(nvg_ctx, wheel_view.pos_x, wheel_view.pos_y)
+                        nvg.rotate(nvg_ctx, wheel_view.angle)
+
+                        -- Draw wheel as a circle with spokes
+                        local radius = wheel.radius
+
+                        -- Wheel body (dark gray circle)
+                        nvg.beginPath(nvg_ctx)
+                        nvg.circle(nvg_ctx, 0, 0, radius)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(80, 80, 80, 255))
+                        nvg.fill(nvg_ctx)
+
+                        -- Draw spokes to show rotation
+                        nvg.strokeWidth(nvg_ctx, 0.1)
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(200, 200, 200, 255))
+                        for spoke = 0, 3 do
+                            local angle = spoke * math.pi / 2
+                            nvg.beginPath(nvg_ctx)
+                            nvg.moveTo(nvg_ctx, 0, 0)
+                            nvg.lineTo(nvg_ctx, radius * math.cos(angle), radius * math.sin(angle))
+                            nvg.stroke(nvg_ctx)
+                        end
+
+                        -- Hub center (black circle)
+                        nvg.beginPath(nvg_ctx)
+                        nvg.circle(nvg_ctx, 0, 0, 0.3)
+                        nvg.fillColor(nvg_ctx, nvg.rgba(40, 40, 40, 255))
+                        nvg.fill(nvg_ctx)
+
+                        -- Outline
+                        nvg.beginPath(nvg_ctx)
+                        nvg.circle(nvg_ctx, 0, 0, radius)
+                        nvg.strokeWidth(nvg_ctx, 0.05)
+                        nvg.strokeColor(nvg_ctx, nvg.rgba(0, 0, 0, 255))
+                        nvg.stroke(nvg_ctx)
+
+                        nvg.restore(nvg_ctx)
+                    end
+                end
+            end
+        end
+
         -- Draw bodies - reading live properties from Body objects
         for i, body in ipairs(bodies) do
             nvg.save(nvg_ctx)
